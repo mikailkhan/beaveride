@@ -1,6 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Footer } from '../../components/layout/Footer';
+import BeaverMascotLogo from "../../assets/logos/beaveride-mascot-logo.png";
+
+import step1 from "../../assets/home-images/image1.png";
+import step2 from "../../assets/home-images/image2.png";
+import step3 from "../../assets/home-images/image3.png";
+import step4 from "../../assets/home-images/image4.png";
+import step5 from "../../assets/home-images/image5.png";
+import step6 from "../../assets/home-images/image6.png";
+import step7 from "../../assets/home-images/image7.png";
+import { Header } from '../../components/layout/Header';
 
 export const Home = () => {
   const [currentText, setCurrentText] = useState('');
@@ -56,21 +66,7 @@ export const Home = () => {
   return (
     <div className="bg-background text-on-background font-body-md min-h-screen antialiased flex flex-col selection:bg-primary-container/30">
       {/* TopNavBar */}
-      <nav className="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-gutter bg-surface/80 backdrop-blur-xl border-b border-outline-variant/20 shadow-sm transition-transform duration-200 py-3">
-        <div className="flex items-center justify-center w-[140px] h-[54px]">
-          <img alt="BeaverIDE Logo" className="h-full w-full object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCimabqgXEvB0x3jLAIBGv2OC8KLhke9tUQaB74bCEWzPLJwaq8msIYNgsKimgWGZ_i_Q8dV0ojEIjOls4MsIMVz5iHDtBY3STP65iYOmuQdEdSIXZWJb_qRtg4eJ9--refIOtNyCb7Gt696l76uc9uz2hUDtIQ2ZXHf7060Kl46KyvEdDFhxUIxS810ewQBVlvBasNmMpHrK14rFabDxd-l_WEmj1LXq5AsPb9fWDemeeEHLdsgnKqb-xoQ7CAz9hghhZc79LQAq0" />
-        </div>
-        <div className="hidden md:flex items-center gap-xl">
-          <a className="text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors px-3 py-2 rounded-md font-label-md text-label-md cursor-pointer">Features</a>
-          <a className="text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors px-3 py-2 rounded-md font-label-md text-label-md cursor-pointer">Pricing</a>
-          <a className="text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors px-3 py-2 rounded-md font-label-md text-label-md cursor-pointer">Docs</a>
-          <Link to="/about" className="text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors px-3 py-2 rounded-md font-label-md text-label-md cursor-pointer">About</Link>
-        </div>
-        <div className="flex items-center gap-md">
-          <Link to="/login" className="hidden md:block font-label-md text-label-md text-on-surface-variant hover:text-primary px-4 py-2 transition-colors">Log In</Link>
-          <Link to="/register" className="font-label-md text-label-md bg-primary-container text-on-primary shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] px-4 py-2 rounded-lg hover:bg-surface-tint transition-all active:scale-95">Start Coding</Link>
-        </div>
-      </nav>
+      <Header />
 
       {/* Hero Section */}
       <section className="relative pt-32 pb-24 px-gutter flex flex-col items-center justify-center min-h-[90vh] overflow-hidden">
@@ -82,7 +78,7 @@ export const Home = () => {
             The browser-based collaborative IDE for 2026. Code together, run together, build the future together.
           </p>
           <div className="flex justify-center mb-8 transition-all duration-700 animate-in fade-in slide-in-from-bottom-4">
-            <img alt="BeaverIDE Hero Mascot" className="h-40 md:h-48 object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD_UZB22zKA8R8rAX7_lI6mVl864pG8__8cz_zEo-jj_s_ImodkpQVaachOeu33Xjfe9k0t05q3sy5xEV8ryfCDy5g71t6RrZtHqp941nsBwmfSPV_-B8HEZAXn0rmgpPqTxxwFbSih6h8PhjXq2kXk6i_G2yiz5LBzYvJ3rgAADiEuLEZigQnP-E2pt0MEH5Vi6q-8acCn1DBli2uCJlAme3dAF69eit6xgx-oWEl6Elm2m2TUVkqXsPmoN_7wqMeZbjHETGL8Z1E" />
+            <img alt="BeaverIDE Hero Mascot" className="h-40 md:h-48 object-contain" src={BeaverMascotLogo} />
           </div>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-md">
             <Link to="/register" className="w-full sm:w-auto font-label-md text-label-md bg-primary-container text-on-primary shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] px-8 py-3 rounded-lg hover:bg-surface-tint transition-all active:scale-95 text-lg">Start Coding Together</Link>
@@ -146,7 +142,7 @@ export const Home = () => {
             {/* Step 1: Image Left / Text Right */}
             <div className="flex flex-col md:flex-row items-center gap-xl">
               <div className="w-full md:w-1/2 aspect-video rounded-xl flex items-center justify-center text-on-surface-variant/30">
-                <img alt="Create Your Workspace" className="w-full h-full object-contain rounded-xl" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAVeR3x_2kTghBPGFRf6EYfSSXekxzSQWBX4FBjyAiC72GM3ThiiRdlbS26YxkLwgD7rA7MRTbZhoreu9PJBJxrZWkkE1L7YYkrxtirY4Y6ZCbiNJ4f1IBxjTcMPF7b37Hk4uXxJTqrRc-054atUGA4QlldeEun-hjFLCxCSlNy39Y1ZmlDN_CUfqyfM7Fwzfy0squsqKo90i5Cyho-dbOhjQ1GBRUiBWQjAafcgM1RPPtWa4FTdDrJUD91JRKEDK7MmALogtRKMH0" />
+                <img alt="Create Your Workspace" className="w-full h-full object-contain rounded-xl" src={step1} />
               </div>
               <div className="w-full md:w-1/2 text-center md:text-left">
                 <h3 className="font-headline-md text-headline-md text-primary-container mb-4">1. Create Your Workspace</h3>
@@ -156,7 +152,7 @@ export const Home = () => {
             {/* Step 2: Image Right / Text Left */}
             <div className="flex flex-col md:flex-row-reverse items-center gap-xl">
               <div className="w-full md:w-1/2 aspect-video rounded-xl flex items-center justify-center text-on-surface-variant/30">
-                <img alt="Open a Coding Room" className="w-full h-full object-contain rounded-xl" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBvCntDCeuHJXUukws4B7mnJi2V5Aq9vcn7L121pdbhsiJ7MnbvLs1Nbl5YAdsaJsPpIKqvObN_Cpl9hUE67psf8HhL5r4C3y7minWEJgMRc_LEjpnKIH8Kvo4G9se2eDcCYhL1mYTcUbJHXQtM-ZhvXSOYJoqEe_zl8JCrWUdQNkAuiKaqz14PfQO08MObXLsqmRC_Y7ry4ZI-iuwZOleLYPQ00CiLjR9Bklm4iDFxOmbPn66wQb25nhaKzDr4mlKgfKHaAn8h4V0" />
+                <img alt="Open a Coding Room" className="w-full h-full object-contain rounded-xl" src={step2} />
               </div>
               <div className="w-full md:w-1/2 text-center md:text-left">
                 <h3 className="font-headline-md text-headline-md text-primary-container mb-4">2. Open a Coding Room</h3>
@@ -166,7 +162,7 @@ export const Home = () => {
             {/* Step 3: Image Left / Text Right */}
             <div className="flex flex-col md:flex-row items-center gap-xl">
               <div className="w-full md:w-1/2 aspect-video rounded-xl flex items-center justify-center text-on-surface-variant/30">
-                <img alt="Invite Your Team" className="w-full h-full object-contain rounded-xl" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCUpWeVop6MBMDoeM_jHayMaHeTiDTzb9xpf2zqIhGexKmokChkvVqcKvmZ7pkL3OjddYUT75e0x8zbfG0QWl8FrwirOQRKgOBz19iTKAfNEZDksk74aHp1FlZuKiJd_pLyPd-4T5NnOjJw9faQEHFhQXi0ySz8rwTb6d1fihQt463LBscLny7vLdKVM5q4hEFsR8tYpOyWoZnuNogLlkZvi7N_2Rlhngdwo4k-t187ZAYHAsFH74InkG3Y6ZPFU7YZkA-a6Xl8ozA" />
+                <img alt="Invite Your Team" className="w-full h-full object-contain rounded-xl" src={step3} />
               </div>
               <div className="w-full md:w-1/2 text-center md:text-left">
                 <h3 className="font-headline-md text-headline-md text-primary-container mb-4">3. Invite Your Team</h3>
@@ -176,7 +172,7 @@ export const Home = () => {
             {/* Step 4: Image Right / Text Left */}
             <div className="flex flex-col md:flex-row-reverse items-center gap-xl">
               <div className="w-full md:w-1/2 aspect-video rounded-xl flex items-center justify-center text-on-surface-variant/30">
-                <img alt="Code Together Live" className="w-full h-full object-contain rounded-xl" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDqk6DFF8uFeJ5lAkdABGCIigqpm1-s7_cNzegUY4kW97mHL8piVusEkkG73aQIS6D5nckvVTCTj9mrp1zdsu8U-gWkV1_VtdpvldoNWafu8P24uAFsiyVJQEgt2KOUSfkqQfYKUN9GifQyQeGCIBZFW_SoknhW-KoicJRvc647x3fWDP9xUUGWaI3_Q0hcdy85Y68Z0YNU3nKbqc6GvDtAQ8uDLhHcmHsCP14tjz1WkE5cY9b7fiZqQGq19x5cI1I0cqFnKwCCXQc" />
+                <img alt="Code Together Live" className="w-full h-full object-contain rounded-xl" src={step4} />
               </div>
               <div className="w-full md:w-1/2 text-center md:text-left">
                 <h3 className="font-headline-md text-headline-md text-primary-container mb-4">4. Code Together Live</h3>
@@ -186,7 +182,7 @@ export const Home = () => {
             {/* Step 5: Image Left / Text Right */}
             <div className="flex flex-col md:flex-row items-center gap-xl">
               <div className="w-full md:w-1/2 aspect-video rounded-xl flex items-center justify-center text-on-surface-variant/30">
-                <img alt="Run in the Cloud" className="w-full h-full object-contain rounded-xl" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDrzQyppZZU24wapWZ7oeeYX-xU97LgyZHxZQT4TOYyjK5KLWSMNqFtheOIveCfGOwSFRjer31eR-dvQmbq1W8cRXCTdNwShy30WkH4aj80sY2u3CwBi51jvH_qy2nEyOtcjiKqy0rzdNFdA1xcuS6WyU3qos7Dn4HReb6di3CaSfOci0y1mAmaJzPPnHSawVmCubPiIpCSthhbuiHRG1ed53Ty1hXAk5owuZL4MkMGW-KvQOingBLt5zRfngDYzp6N0IvEgKA0DXw" />
+                <img alt="Run in the Cloud" className="w-full h-full object-contain rounded-xl" src={step5} />
               </div>
               <div className="w-full md:w-1/2 text-center md:text-left">
                 <h3 className="font-headline-md text-headline-md text-primary-container mb-4">5. Run in the Cloud</h3>
@@ -196,7 +192,7 @@ export const Home = () => {
             {/* Step 6: Image Right / Text Left */}
             <div className="flex flex-col md:flex-row-reverse items-center gap-xl">
               <div className="w-full md:w-1/2 aspect-video rounded-xl flex items-center justify-center text-on-surface-variant/30">
-                <img alt="Watch Live Output" className="w-full h-full object-contain rounded-xl" src="https://lh3.googleusercontent.com/aida-public/AB6AXuACeAiv18O5C4IUz0kh4aXGmsIpAVktdri2rkE6kYLW3YNAhi3yv-4HtHUy9Yd4ZwMk--Cdd7QBpTX76CQ2Ftwi7zBg1QNiZZ5sA67yEKx-szchv_VlpVnThAPUlrw8IImb63YzAz20XBxb7gZ3FzDo1jGF3kUvHGqr87Hj96xtXuw3VCah3y49-0pUD2pGmAl3gOHaQZwIjOgEb1L-trAV61Ds3B4jGtDJphZglGh5JvW5g7xEufE2KdZ_cMPgQ6AWfhOsGAZ60Wo" />
+                <img alt="Watch Live Output" className="w-full h-full object-contain rounded-xl" src={step6} />
               </div>
               <div className="w-full md:w-1/2 text-center md:text-left">
                 <h3 className="font-headline-md text-headline-md text-primary-container mb-4">6. Watch Live Output</h3>
@@ -206,7 +202,7 @@ export const Home = () => {
             {/* Step 7: Image Left / Text Right */}
             <div className="flex flex-col md:flex-row items-center gap-xl">
               <div className="w-full md:w-1/2 aspect-video rounded-xl flex items-center justify-center text-on-surface-variant/30">
-                <img alt="Ship Faster Together" className="w-full h-full object-contain rounded-xl" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA9Aotu1S9CYNLcqcJ6i82ejvRjJk0FCtlomxlCeNqluBZHlYbLhLN084avpPUSTShclELeJL29tXQidZ7L73Lby_t38hyDub3ZKHRIGfi-_jAe82E1C-WBi144LH6PxOt-oTiBmJlFoc6Vw7ljUWdCmfmX_II4EIA6XeONOhsZ-FG_U-epqfpUL66UgegDOTibXuHeddgzXxcEFiT3OgCHmBPZPUFvRR2BMksLeZ6N0D8xWkR7FRfdKVBRq1DpqnD-qkTVsTObT4s" />
+                <img alt="Ship Faster Together" className="w-full h-full object-contain rounded-xl" src={step7} />
               </div>
               <div className="w-full md:w-1/2 text-center md:text-left">
                 <h3 className="font-headline-md text-headline-md text-primary-container mb-4">7. Ship Faster Together</h3>
@@ -226,7 +222,7 @@ export const Home = () => {
             <Link to="/register" className="inline-block font-label-md text-label-md bg-surface-container-lowest text-tertiary px-8 py-4 rounded-lg hover:bg-surface-container-low transition-all active:scale-95 text-lg font-bold">Start Coding Now</Link>
           </div>
           <div className="md:w-1/3 flex justify-center">
-            <img alt="BeaverIDE Mascot" className="w-64 h-auto object-contain drop-shadow-2xl" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDrhGaTSjVGYaRr4h--xulaslyu6j4sFZCezCICxO_PmhgOn4HxaZfcx6HrW-QvEBTF_23nkd8-tqWlO8lUtNp_nRL0KJv-wBc3cPPoDRxEWeL6aQwALVjp3w7EEPXTkek_2Cgg9Q-VAkyNpie9TyoyPMW9wXruaYaEWU6kUR8XXl9OcMT7FTXugsWkebDOgOaRc5QQ2XlldKSZghG48Lpjefv-01PTunUXuDHownKDkwAZyPFpHYjm2c0Z5qatbTwapcR0iWHkKWg" />
+            <img alt="BeaverIDE Mascot" className="w-64 h-auto object-contain drop-shadow-2xl" src={BeaverMascotLogo} />
           </div>
         </div>
       </section>
