@@ -1,69 +1,26 @@
-import { Link, useLocation } from 'react-router-dom';
-import { Button } from '../common/Button';
-import { useAuthStore } from '../../store/authStore';
-import { cn } from '../../utils/cn';
-import { Code2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+
+import BeaverideLogo from "../../assets/logos/beaveride-logo.png";
 
 export const Header = () => {
-  const { isAuthenticated, user, logout } = useAuthStore();
-  const location = useLocation();
-
-  const isEditor = location.pathname.startsWith('/room/');
-
+ 
   return (
-    <header
-      className={cn(
-        'sticky top-0 z-50 w-full border-b border-outline-variant/30 bg-surface/80 backdrop-blur-md',
-        isEditor && 'bg-surface border-outline-variant/50'
-      )}
-    >
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center gap-8">
-          <Link to="/" className="flex items-center gap-2 group">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white group-hover:bg-primary-container transition-colors">
-              <Code2 size={20} />
-            </div>
-            <span className="text-xl font-bold tracking-tight text-on-surface">
-              Beaver<span className="text-primary">IDE</span>
-            </span>
-          </Link>
-
-          {!isEditor && (
-            <nav className="hidden md:flex items-center gap-6">
-              <Link to="/" className="text-sm font-medium text-on-surface-variant hover:text-primary transition-colors">Home</Link>
-              <Link to="/about" className="text-sm font-medium text-on-surface-variant hover:text-primary transition-colors">About</Link>
-              <Link to="/contact" className="text-sm font-medium text-on-surface-variant hover:text-primary transition-colors">Contact</Link>
-            </nav>
-          )}
+    <header>
+      <nav className="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-gutter bg-surface/80 backdrop-blur-xl border-b border-outline-variant/20 shadow-sm transition-transform duration-200 py-3">
+        <div className="flex items-center justify-center w-[140px] h-[54px]">
+          <img alt="BeaverIDE Logo" className="h-full w-full object-contain" src={BeaverideLogo} />
         </div>
-
-        <div className="flex items-center gap-4">
-          {isAuthenticated ? (
-            <>
-              {!isEditor && (
-                <Link to="/dashboard">
-                  <Button variant="ghost" size="sm">Dashboard</Button>
-                </Link>
-              )}
-              <div className="flex items-center gap-3 ml-2 pl-4 border-l border-outline-variant/30">
-                <span className="text-sm font-medium text-on-surface">{user?.firstName}</span>
-                <Button variant="ghost" size="sm" onClick={logout} className="text-error hover:text-error hover:bg-error-container/50">
-                  Logout
-                </Button>
-              </div>
-            </>
-          ) : (
-            <>
-              <Link to="/login">
-                <Button variant="ghost" size="sm">Log in</Button>
-              </Link>
-              <Link to="/register">
-                <Button size="sm">Sign up</Button>
-              </Link>
-            </>
-          )}
+        <div className="hidden md:flex items-center gap-xl">
+          <a className="text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors px-3 py-2 rounded-md font-label-md text-label-md cursor-pointer">Features</a>
+          <a className="text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors px-3 py-2 rounded-md font-label-md text-label-md cursor-pointer">Pricing</a>
+          <a className="text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors px-3 py-2 rounded-md font-label-md text-label-md cursor-pointer">Docs</a>
+          <Link to="/about" className="text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors px-3 py-2 rounded-md font-label-md text-label-md cursor-pointer">About</Link>
         </div>
-      </div>
+        <div className="flex items-center gap-md">
+          <Link to="/login" className="hidden md:block font-label-md text-label-md text-on-surface-variant hover:text-primary px-4 py-2 transition-colors">Log In</Link>
+          <Link to="/register" className="font-label-md text-label-md bg-primary-container text-on-primary shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] px-4 py-2 rounded-lg hover:bg-surface-tint transition-all active:scale-95">Start Coding</Link>
+        </div>
+      </nav>
     </header>
   );
 };
