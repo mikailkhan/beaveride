@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { PageContainer } from '../../components/layout/PageContainer';
 import { Card } from '../../components/common/Card';
 import { Input } from '../../components/common/Input';
 import { Button } from '../../components/common/Button';
@@ -45,8 +44,7 @@ export const Register = () => {
   };
 
   return (
-    <PageContainer>
-      <div className="flex min-h-[calc(100vh-140px)] items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div className="flex min-h-[calc(100vh-140px)] items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
         <Card className="w-full max-w-md space-y-8 p-8" glass>
           <div className="text-center">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-white mb-4">
@@ -92,7 +90,6 @@ export const Register = () => {
             </Button>
           </form>
         </Card>
-      </div>
-    </PageContainer>
+    </div>
   );
 };

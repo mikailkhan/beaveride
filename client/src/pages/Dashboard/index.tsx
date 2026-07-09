@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { PageContainer } from '../../components/layout/PageContainer';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { useRoomStore } from '../../store/roomStore';
@@ -36,8 +35,7 @@ export const Dashboard = () => {
   };
 
   return (
-    <PageContainer>
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
+    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-3xl font-bold text-on-surface">Your Projects</h1>
           <Button onClick={handleCreateRoom} className="gap-2">
@@ -77,7 +75,6 @@ export const Dashboard = () => {
             ))}
           </div>
         )}
-      </div>
-    </PageContainer>
+    </div>
   );
 };

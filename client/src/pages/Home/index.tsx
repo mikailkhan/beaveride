@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Footer } from '../../components/layout/Footer';
 import BeaverMascotLogo from "../../assets/logos/beaveride-mascot-logo.png";
-
 import step1 from "../../assets/home-images/image1.png";
 import step2 from "../../assets/home-images/image2.png";
 import step3 from "../../assets/home-images/image3.png";
@@ -10,7 +8,6 @@ import step4 from "../../assets/home-images/image4.png";
 import step5 from "../../assets/home-images/image5.png";
 import step6 from "../../assets/home-images/image6.png";
 import step7 from "../../assets/home-images/image7.png";
-import { Header } from '../../components/layout/Header';
 
 export const Home = () => {
   const [currentText, setCurrentText] = useState('');
@@ -66,7 +63,7 @@ export const Home = () => {
   return (
     <div className="bg-background text-on-background font-body-md min-h-screen antialiased flex flex-col selection:bg-primary-container/30">
       {/* TopNavBar */}
-      <Header />
+      
 
       {/* Hero Section */}
       <section className="relative pt-32 pb-24 px-gutter flex flex-col items-center justify-center min-h-[90vh] overflow-hidden">
@@ -273,7 +270,7 @@ export const Home = () => {
       </section>
 
       {/* Footer */}
-      <Footer />
+      
     </div>
   );
 };

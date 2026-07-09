@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { PageContainer } from '../../components/layout/PageContainer';
 import { MonacoEditor } from '../../components/editor/MonacoEditor';
 import { TerminalPanel } from '../../components/editor/TerminalPanel';
 import { Button } from '../../components/common/Button';
@@ -49,11 +48,10 @@ export const EditorRoom = () => {
     }
   };
 
-  if (!activeRoom) return <PageContainer><div className="p-8 text-center">Loading room...</div></PageContainer>;
+  if (!activeRoom) return <div className="p-8 text-center">Loading room...</div>;
 
   return (
-    <PageContainer>
-      <div className="flex h-[calc(100vh-64px)] flex-col bg-surface">
+    <div className="flex h-[calc(100vh-64px)] flex-col bg-surface">
         {/* Editor Toolbar */}
         <div className="flex items-center justify-between px-4 py-2 border-b border-outline-variant/50 bg-surface">
           <div className="flex items-center gap-4">
@@ -89,7 +87,6 @@ export const EditorRoom = () => {
           </div>
           <TerminalPanel output={output} status={status} />
         </div>
-      </div>
-    </PageContainer>
+    </div>
   );
 };

@@ -8,6 +8,9 @@ import { Dashboard } from './pages/Dashboard';
 import { EditorRoom } from './pages/EditorRoom';
 import { useAuthStore } from './store/authStore';
 
+import { PageContainer } from './components/layout/PageContainer';
+import { Outlet } from 'react-router-dom';
+
 // Mock Protected Route Wrapper
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -15,33 +18,44 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+// Layout route to wrap pages in Header/Footer automatically
+const AppLayout = () => {
+  return (
+    <PageContainer>
+      <Outlet />
+    </PageContainer>
+  );
+};
+
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/about" element={<About />} />
-        <Route path="/contact" element={<Contact />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        
-        {/* Protected Routes */}
-        <Route 
-          path="/dashboard" 
-          element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/room/:roomId" 
-          element={
-            <ProtectedRoute>
-              <EditorRoom />
-            </ProtectedRoute>
-          } 
-        />
+        <Route element={<AppLayout />}>
+          <Route path="/" element={<Home />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/contact" element={<Contact />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          
+          {/* Protected Routes */}
+          <Route 
+            path="/dashboard" 
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/room/:roomId" 
+            element={
+              <ProtectedRoute>
+                <EditorRoom />
+              </ProtectedRoute>
+            } 
+          />
+        </Route>
       </Routes>
     </BrowserRouter>
   );
