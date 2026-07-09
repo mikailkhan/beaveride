@@ -1,0 +1,81 @@
+@import "tailwindcss";
+
+@theme {
+  --color-surface: #fbf9f8;
+  --color-surface-dim: #dbd9d9;
+  --color-surface-bright: #fbf9f8;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f5f3f3;
+  --color-surface-container: #efeded;
+  --color-surface-container-high: #eae8e7;
+  --color-surface-container-highest: #e4e2e2;
+  --color-on-surface: #1b1c1c;
+  --color-on-surface-variant: #5a4138;
+  
+  --color-inverse-surface: #303030;
+  --color-inverse-on-surface: #f2f0f0;
+  --color-outline: #8e7166;
+  --color-outline-variant: #e2bfb2;
+  
+  --color-primary: #a53c00;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #f66317;
+  --color-on-primary-container: #501900;
+  
+  --color-secondary: #286867;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #afeeec;
+  --color-on-secondary-container: #2f6e6d;
+  
+  --color-tertiary: #2c59bc;
+  --color-on-tertiary: #ffffff;
+  --color-tertiary-container: #678ef4;
+  --color-on-tertiary-container: #002669;
+  
+  --color-error: #ba1a1a;
+  --color-on-error: #ffffff;
+  --color-error-container: #ffdad6;
+  --color-on-error-container: #93000a;
+
+  --color-background: #fbf9f8;
+  --color-on-background: #1b1c1c;
+
+  --font-geist: "Geist", system-ui, sans-serif;
+  --font-inter: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  --spacing-base: 4px;
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2.5rem;
+  --spacing-2xl: 4rem;
+  --spacing-gutter: 1.5rem;
+  --spacing-margin: 2rem;
+
+  --radius-sm: 0.25rem;
+  --radius-DEFAULT: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+  --radius-full: 9999px;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-background);
+    color: var(--color-on-background);
+    font-family: var(--font-inter);
+    margin: 0;
+    padding: 0;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-geist);
+  }
+
+  code, pre {
+    font-family: var(--font-mono);
+  }
+}
