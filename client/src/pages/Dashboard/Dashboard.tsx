@@ -68,7 +68,7 @@ export const Dashboard = () => {
       <nav className="fixed left-0 top-0 h-full flex flex-col p-md bg-surface-container-low w-72 z-40 hidden md:flex border-r border-surface-variant">
         <div className="mb-xl flex items-center gap-sm px-sm mt-sm">
           <Link to="/">
-            <img alt="BeaverIDE Logo" className="h-8 w-auto" src={BeaverideLogo} />
+            <img alt="BeaverIDE Logo" className="h-16 w-auto" src={BeaverideLogo} />
           </Link>
         </div>
         
@@ -103,25 +103,16 @@ export const Dashboard = () => {
             <span className="material-symbols-outlined">group</span>
             Shared
           </a>
-          <a className="flex items-center gap-md px-md py-sm text-on-surface-variant hover:bg-surface-container-highest transition-all rounded-lg font-label-md text-label-md active:translate-x-1" href="#templates">
-            <span className="material-symbols-outlined">description</span>
-            Templates
-          </a>
+          
           <a className="flex items-center gap-md px-md py-sm text-on-surface-variant hover:bg-surface-container-highest transition-all rounded-lg font-label-md text-label-md active:translate-x-1" href="#settings">
             <span className="material-symbols-outlined">settings</span>
             Settings
           </a>
-          <a className="flex items-center gap-md px-md py-sm text-on-surface-variant hover:bg-surface-container-highest transition-all rounded-lg font-label-md text-label-md active:translate-x-1" href="#help">
-            <span className="material-symbols-outlined">help</span>
-            Help
-          </a>
+          
         </div>
 
         <div className="mt-auto px-sm pt-md border-t border-surface-variant space-y-1">
-          <a className="flex items-center gap-md px-md py-sm text-on-surface-variant hover:bg-surface-container-highest transition-all rounded-lg font-label-md text-label-md" href="#feedback">
-            <span className="material-symbols-outlined">chat_bubble</span>
-            Feedback
-          </a>
+          
           <button 
             onClick={() => { logout(); navigate('/'); }}
             className="w-full flex items-center gap-md px-md py-sm text-error hover:bg-error-container/20 transition-all rounded-lg font-label-md text-label-md cursor-pointer text-left"
@@ -243,57 +234,7 @@ export const Dashboard = () => {
 
           {/* Cloud Environment Usage Stats */}
           <aside className="lg:col-span-4 flex flex-col gap-md">
-            <h2 className="font-headline-md text-body-lg font-semibold text-on-surface mb-sm">Cloud Environment</h2>
             
-            <div className="glass-panel rounded-xl p-lg border border-surface-variant shadow-sm space-y-md">
-              {/* CPU Usage */}
-              <div>
-                <div className="flex justify-between items-end mb-xs">
-                  <span className="font-label-md text-sm text-on-surface-variant flex items-center gap-xs">
-                    <span className="material-symbols-outlined text-sm">memory</span>
-                    CPU Usage
-                  </span>
-                  <span className="font-code-md text-sm font-semibold text-on-surface">45%</span>
-                </div>
-                <div className="w-full bg-surface-container-high rounded-full h-2 overflow-hidden">
-                  <div className="bg-primary-container h-2 rounded-full" style={{ width: '45%' }}></div>
-                </div>
-              </div>
-              
-              {/* RAM Usage */}
-              <div>
-                <div className="flex justify-between items-end mb-xs">
-                  <span className="font-label-md text-sm text-on-surface-variant flex items-center gap-xs">
-                    <span className="material-symbols-outlined text-sm">storage</span>
-                    RAM (8GB Total)
-                  </span>
-                  <span className="font-code-md text-sm font-semibold text-on-surface">6.2 GB</span>
-                </div>
-                <div className="w-full bg-surface-container-high rounded-full h-2 overflow-hidden">
-                  <div className="bg-tertiary h-2 rounded-full" style={{ width: '77%' }}></div>
-                </div>
-              </div>
-              
-              {/* Storage */}
-              <div>
-                <div className="flex justify-between items-end mb-xs">
-                  <span className="font-label-md text-sm text-on-surface-variant flex items-center gap-xs">
-                    <span className="material-symbols-outlined text-sm">cloud</span>
-                    Storage
-                  </span>
-                  <span className="font-code-md text-sm font-semibold text-on-surface">12 GB / 50 GB</span>
-                </div>
-                <div className="w-full bg-surface-container-high rounded-full h-2 overflow-hidden">
-                  <div className="bg-secondary h-2 rounded-full" style={{ width: '24%' }}></div>
-                </div>
-              </div>
-              
-              <div className="pt-md border-t border-surface-variant mt-md">
-                <button className="w-full py-sm px-md rounded-lg border border-outline text-on-surface font-label-md text-sm hover:bg-surface-container-highest transition-colors cursor-pointer">
-                  Manage Instances
-                </button>
-              </div>
-            </div>
 
             {/* Mini Activity Log */}
             <div className="glass-panel rounded-xl p-lg border border-surface-variant shadow-sm mt-md flex-1">
