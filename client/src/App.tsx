@@ -1,14 +1,14 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { Home } from './pages/Home';
-import { About } from './pages/About';
-import { Contact } from './pages/Contact';
-import { Login } from './pages/Login';
-import { Register } from './pages/Register';
-import { Dashboard } from './pages/Dashboard';
-import { EditorRoom } from './pages/EditorRoom';
+import { Home } from './pages/Home/Home';
+import { About } from './pages/About/About';
+import { Contact } from './pages/Contact/Contact';
+import { Login } from './pages/Login/Login';
+import { Register } from './pages/Register/Register';
+import { Dashboard } from './pages/Dashboard/Dashboard';
+import { EditorRoom } from './pages/EditorRoom/EditorRoom';
 import { useAuthStore } from './store/authStore';
 
-import { PageContainer } from './components/layout/PageContainer';
+import { PageContainer } from './components/layout/PageContainer/PageContainer';
 import { Outlet } from 'react-router-dom';
 
 // Mock Protected Route Wrapper
