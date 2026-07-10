@@ -58,10 +58,10 @@ export const Footer = () => {
           <div>
             <h3 className="font-headline-md text-base font-semibold mb-6" style={{ color: '#f0f0f0' }}>Product</h3>
             <ul className="space-y-4">
-              <li><a href="#" className="font-body-md text-sm transition-colors cursor-pointer hover:text-primary-container" style={{ color: '#a8a8a8' }}>Features</a></li>
-              <li><a href="#" className="font-body-md text-sm transition-colors cursor-pointer hover:text-primary-container" style={{ color: '#a8a8a8' }}>Pricing</a></li>
-              <li><a href="#" className="font-body-md text-sm transition-colors cursor-pointer hover:text-primary-container" style={{ color: '#a8a8a8' }}>Changelog</a></li>
-              <li><a href="#" className="font-body-md text-sm transition-colors cursor-pointer hover:text-primary-container" style={{ color: '#a8a8a8' }}>Integrations</a></li>
+              <li><Link to="/features" className="font-body-md text-sm transition-colors cursor-pointer hover:text-primary-container" style={{ color: '#a8a8a8' }}>Features</Link></li>
+              <li><Link to="/pricing" className="font-body-md text-sm transition-colors cursor-pointer hover:text-primary-container" style={{ color: '#a8a8a8' }}>Pricing</Link></li>
+              <li><Link to="/changelog" className="font-body-md text-sm transition-colors cursor-pointer hover:text-primary-container" style={{ color: '#a8a8a8' }}>Changelog</Link></li>
+              <li><Link to="/integrations" className="font-body-md text-sm transition-colors cursor-pointer hover:text-primary-container" style={{ color: '#a8a8a8' }}>Integrations</Link></li>
             </ul>
           </div>
 
@@ -69,10 +69,10 @@ export const Footer = () => {
           <div>
             <h3 className="font-headline-md text-base font-semibold mb-6" style={{ color: '#f0f0f0' }}>Resources</h3>
             <ul className="space-y-4">
-              <li><a href="#" className="font-body-md text-sm transition-colors cursor-pointer hover:text-primary-container" style={{ color: '#a8a8a8' }}>Documentation</a></li>
-              <li><a href="#" className="font-body-md text-sm transition-colors cursor-pointer hover:text-primary-container" style={{ color: '#a8a8a8' }}>API Reference</a></li>
-              <li><a href="#" className="font-body-md text-sm transition-colors cursor-pointer hover:text-primary-container" style={{ color: '#a8a8a8' }}>Community Forum</a></li>
-              <li><a href="#" className="font-body-md text-sm transition-colors cursor-pointer hover:text-primary-container" style={{ color: '#a8a8a8' }}>System Status</a></li>
+              <li><Link to="/docs" className="font-body-md text-sm transition-colors cursor-pointer hover:text-primary-container" style={{ color: '#a8a8a8' }}>Documentation</Link></li>
+              <li><Link to="/api-reference" className="font-body-md text-sm transition-colors cursor-pointer hover:text-primary-container" style={{ color: '#a8a8a8' }}>API Reference</Link></li>
+              <li><Link to="/community" className="font-body-md text-sm transition-colors cursor-pointer hover:text-primary-container" style={{ color: '#a8a8a8' }}>Community Forum</Link></li>
+              <li><Link to="/system-status" className="font-body-md text-sm transition-colors cursor-pointer hover:text-primary-container" style={{ color: '#a8a8a8' }}>System Status</Link></li>
             </ul>
           </div>
 
@@ -82,8 +82,8 @@ export const Footer = () => {
             <ul className="space-y-4">
               <li><Link to="/about" className="font-body-md text-sm transition-colors hover:text-primary-container" style={{ color: '#a8a8a8' }}>About Us</Link></li>
               <li><Link to="/contact" className="font-body-md text-sm transition-colors hover:text-primary-container" style={{ color: '#a8a8a8' }}>Contact Support</Link></li>
-              <li><a href="#" className="font-body-md text-sm transition-colors cursor-pointer hover:text-primary-container" style={{ color: '#a8a8a8' }}>Privacy Policy</a></li>
-              <li><a href="#" className="font-body-md text-sm transition-colors cursor-pointer hover:text-primary-container" style={{ color: '#a8a8a8' }}>Terms of Service</a></li>
+              <li><Link to="/privacy-policy" className="font-body-md text-sm transition-colors cursor-pointer hover:text-primary-container" style={{ color: '#a8a8a8' }}>Privacy Policy</Link></li>
+              <li><Link to="/terms-of-service" className="font-body-md text-sm transition-colors cursor-pointer hover:text-primary-container" style={{ color: '#a8a8a8' }}>Terms of Service</Link></li>
             </ul>
           </div>
         </div>

@@ -11,9 +11,9 @@ export const Header = () => {
           <img alt="BeaverIDE Logo" className="h-full w-full object-contain" src={BeaverideLogo} />
         </div>
         <div className="hidden md:flex items-center gap-xl">
-          <a className="text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors px-3 py-2 rounded-md font-label-md text-label-md cursor-pointer">Features</a>
-          <a className="text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors px-3 py-2 rounded-md font-label-md text-label-md cursor-pointer">Pricing</a>
-          <a className="text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors px-3 py-2 rounded-md font-label-md text-label-md cursor-pointer">Docs</a>
+          <Link to="/features" className="text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors px-3 py-2 rounded-md font-label-md text-label-md cursor-pointer">Features</Link>
+          <Link to="/pricing" className="text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors px-3 py-2 rounded-md font-label-md text-label-md cursor-pointer">Pricing</Link>
+          <Link to="/docs" className="text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors px-3 py-2 rounded-md font-label-md text-label-md cursor-pointer">Docs</Link>
           <Link to="/about" className="text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors px-3 py-2 rounded-md font-label-md text-label-md cursor-pointer">About</Link>
         </div>
         <div className="flex items-center gap-md">

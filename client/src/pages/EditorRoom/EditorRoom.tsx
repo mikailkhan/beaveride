@@ -15,10 +15,6 @@ export const EditorRoom = () => {
   const [activeFile, setActiveFile] = useState('main.js');
   const [files, setFiles] = useState<Record<string, string>>({
     'main.js': `import { serve } from '@beaveride/http';\nimport { logger } from './utils/logger.js';\n\nconst PORT = process.env.PORT || 3000;\n\nasync function initServer() {\n  try {\n    const server = await serve({ port: PORT });\n    logger.info(\`Server running successfully on port \${PORT}\`);\n    \n    // Initialize collaboration websocket\n    const wss = new WebSocketServer({ server });\n\n  } catch (err) {\n    logger.error('Failed to start server', err);\n    process.exit(1);\n  }\n}\n\ninitServer();`,
-    'server.go': `package main\n\nimport (\n    "fmt"\n    "net/http"\n)\n\nfunc main() {\n    http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {\n        fmt.Fprintf(w, "Hello, BeaverIDE!")\n    })\n    fmt.Println("Server starting on port 8080...")\n    http.ListenAndServe(":8080", nil)\n}`,
-    'style.css': `body {\n  background-color: var(--color-background);\n  color: var(--color-on-surface);\n  font-family: 'Inter', sans-serif;\n}`,
-    'README.md': `# BeaverIDE Collaborative Room\n\nWelcome to your real-time code editor.\nInvite team members to begin pair programming.`,
-    'package.json': `{\n  "name": "beaveride-project",\n  "version": "1.0.0",\n  "scripts": {\n    "dev": "nodemon src/main.js"\n  }\n}`
   });
 
   const [output, setOutput] = useState('');
@@ -151,15 +147,8 @@ export const EditorRoom = () => {
             <span className="material-symbols-outlined text-[20px]">search</span>
             <span className="font-label-md text-label-md">Search</span>
           </a>
-          <a className="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-all relative" href="#source-control">
-            <span className="material-symbols-outlined text-[20px]">account_tree</span>
-            <span className="font-label-md text-label-md flex-1">Source Control</span>
-            <span className="bg-primary text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0">2</span>
-          </a>
-          <a className="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-all" href="#extensions">
-            <span className="material-symbols-outlined text-[20px]">extension</span>
-            <span className="font-label-md text-label-md">Extensions</span>
-          </a>
+        
+          
           <a className="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-all" href="#settings">
             <span className="material-symbols-outlined text-[20px]">settings</span>
             <span className="font-label-md text-label-md">Settings</span>
