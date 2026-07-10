@@ -8,6 +8,7 @@ import step4 from "../../assets/home-images/image4.png";
 import step5 from "../../assets/home-images/image5.png";
 import step6 from "../../assets/home-images/image6.png";
 import step7 from "../../assets/home-images/image7.png";
+import brandMascot from "../../assets/logos/brand-mascot.svg";
 
 const steps = [
   {
@@ -423,15 +424,86 @@ export const Home = () => {
       </section>
 
       {/* Ready CTA */}
-      <section className="py-2xl px-gutter bg-surface">
-        <div className="max-w-5xl mx-auto bg-tertiary rounded-2xl p-8 md:p-16 shadow-xl flex flex-col md:flex-row items-center text-center md:text-left gap-12">
-          <div className="md:w-2/3">
-            <h2 className="font-display-lg text-headline-lg md:text-display-lg text-on-tertiary mb-6">Ready to build the future?</h2>
-            <p className="font-body-lg text-body-lg text-on-tertiary/90 mb-10 min-w-2xl">Join thousands of developers and start coding together in seconds. Experience the most fluid collaborative environment ever built.</p>
-            <Link to="/register" className="inline-block font-label-md text-label-md bg-surface-container-lowest text-tertiary px-8 py-4 rounded-lg hover:bg-surface-container-low transition-all active:scale-95 text-lg font-bold">Start Coding Now</Link>
-          </div>
-          <div className="md:w-1/3 flex justify-center">
-            <img alt="BeaverIDE Mascot" className="w-64 h-auto object-contain drop-shadow-2xl" src={BeaverMascotLogo} />
+      <section className="py-2xl px-gutter bg-surface relative overflow-hidden">
+        <div className="max-w-6xl mx-auto relative rounded-3xl bg-neutral-950 border border-neutral-800 shadow-[0_30px_70px_rgba(0,0,0,0.18)] overflow-hidden bg-dot-grid p-8 md:p-16 lg:p-20">
+          {/* Ambient Glows */}
+          <div className="absolute top-0 left-0 w-[350px] h-[350px] bg-primary-container/10 rounded-full blur-[120px] pointer-events-none -translate-x-1/4 -translate-y-1/4" />
+          <div className="absolute bottom-0 right-0 w-[350px] h-[350px] bg-tertiary/15 rounded-full blur-[120px] pointer-events-none translate-x-1/4 translate-y-1/4" />
+
+          <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+            {/* Left Content */}
+            <div className="lg:col-span-7 flex flex-col items-center lg:items-start text-center lg:text-left">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono uppercase tracking-widest text-primary-container bg-primary-container/10 border border-primary-container/20 mb-6">
+                Start Coding Today
+              </span>
+              <h2 className="font-display-lg text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-white mb-6 leading-tight">
+                Ready to build the <br className="hidden sm:inline" />
+                <span className="bg-gradient-to-r from-primary-container via-secondary to-tertiary-container bg-clip-text text-transparent">future?</span>
+              </h2>
+              <p className="font-body-lg text-lg text-neutral-400 mb-10 max-w-3xl leading-relaxed">
+                Join thousands of developers coding together in real-time. Spin up workspaces in seconds, invite your team, and build faster from anywhere.
+              </p>
+              
+              <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
+                <Link 
+                  to="/register" 
+                  className="group w-full sm:w-auto inline-flex items-center justify-center gap-2 font-label-md text-label-md bg-primary-container text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.3),_0_4px_20px_rgba(246,99,23,0.3)] px-8 py-4 rounded-xl hover:bg-primary-container/90 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.3),_0_8px_30px_rgba(246,99,23,0.5)] transition-all active:scale-95 text-lg font-semibold"
+                >
+                  Start Coding Now
+                  <span className="material-symbols-outlined transition-transform group-hover:translate-x-1" style={{ fontSize: '20px' }}>arrow_forward</span>
+                </Link>
+                <Link 
+                  to="/docs" 
+                  className="group w-full sm:w-auto inline-flex items-center justify-center gap-2 font-label-md text-label-md text-neutral-300 hover:text-white px-6 py-4 rounded-xl transition-all text-lg font-semibold hover:bg-white/5 border border-transparent hover:border-white/10"
+                >
+                  Read Documentation
+                  <span className="material-symbols-outlined text-[20px] opacity-60 group-hover:opacity-100 transition-opacity">menu_book</span>
+                </Link>
+              </div>
+            </div>
+
+            {/* Right Interactive Collaborative Mockup */}
+            <div className="lg:col-span-5 flex justify-center relative select-none">
+              {/* Outer Glow */}
+              <div className="absolute inset-0 bg-gradient-to-tr from-primary-container/20 to-tertiary/10 rounded-full blur-[80px] opacity-50 scale-90" />
+              
+              {/* Mockup Session Ring */}
+              <div className="w-64 h-64 sm:w-72 sm:h-72 lg:w-80 lg:h-80 rounded-full relative flex items-center justify-center bg-gradient-to-b from-neutral-900 to-neutral-950 border border-neutral-800 shadow-2xl p-6">
+                
+                {/* Floating Beaver Mascot */}
+                <img 
+                  alt="BeaverIDE Mascot" 
+                  className="w-40 sm:w-48 h-auto object-contain drop-shadow-[0_10px_30px_rgba(246,99,23,0.25)] animate-float" 
+                  src={brandMascot} 
+                />
+
+                {/* Overlapping Collaborator Avatars & Tags */}
+                {/* Avatar 1: Oak (React Developer) */}
+                <div className="absolute left-[-10px] top-[40%] flex items-center gap-2 bg-secondary/15 backdrop-blur-md border border-secondary/30 rounded-lg px-2.5 py-1 shadow-lg">
+                  <span className="w-2.5 h-2.5 rounded-full bg-secondary"></span>
+                  <span className="font-mono text-xs font-semibold text-secondary-container">Oak</span>
+                  {/* Miniature cursor */}
+                  <span className="material-symbols-outlined text-secondary absolute right-[-10px] top-[-8px] text-xs pointer-events-none" style={{ fontVariationSettings: '"FILL" 1', transform: 'rotate(-45deg)' }}>navigation</span>
+                </div>
+
+                {/* Avatar 2: Willow (Go Backend Developer) */}
+                <div className="absolute right-[-15px] top-[20%] flex items-center gap-2 bg-tertiary/15 backdrop-blur-md border border-tertiary/30 rounded-lg px-2.5 py-1 shadow-lg">
+                  <span className="w-2.5 h-2.5 rounded-full bg-tertiary-container"></span>
+                  <span className="font-mono text-xs font-semibold text-tertiary-container">Willow</span>
+                  <span className="material-symbols-outlined text-tertiary absolute left-[-10px] bottom-[-8px] text-xs pointer-events-none" style={{ fontVariationSettings: '"FILL" 1', transform: 'rotate(135deg)' }}>navigation</span>
+                </div>
+
+                {/* Avatar 3: Beaver (Owner) */}
+                <div className="absolute bottom-[20px] left-[30%] flex items-center gap-2 bg-primary-container/15 backdrop-blur-md border border-primary-container/30 rounded-lg px-2.5 py-1 shadow-lg">
+                  <span className="w-2.5 h-2.5 rounded-full bg-primary-container"></span>
+                  <span className="font-mono text-xs font-semibold text-primary">Beaver</span>
+                </div>
+
+                {/* Code symbol floaters */}
+                <div className="absolute top-[20px] left-[40px] opacity-35 hover:opacity-100 transition-opacity font-mono text-xs text-secondary-container bg-neutral-800/80 border border-neutral-700/50 rounded px-1.5 py-0.5">&lt;div&gt;</div>
+                <div className="absolute bottom-[40px] right-[40px] opacity-35 hover:opacity-100 transition-opacity font-mono text-xs text-primary bg-neutral-800/80 border border-neutral-700/50 rounded px-1.5 py-0.5">{"app.run()"}</div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
