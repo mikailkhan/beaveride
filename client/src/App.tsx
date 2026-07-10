@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Home } from './pages/Home/Home';
 import { About } from './pages/About/About';
 import { Contact } from './pages/Contact/Contact';
@@ -6,17 +6,11 @@ import { Login } from './pages/Login/Login';
 import { Register } from './pages/Register/Register';
 import { Dashboard } from './pages/Dashboard/Dashboard';
 import { EditorRoom } from './pages/EditorRoom/EditorRoom';
-import { useAuthStore } from './store/authStore';
 
 import { PageContainer } from './components/layout/PageContainer/PageContainer';
 import { Outlet } from 'react-router-dom';
 
-// Mock Protected Route Wrapper
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
-  return <>{children}</>;
-};
+
 
 // Layout route to wrap pages in Header/Footer automatically
 const AppLayout = () => {
@@ -42,17 +36,17 @@ function App() {
           <Route 
             path="/dashboard" 
             element={
-              <ProtectedRoute>
+              // <ProtectedRoute>
                 <Dashboard />
-              </ProtectedRoute>
+              // </ProtectedRoute>
             } 
           />
           <Route 
             path="/room/:roomId" 
             element={
-              <ProtectedRoute>
+              // <ProtectedRoute>
                 <EditorRoom />
-              </ProtectedRoute>
+              // </ProtectedRoute>
             } 
           />
         </Route>
