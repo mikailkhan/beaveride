@@ -2,9 +2,9 @@ import { Link } from 'react-router-dom';
 
 export const About = () => {
   return (
-    <div className="flex-grow pt-2xl mt-xl bg-background text-on-background">
+    <div>
         {/* Hero Section */}
-        <section className="max-w-7xl mx-auto px-gutter py-2xl text-center">
+        <section className="max-w-7xl mx-auto px-gutter text-center">
           <h1 className="font-display-lg text-display-lg mb-lg max-w-3xl mx-auto text-on-background">
             Why we built the future of engineering.
           </h1>

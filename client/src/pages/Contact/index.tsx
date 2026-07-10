@@ -1,6 +1,6 @@
 export const Contact = () => {
   return (
-    <main className="flex-grow pt-[80px] md:pt-[100px] px-gutter max-w-7xl mx-auto w-full flex flex-col lg:flex-row gap-2xl mb-2xl">
+    <div className="px-gutter max-w-7xl mx-auto w-full flex flex-col lg:flex-row gap-2xl mb-2xl">
       {/* Left Column: Contact Form */}
       <div className="flex-1 flex flex-col justify-center">
         <div className="mb-lg">
@@ -105,6 +105,6 @@ export const Contact = () => {
           </a>
         </div>
       </div>
-    </main>
+    </div>
   );
 };

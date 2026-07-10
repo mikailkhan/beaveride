@@ -62,11 +62,8 @@ export const Home = () => {
 
   return (
     <div className="bg-background text-on-background font-body-md min-h-screen antialiased flex flex-col selection:bg-primary-container/30">
-      {/* TopNavBar */}
-      
-
       {/* Hero Section */}
-      <section className="relative pt-32 pb-24 px-gutter flex flex-col items-center justify-center min-h-[90vh] overflow-hidden">
+      <section className="relative px-gutter flex flex-col items-center justify-center min-h-[90vh] overflow-hidden">
         <div className="max-w-4xl mx-auto text-center z-10 relative">
           <h1 className="font-display-lg text-display-lg mb-6 text-on-background">
             The new way of <br /> <span className="text-primary-container typing-cursor" ref={typewriterRef}>{currentText}</span>
