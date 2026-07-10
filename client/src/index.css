@@ -163,4 +163,12 @@
   .soft-shadow {
     box-shadow: 0 8px 30px rgba(0,0,0,0.04);
   }
+
+  @keyframes stepProgress {
+    from { width: 0%; }
+    to { width: 100%; }
+  }
+  .animate-step-progress {
+    animation: stepProgress 6s linear forwards;
+  }
 }
