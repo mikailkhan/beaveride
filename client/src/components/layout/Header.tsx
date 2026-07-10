@@ -8,7 +8,9 @@ export const Header = () => {
     <header className="h-[80px]">
       <nav className="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-gutter bg-surface/80 backdrop-blur-xl border-b border-outline-variant/20 shadow-sm transition-transform duration-200 py-3">
         <div className="flex items-center justify-center w-[140px] h-[54px]">
-          <img alt="BeaverIDE Logo" className="h-full w-full object-contain" src={BeaverideLogo} />
+          <Link to="/">
+            <img alt="BeaverIDE Logo" className="h-full w-full object-contain" src={BeaverideLogo} />
+          </Link>
         </div>
         <div className="hidden md:flex items-center gap-xl">
           <Link to="/features" className="text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors px-3 py-2 rounded-md font-label-md text-label-md cursor-pointer">Features</Link>
