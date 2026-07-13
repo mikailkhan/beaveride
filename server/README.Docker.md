@@ -1,9 +1,25 @@
-### Building and running your application
+### Building and running the backend
 
-When you're ready, start your application by running:
-`docker compose up --build`.
+From the repository root, start the full development stack:
 
-Your application will be available at http://localhost:3000.
+```bash
+docker compose up --build
+```
+
+The backend API will be available at http://localhost:3000.
+
+Health checks:
+
+```bash
+curl http://localhost:3000/health
+curl http://localhost:3000/api/health
+```
+
+Run database migrations against the Compose database:
+
+```bash
+docker compose exec server npm run db:migrate
+```
 
 ### Deploying your application to the cloud
 
