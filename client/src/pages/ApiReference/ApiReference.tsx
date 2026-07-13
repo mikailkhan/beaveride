@@ -1,4 +1,3 @@
-import React from 'react';
 import { Blocks } from 'lucide-react';
 
 export const ApiReference = () => {
