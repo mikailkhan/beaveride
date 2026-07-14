@@ -19,6 +19,10 @@ export interface AuthResult {
   token: string;
 }
 
+export interface CurrentUserResult {
+  user: SafeUser;
+}
+
 type RegisterDto = {
   email: string;
   username: string;
@@ -85,6 +89,16 @@ export class AuthService {
     const token = this.signToken(safeUser);
 
     return { user: safeUser, token };
+  }
+
+  async getCurrentUser(userId: number): Promise<CurrentUserResult> {
+    const user = await this.userRepository.findById(userId);
+
+    if (!user) {
+      throw new HttpError(404, 'User not found');
+    }
+
+    return { user: toSafeUser(user) };
   }
 
   verifyToken(token: string): JwtPayload {
