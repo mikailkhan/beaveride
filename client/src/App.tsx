@@ -30,10 +30,13 @@ const AppLayout = () => {
   );
 };
 
+import { AuthProvider } from './components/common/AuthProvider';
+
 function App() {
   return (
     <BrowserRouter>
-      <Routes>
+      <AuthProvider>
+        <Routes>
         <Route element={<AppLayout />}>
           <Route path="/" element={<Home />} />
           <Route path="/about" element={<About />} />
@@ -68,7 +71,8 @@ function App() {
             } 
           />
         </Route>
-      </Routes>
+        </Routes>
+      </AuthProvider>
     </BrowserRouter>
   );
 }
