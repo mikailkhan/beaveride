@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
-import { mockAuthService } from '../../services/mocks/mockAuthService';
+import { authService } from '../../services/authService';
 import BeaverideLogo from '../../assets/logos/beaveride-logo.png';
 
 export const Register = () => {
   const [fullName, setFullName] = useState('');
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -24,12 +25,12 @@ export const Register = () => {
       const firstName = parts[0] || '';
       const lastName = parts.slice(1).join(' ') || '';
 
-      const { token, user } = await mockAuthService.register({
+      const { token, user } = await authService.register({
         firstName,
         lastName,
         email,
         password,
-        username: email.split('@')[0],
+        username,
       });
       setAuth(user, token);
       navigate('/dashboard');
@@ -102,6 +103,18 @@ export const Register = () => {
               required
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="block font-label-md text-label-md text-on-surface mb-1" htmlFor="username">Username</label>
+            <input 
+              className="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-2 text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-body-md" 
+              id="username" 
+              placeholder="janedoe" 
+              type="text"
+              required
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
             />
           </div>
           <div>

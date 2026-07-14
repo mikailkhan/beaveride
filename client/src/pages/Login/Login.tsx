@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
-import { mockAuthService } from '../../services/mocks/mockAuthService';
+import { authService } from '../../services/authService';
 
 export const Login = () => {
   const [email, setEmail] = useState('');
@@ -17,7 +17,7 @@ export const Login = () => {
     setError('');
     
     try {
-      const { token, user } = await mockAuthService.login(email, password);
+      const { token, user } = await authService.login(email, password);
       setAuth(user, token);
       navigate('/dashboard');
     } catch (err) {
