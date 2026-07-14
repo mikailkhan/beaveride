@@ -20,7 +20,6 @@ import { PageContainer } from './components/layout/PageContainer/PageContainer';
 import { Outlet } from 'react-router-dom';
 
 
-
 // Layout route to wrap pages in Header/Footer automatically
 const AppLayout = () => {
   return (
@@ -31,6 +30,8 @@ const AppLayout = () => {
 };
 
 import { AuthProvider } from './components/common/AuthProvider';
+import { ProtectedRoute } from './components/common/ProtectedRoute';
+import { PublicOnlyRoute } from './components/common/PublicOnlyRoute';
 
 function App() {
   return (
@@ -41,8 +42,22 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/about" element={<About />} />
           <Route path="/contact" element={<Contact />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
+          <Route 
+            path="/login" 
+            element={
+              <PublicOnlyRoute>
+                <Login />
+              </PublicOnlyRoute>
+            } 
+          />
+          <Route 
+            path="/register" 
+            element={
+              <PublicOnlyRoute>
+                <Register />
+              </PublicOnlyRoute>
+            } 
+          />
           <Route path="/features" element={<Features />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/docs" element={<Docs />} />
@@ -57,17 +72,17 @@ function App() {
           <Route 
             path="/dashboard" 
             element={
-              // <ProtectedRoute>
+              <ProtectedRoute>
                 <Dashboard />
-              // </ProtectedRoute>
+              </ProtectedRoute>
             } 
           />
           <Route 
             path="/room/:roomId" 
             element={
-              // <ProtectedRoute>
+              <ProtectedRoute>
                 <EditorRoom />
-              // </ProtectedRoute>
+              </ProtectedRoute>
             } 
           />
         </Route>
