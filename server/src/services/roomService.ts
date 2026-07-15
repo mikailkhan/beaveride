@@ -1,0 +1,78 @@
+import { HttpError } from '../middleware/errorMiddleware.js';
+import { RoomRepository } from '../repositories/roomRepository.js';
+
+export class RoomService {
+  constructor(private readonly roomRepository = new RoomRepository()) {}
+
+  async createRoom(userId: number, title: string, languageName: string) {
+    const cleanLanguageName = languageName.trim().toLowerCase();
+    const language = await this.roomRepository.findLanguageByName(cleanLanguageName);
+    if (!language) {
+      throw new HttpError(400, `Unsupported programming language: ${languageName}`);
+    }
+
+    const status = await this.roomRepository.findStatusByState('active');
+    if (!status) {
+      throw new HttpError(500, 'Reference status "active" not found in database');
+    }
+
+    const room = await this.roomRepository.create(title, language.id, status.id);
+
+    // Creator is assigned the 'owner' role and canRun is set to true
+    await this.roomRepository.addMember(room.id, userId, 'owner', true);
+
+    return {
+      id: room.id,
+      title: room.title,
+      language: language.language,
+      status: status.state,
+      createdAt: room.createdAt,
+      updatedAt: room.updatedAt,
+    };
+  }
+
+  async getUserRooms(userId: number) {
+    return this.roomRepository.findByUserId(userId);
+  }
+
+  async getRoomDetails(userId: number, roomId: number) {
+    const room = await this.roomRepository.findById(roomId);
+    if (!room) {
+      throw new HttpError(404, 'Room not found');
+    }
+
+    const membership = await this.roomRepository.findMembership(roomId, userId);
+    if (!membership) {
+      throw new HttpError(403, 'You are not a member of this room');
+    }
+
+    const members = await this.roomRepository.findMembers(roomId);
+
+    return {
+      id: room.id,
+      title: room.title,
+      language: room.programmingLanguage.language,
+      status: room.status.state,
+      role: membership.role,
+      canRun: membership.canRun,
+      createdAt: room.createdAt,
+      updatedAt: room.updatedAt,
+      members,
+    };
+  }
+
+  async joinRoom(userId: number, roomId: number) {
+    const room = await this.roomRepository.findById(roomId);
+    if (!room) {
+      throw new HttpError(404, 'Room not found');
+    }
+
+    const existingMembership = await this.roomRepository.findMembership(roomId, userId);
+    if (existingMembership) {
+      return existingMembership;
+    }
+
+    // Default joining role is 'editor' with canRun set to true
+    return this.roomRepository.addMember(roomId, userId, 'editor', true);
+  }
+}
