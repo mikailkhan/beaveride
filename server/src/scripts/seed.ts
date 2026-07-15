@@ -5,7 +5,12 @@ import { programmingLanguages, statuses } from '../db/schema.js';
 const seed = async () => {
   await db
     .insert(programmingLanguages)
-    .values([{ language: 'javascript' }])
+    .values([
+      { language: 'javascript' },
+      { language: 'typescript' },
+      { language: 'python' },
+      { language: 'go' },
+    ])
     .onConflictDoNothing();
 
   await db
