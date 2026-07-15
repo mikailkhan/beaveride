@@ -43,7 +43,7 @@ export const Register = () => {
 
   return (
     <div className="flex items-center justify-center px-md">
-      <div className="bg-surface-container-lowest rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.04)]  p-8 relative overflow-hidden">
+      <div className="bg-surface-container-lowest rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.04)] p-8 relative overflow-hidden w-full max-w-[460px] min-h-[580px] flex flex-col justify-between">
         {/* Decorative Glow */}
         <div className="absolute -top-24 -right-24 w-48 h-48 bg-primary-container/10 rounded-full blur-3xl pointer-events-none"></div>
         <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-tertiary/10 rounded-full blur-3xl pointer-events-none"></div>
