@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { Home } from './pages/Home/Home';
 import { About } from './pages/About/About';
 import { Contact } from './pages/Contact/Contact';
@@ -18,7 +18,9 @@ import { Changelog } from './pages/Changelog/Changelog';
 import { Integrations } from './pages/Integrations/Integrations';
 import { PageContainer } from './components/layout/PageContainer/PageContainer';
 import { Outlet } from 'react-router-dom';
-
+import { AuthProvider } from './components/common/AuthProvider';
+import { ProtectedRoute } from './components/common/ProtectedRoute';
+import { PublicOnlyRoute } from './components/common/PublicOnlyRoute';
 
 // Layout route to wrap pages in Header/Footer automatically
 const AppLayout = () => {
@@ -29,66 +31,64 @@ const AppLayout = () => {
   );
 };
 
-import { AuthProvider } from './components/common/AuthProvider';
-import { ProtectedRoute } from './components/common/ProtectedRoute';
-import { PublicOnlyRoute } from './components/common/PublicOnlyRoute';
+const router = createBrowserRouter([
+  {
+    element: <AppLayout />,
+    children: [
+      { path: '/', element: <Home /> },
+      { path: '/about', element: <About /> },
+      { path: '/contact', element: <Contact /> },
+      {
+        path: '/login',
+        element: (
+          <PublicOnlyRoute>
+            <Login />
+          </PublicOnlyRoute>
+        ),
+      },
+      {
+        path: '/register',
+        element: (
+          <PublicOnlyRoute>
+            <Register />
+          </PublicOnlyRoute>
+        ),
+      },
+      { path: '/features', element: <Features /> },
+      { path: '/pricing', element: <Pricing /> },
+      { path: '/docs', element: <Docs /> },
+      { path: '/privacy-policy', element: <PrivacyPolicy /> },
+      { path: '/terms-of-service', element: <TermsOfService /> },
+      { path: '/api-reference', element: <ApiReference /> },
+      { path: '/community', element: <CommunityForum /> },
+      { path: '/system-status', element: <SystemStatus /> },
+      { path: '/changelog', element: <Changelog /> },
+      { path: '/integrations', element: <Integrations /> },
+      {
+        path: '/dashboard',
+        element: (
+          <ProtectedRoute>
+            <Dashboard />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: '/room/:roomId',
+        element: (
+          <ProtectedRoute>
+            <EditorRoom />
+          </ProtectedRoute>
+        ),
+      },
+    ],
+  },
+]);
 
 function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <Routes>
-        <Route element={<AppLayout />}>
-          <Route path="/" element={<Home />} />
-          <Route path="/about" element={<About />} />
-          <Route path="/contact" element={<Contact />} />
-          <Route 
-            path="/login" 
-            element={
-              <PublicOnlyRoute>
-                <Login />
-              </PublicOnlyRoute>
-            } 
-          />
-          <Route 
-            path="/register" 
-            element={
-              <PublicOnlyRoute>
-                <Register />
-              </PublicOnlyRoute>
-            } 
-          />
-          <Route path="/features" element={<Features />} />
-          <Route path="/pricing" element={<Pricing />} />
-          <Route path="/docs" element={<Docs />} />
-          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-          <Route path="/terms-of-service" element={<TermsOfService />} />
-          <Route path="/api-reference" element={<ApiReference />} />
-          <Route path="/community" element={<CommunityForum />} />
-          <Route path="/system-status" element={<SystemStatus />} />
-          <Route path="/changelog" element={<Changelog />} />
-          <Route path="/integrations" element={<Integrations />} />
-          {/* Protected Routes */}
-          <Route 
-            path="/dashboard" 
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/room/:roomId" 
-            element={
-              <ProtectedRoute>
-                <EditorRoom />
-              </ProtectedRoute>
-            } 
-          />
-        </Route>
-        </Routes>
-      </AuthProvider>
-    </BrowserRouter>
+    <AuthProvider>
+      <RouterProvider router={router} />
+    </AuthProvider>
   );
 }
 
