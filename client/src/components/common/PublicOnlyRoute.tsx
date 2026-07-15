@@ -1,9 +1,9 @@
 import { type ReactNode } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, Outlet } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 
 interface PublicOnlyRouteProps {
-  children: ReactNode;
+  children?: ReactNode;
 }
 
 export const PublicOnlyRoute = ({ children }: PublicOnlyRouteProps) => {
@@ -13,5 +13,5 @@ export const PublicOnlyRoute = ({ children }: PublicOnlyRouteProps) => {
     return <Navigate replace to="/dashboard" />;
   }
 
-  return <>{children}</>;
+  return children ? <>{children}</> : <Outlet />;
 };

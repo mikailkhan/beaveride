@@ -1,9 +1,9 @@
 import { type ReactNode } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, Outlet } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 
 interface ProtectedRouteProps {
-  children: ReactNode;
+  children?: ReactNode;
 }
 
 export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
@@ -13,5 +13,5 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     return <Navigate replace to="/login" />;
   }
 
-  return <>{children}</>;
+  return children ? <>{children}</> : <Outlet />;
 };

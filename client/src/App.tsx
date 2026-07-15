@@ -38,22 +38,6 @@ const router = createBrowserRouter([
       { path: '/', element: <Home /> },
       { path: '/about', element: <About /> },
       { path: '/contact', element: <Contact /> },
-      {
-        path: '/login',
-        element: (
-          <PublicOnlyRoute>
-            <Login />
-          </PublicOnlyRoute>
-        ),
-      },
-      {
-        path: '/register',
-        element: (
-          <PublicOnlyRoute>
-            <Register />
-          </PublicOnlyRoute>
-        ),
-      },
       { path: '/features', element: <Features /> },
       { path: '/pricing', element: <Pricing /> },
       { path: '/docs', element: <Docs /> },
@@ -64,21 +48,21 @@ const router = createBrowserRouter([
       { path: '/system-status', element: <SystemStatus /> },
       { path: '/changelog', element: <Changelog /> },
       { path: '/integrations', element: <Integrations /> },
+      // Public-only Routes
       {
-        path: '/dashboard',
-        element: (
-          <ProtectedRoute>
-            <Dashboard />
-          </ProtectedRoute>
-        ),
+        element: <PublicOnlyRoute />,
+        children: [
+          { path: '/login', element: <Login /> },
+          { path: '/register', element: <Register /> },
+        ],
       },
+      // Protected Routes
       {
-        path: '/room/:roomId',
-        element: (
-          <ProtectedRoute>
-            <EditorRoom />
-          </ProtectedRoute>
-        ),
+        element: <ProtectedRoute />,
+        children: [
+          { path: '/dashboard', element: <Dashboard /> },
+          { path: '/room/:roomId', element: <EditorRoom /> },
+        ],
       },
     ],
   },
