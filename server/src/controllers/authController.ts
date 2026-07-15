@@ -4,20 +4,23 @@ import { AuthService } from '../services/authService.js';
 import { HttpError } from '../middleware/errorMiddleware.js';
 
 const registerSchema = z.object({
-  email: z.string().email(),
+  email: z.string().email('Invalid email address'),
   username: z
     .string()
-    .min(3)
-    .max(80)
+    .min(3, 'Username must be at least 3 characters')
+    .max(80, 'Username must be under 80 characters')
     .regex(/^[a-zA-Z0-9_-]+$/, 'Username may only contain letters, numbers, hyphens, and underscores'),
-  firstName: z.string().min(1).max(120),
-  lastName: z.string().min(1).max(120),
-  password: z.string().min(8).max(128),
+  firstName: z.string().min(1, 'First name is required').max(120, 'First name must be under 120 characters'),
+  lastName: z.string().max(120, 'Last name must be under 120 characters').default(''),
+  password: z
+    .string()
+    .min(8, 'Password must be at least 8 characters')
+    .max(128, 'Password must be under 128 characters'),
 });
 
 const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(1, 'Password is required'),
 });
 
 export class AuthController {

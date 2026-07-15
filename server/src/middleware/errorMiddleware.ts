@@ -17,9 +17,16 @@ export const notFoundHandler: RequestHandler = (req, _res, next) => {
 
 export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
   if (error instanceof ZodError) {
+    const formattedMessage = error.issues
+      .map((issue) => {
+        const path = issue.path.join('.');
+        return path ? `${path}: ${issue.message}` : issue.message;
+      })
+      .join(', ');
+
     res.status(400).json({
       error: {
-        message: 'Validation failed',
+        message: `${formattedMessage}`,
         issues: error.issues,
       },
     });
