@@ -3,45 +3,73 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { MonacoEditor } from '../../components/editor/MonacoEditor';
 import { TerminalPanel } from '../../components/editor/TerminalPanel';
 import { useRoomStore } from '../../store/roomStore';
-import { mockRoomService } from '../../services/mocks/mockRoomService';
 import { mockEditorService } from '../../services/mocks/mockEditorService';
 import BeaverideLogo from '../../assets/logos/beaveride-logo.png';
+
+const getDefaultFileInfo = (language: string) => {
+  const lang = language.toLowerCase();
+  if (lang === 'typescript') {
+    return {
+      filename: 'main.ts',
+      code: `// TypeScript execution environment\nconst message: string = "Hello, TypeScript!";\nconsole.log(message);\n`,
+    };
+  }
+  if (lang === 'python') {
+    return {
+      filename: 'main.py',
+      code: `# Python 3 execution environment\ndef greet(name):\n    return f"Hello, {name}!"\n\nprint(greet("Beaver"))\n`,
+    };
+  }
+  if (lang === 'go') {
+    return {
+      filename: 'main.go',
+      code: `package main\n\nimport "fmt"\n\nfunc main() {\n    fmt.Println("Hello, Go!")\n}\n`,
+    };
+  }
+  // Default to javascript
+  return {
+    filename: 'main.js',
+    code: `// JavaScript (Node.js) execution environment\nconst name = "Beaver";\nconsole.log(\`Hello, \${name}!\`);\n`,
+  };
+};
 
 export const EditorRoom = () => {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
-  const { activeRoom, setActiveRoom } = useRoomStore();
+  const { activeRoom, isLoading, error, fetchRoomDetails, clearActiveRoom } = useRoomStore();
 
   const [activeFile, setActiveFile] = useState('main.js');
-  const [files, setFiles] = useState<Record<string, string>>({
-    'main.js': `import { serve } from '@beaveride/http';\nimport { logger } from './utils/logger.js';\n\nconst PORT = process.env.PORT || 3000;\n\nasync function initServer() {\n  try {\n    const server = await serve({ port: PORT });\n    logger.info(\`Server running successfully on port \${PORT}\`);\n    \n    // Initialize collaboration websocket\n    const wss = new WebSocketServer({ server });\n\n  } catch (err) {\n    logger.error('Failed to start server', err);\n    process.exit(1);\n  }\n}\n\ninitServer();`,
-  });
-
+  const [files, setFiles] = useState<Record<string, string>>({});
   const [output, setOutput] = useState('');
   const [status, setStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
 
   useEffect(() => {
-    const fetchRoom = async () => {
-      if (!roomId) return;
-      try {
-        const room = await mockRoomService.getRoom(roomId);
-        setActiveRoom(room);
-      } catch (error) {
-        console.error('Room not found', error);
-        navigate('/dashboard');
-      }
+    if (!roomId) return;
+    fetchRoomDetails(roomId);
+
+    return () => {
+      clearActiveRoom();
     };
-    fetchRoom();
-    
-    return () => setActiveRoom(null);
-  }, [roomId, navigate, setActiveRoom]);
+  }, [roomId, fetchRoomDetails, clearActiveRoom]);
+
+  // Set up initial file and code snippet once the room is loaded
+  useEffect(() => {
+    if (activeRoom) {
+      const fileInfo = getDefaultFileInfo(activeRoom.language);
+      setActiveFile(fileInfo.filename);
+      setFiles({
+        [fileInfo.filename]: fileInfo.code,
+      });
+    }
+  }, [activeRoom]);
 
   const handleRun = async () => {
+    if (!activeRoom) return;
     setStatus('running');
     setOutput('Starting execution environment...');
     
     try {
-      const result = await mockEditorService.executeCode('javascript', files[activeFile] || '');
+      const result = await mockEditorService.executeCode(activeRoom.language, files[activeFile] || '');
       setOutput(result);
       setStatus('success');
     } catch (error) {
@@ -55,15 +83,17 @@ export const EditorRoom = () => {
   };
 
   const handleFileChange = (newVal: string | undefined) => {
-    setFiles(prev => ({
+    setFiles((prev) => ({
       ...prev,
-      [activeFile]: newVal || ''
+      [activeFile]: newVal || '',
     }));
   };
 
   const getLanguageType = (filename: string) => {
     if (filename.endsWith('.js')) return 'javascript';
+    if (filename.endsWith('.ts')) return 'typescript';
     if (filename.endsWith('.go')) return 'go';
+    if (filename.endsWith('.py')) return 'python';
     if (filename.endsWith('.css')) return 'css';
     if (filename.endsWith('.json')) return 'json';
     return 'markdown';
@@ -73,8 +103,14 @@ export const EditorRoom = () => {
     if (filename.endsWith('.js')) {
       return <span className="material-symbols-outlined text-[16px] text-[#f0db4f]">javascript</span>;
     }
+    if (filename.endsWith('.ts')) {
+      return <span className="material-symbols-outlined text-[16px] text-[#007acc]">code</span>;
+    }
     if (filename.endsWith('.go')) {
       return <span className="material-symbols-outlined text-[16px] text-[#00add8]">code</span>;
+    }
+    if (filename.endsWith('.py')) {
+      return <span className="material-symbols-outlined text-[16px] text-[#3572A5]">code</span>;
     }
     if (filename.endsWith('.css')) {
       return <span className="material-symbols-outlined text-[16px] text-secondary">css</span>;
@@ -85,7 +121,35 @@ export const EditorRoom = () => {
     return <span className="material-symbols-outlined text-[16px] text-outline">description</span>;
   };
 
-  if (!activeRoom) return <div className="p-8 text-center text-on-surface-variant font-body-md bg-surface h-screen flex items-center justify-center">Loading room...</div>;
+  const formatLanguageName = (lang: string) => {
+    switch (lang.toLowerCase()) {
+      case 'javascript': return 'JavaScript (Node.js)';
+      case 'typescript': return 'TypeScript (Node.js)';
+      case 'python': return 'Python 3';
+      case 'go': return 'Go (Golang)';
+      default: return lang.charAt(0).toUpperCase() + lang.slice(1);
+    }
+  };
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen bg-surface p-lg text-center gap-md">
+        <div className="text-error text-3xl font-headline-md font-bold">Access Denied</div>
+        <p className="text-on-surface-variant font-body-md max-w-md">{error}</p>
+        <Link to="/dashboard" className="px-md py-sm bg-primary-container text-on-primary-container hover:bg-primary hover:text-on-primary rounded-lg font-label-md transition-colors shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
+          Go to Dashboard
+        </Link>
+      </div>
+    );
+  }
+
+  if (isLoading || !activeRoom) {
+    return (
+      <div className="p-8 text-center text-on-surface-variant font-body-md bg-surface h-screen flex items-center justify-center">
+        Loading room details...
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen bg-background text-on-surface font-body-md overflow-hidden flex font-[Inter] w-full">
@@ -120,7 +184,7 @@ export const EditorRoom = () => {
                 <span className="material-symbols-outlined text-[16px] text-tertiary">folder</span> src
               </div>
               <div className="pl-md flex flex-col gap-xs">
-                {Object.keys(files).filter(f => f === 'main.js' || f === 'server.go' || f === 'style.css').map((filename) => (
+                {Object.keys(files).map((filename) => (
                   <div 
                     key={filename}
                     onClick={() => handleFileClick(filename)}
@@ -130,16 +194,6 @@ export const EditorRoom = () => {
                   </div>
                 ))}
               </div>
-              
-              {Object.keys(files).filter(f => f === 'README.md' || f === 'package.json').map((filename) => (
-                <div 
-                  key={filename}
-                  onClick={() => handleFileClick(filename)}
-                  className={`flex items-center gap-xs px-sm py-xs rounded hover:bg-surface-container-high cursor-pointer text-on-surface font-label-md text-label-md ${activeFile === filename ? 'bg-surface-container-high' : ''}`}
-                >
-                  {getFileIcon(filename)} {filename}
-                </div>
-              ))}
             </div>
           </div>
 
@@ -148,7 +202,6 @@ export const EditorRoom = () => {
             <span className="font-label-md text-label-md">Search</span>
           </a>
         
-          
           <a className="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-all" href="#settings">
             <span className="material-symbols-outlined text-[20px]">settings</span>
             <span className="font-label-md text-label-md">Settings</span>
@@ -158,8 +211,8 @@ export const EditorRoom = () => {
         {/* Footer Navigation */}
         <div className="mt-md pt-sm border-t border-outline-variant/30 flex flex-col gap-xs">
           <Link className="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-all" to="/dashboard">
-            <span className="material-symbols-outlined text-[20px]">account_circle</span>
-            <span className="font-label-md text-label-md">Profile</span>
+            <span className="material-symbols-outlined text-[20px]">folder_open</span>
+            <span className="font-label-md text-label-md">Dashboard</span>
           </Link>
           <a className="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-all relative" href="#notifications">
             <span className="material-symbols-outlined text-[20px]">notifications</span>
@@ -183,7 +236,7 @@ export const EditorRoom = () => {
             </span>
             <span className="px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container text-[12px] font-bold ml-sm flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse"></span>
-              Connected
+              {formatLanguageName(activeRoom.language)} • {activeRoom.role}
             </span>
           </div>
 
@@ -191,31 +244,35 @@ export const EditorRoom = () => {
           <div className="flex items-center gap-sm">
             {/* Active Collaborators */}
             <div className="flex -space-x-2 mr-md">
-              <div className="w-8 h-8 rounded-full border-2 border-tertiary bg-surface-container-high flex items-center justify-center relative cursor-pointer group">
-                <span className="text-label-md font-bold text-on-surface-variant text-xs">A</span>
-                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 glass-panel rounded-lg px-3 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                  <div className="font-label-md text-label-md font-bold text-on-surface">Alex</div>
-                  <div className="text-[12px] text-on-surface-variant">Viewing main.js</div>
-                </div>
-              </div>
-              <div className="w-8 h-8 rounded-full border-2 border-secondary bg-surface-container-high flex items-center justify-center relative cursor-pointer group">
-                <span className="material-symbols-outlined text-[16px] text-on-surface-variant">smart_toy</span>
-                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 glass-panel rounded-lg px-3 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                  <div className="font-label-md text-label-md font-bold text-on-surface">BeaverBot</div>
-                  <div className="text-[12px] text-on-surface-variant">Typing...</div>
-                </div>
-              </div>
-              <div className="w-8 h-8 rounded-full border-2 border-error bg-surface-container-high flex items-center justify-center relative cursor-pointer group">
-                <span className="text-label-md font-bold text-on-surface-variant text-xs">S</span>
-                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 glass-panel rounded-lg px-3 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                  <div className="font-label-md text-label-md font-bold text-on-surface">Sarah</div>
-                  <div className="text-[12px] text-on-surface-variant">Idle</div>
-                </div>
-              </div>
+              {activeRoom.members?.map((member, idx) => {
+                const borderColors = ['border-primary', 'border-secondary', 'border-tertiary', 'border-error'];
+                const borderColor = borderColors[idx % borderColors.length];
+                return (
+                  <div 
+                    key={member.id} 
+                    className={`w-8 h-8 rounded-full border-2 ${borderColor} bg-surface-container-high flex items-center justify-center relative cursor-pointer group`}
+                  >
+                    <span className="text-label-md font-bold text-on-surface-variant text-xs">
+                      {member.username.charAt(0).toUpperCase()}
+                    </span>
+                    <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 glass-panel rounded-lg px-3 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                      <div className="font-label-md text-label-md font-bold text-on-surface">
+                        {member.firstName} {member.lastName}
+                      </div>
+                      <div className="text-[12px] text-on-surface-variant capitalize">
+                        {member.role} ({member.canRun ? 'can run' : 'read only'})
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
             <button 
-              onClick={() => alert("Invite link copied! Invite others to join.")}
+              onClick={() => {
+                navigator.clipboard.writeText(window.location.href);
+                alert("Room link copied to clipboard!");
+              }}
               className="px-md py-sm rounded-lg border border-outline-variant text-on-surface font-label-md text-label-md hover:bg-surface-container-high transition-colors flex items-center gap-xs cursor-pointer"
             >
               <span className="material-symbols-outlined text-[18px]">person_add</span> Invite
@@ -228,7 +285,7 @@ export const EditorRoom = () => {
             </button>
             <button 
               onClick={handleRun} 
-              disabled={status === 'running'}
+              disabled={status === 'running' || !activeRoom.canRun}
               className="px-md py-sm rounded-lg bg-primary-container text-white font-label-md text-label-md hover:bg-primary transition-colors flex items-center gap-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] cursor-pointer disabled:opacity-60"
             >
               <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>play_arrow</span> Run
@@ -264,22 +321,24 @@ export const EditorRoom = () => {
               <div className="glass-panel rounded-xl p-sm bg-white/80 backdrop-blur-md border border-outline-variant/30 shadow-md">
                 <h3 className="font-label-md text-label-md font-bold text-on-surface mb-xs px-xs">Activity</h3>
                 <div className="flex flex-col gap-1">
-                  <div className="flex items-center gap-sm p-xs rounded-lg hover:bg-surface-container-low transition-colors">
-                    <div className="w-6 h-6 rounded-full border-2 border-tertiary bg-surface-container-high flex items-center justify-center text-[10px] font-bold">A</div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-label-md text-[12px] font-bold text-on-surface truncate">Alex</div>
-                      <div className="text-[10px] text-on-surface-variant truncate">Refactoring initServer</div>
+                  {activeRoom.members?.map((member) => (
+                    <div 
+                      key={member.id} 
+                      className="flex items-center gap-sm p-xs rounded-lg hover:bg-surface-container-low transition-colors"
+                    >
+                      <div className="w-6 h-6 rounded-full border-2 border-tertiary bg-surface-container-high flex items-center justify-center text-[10px] font-bold">
+                        {member.username.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-label-md text-[12px] font-bold text-on-surface truncate">
+                          {member.firstName}
+                        </div>
+                        <div className="text-[10px] text-on-surface-variant truncate">
+                          Joined room ({member.role})
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-sm p-xs rounded-lg hover:bg-surface-container-low transition-colors">
-                    <div className="w-6 h-6 rounded-full border-2 border-secondary bg-surface-container-high flex items-center justify-center">
-                      <span className="material-symbols-outlined text-[12px]">smart_toy</span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-label-md text-[12px] font-bold text-on-surface truncate">BeaverBot</div>
-                      <div className="text-[10px] text-on-surface-variant truncate">Generating WebSocket boilerplate</div>
-                    </div>
-                  </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -292,3 +351,4 @@ export const EditorRoom = () => {
     </div>
   );
 };
+
