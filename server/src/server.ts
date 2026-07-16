@@ -2,9 +2,11 @@ import { createServer } from 'node:http';
 import { createApp } from './app.js';
 import { env } from './config/env.js';
 import { closeDb } from './db/client.js';
+import { createSocketServer } from './sockets/socketServer.js';
 
 const app = createApp();
 const server = createServer(app);
+createSocketServer(server);
 
 server.listen(env.PORT, () => {
   console.log(`BeaverIDE API listening on port ${env.PORT}`);

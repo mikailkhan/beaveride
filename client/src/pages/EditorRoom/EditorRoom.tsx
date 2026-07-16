@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { io } from 'socket.io-client';
 import { MonacoEditor } from '../../components/editor/MonacoEditor';
 import { TerminalPanel } from '../../components/editor/TerminalPanel';
 import { useRoomStore } from '../../store/roomStore';
@@ -51,6 +52,18 @@ export const EditorRoom = () => {
       clearActiveRoom();
     };
   }, [roomId, fetchRoomDetails, clearActiveRoom]);
+
+  useEffect(() => {
+    const socketUrl = (import.meta.env.VITE_API_URL as string) || 'http://localhost:3000';
+    console.log('Connecting to Socket.IO at:', socketUrl);
+    const socket = io(socketUrl);
+    socket.on('connect', () => {
+      console.log('Successfully connected to Socket.IO server, socket id:', socket.id);
+    });
+    return () => {
+      socket.disconnect();
+    };
+  }, []);
 
   // Set up initial file and code snippet once the room is loaded
   useEffect(() => {
