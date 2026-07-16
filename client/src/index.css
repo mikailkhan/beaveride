@@ -184,4 +184,11 @@
     0%, 100% { transform: translateY(0); }
     50% { transform: translateY(-10px); }
   }
+
+  /* Yjs Remote Selection & Cursor styling inside Monaco */
+  @keyframes yRemoteSelectionHead-blink {
+    50% {
+      border-color: transparent !important;
+    }
+  }
 }

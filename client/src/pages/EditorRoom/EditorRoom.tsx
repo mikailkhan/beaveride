@@ -58,7 +58,7 @@ export const EditorRoom = () => {
   const token = useAuthStore((state) => state.token);
 
   // Sync editor workspace using Yjs
-  useYjsSync({ roomId: roomId || '', token: token || '', editor });
+  const { collaborators } = useYjsSync({ roomId: roomId || '', token: token || '', editor });
 
   // Set up initial file and code snippet once the room is loaded
   useEffect(() => {
@@ -246,28 +246,25 @@ export const EditorRoom = () => {
           <div className="flex items-center gap-sm">
             {/* Active Collaborators */}
             <div className="flex -space-x-2 mr-md">
-              {activeRoom.members?.map((member, idx) => {
-                const borderColors = ['border-primary', 'border-secondary', 'border-tertiary', 'border-error'];
-                const borderColor = borderColors[idx % borderColors.length];
-                return (
-                  <div 
-                    key={member.id} 
-                    className={`w-8 h-8 rounded-full border-2 ${borderColor} bg-surface-container-high flex items-center justify-center relative cursor-pointer group`}
-                  >
-                    <span className="text-label-md font-bold text-on-surface-variant text-xs">
-                      {member.username.charAt(0).toUpperCase()}
-                    </span>
-                    <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 glass-panel rounded-lg px-3 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                      <div className="font-label-md text-label-md font-bold text-on-surface">
-                        {member.firstName} {member.lastName}
-                      </div>
-                      <div className="text-[12px] text-on-surface-variant capitalize">
-                        {member.role} ({member.canRun ? 'can run' : 'read only'})
-                      </div>
+              {collaborators.map((member) => (
+                <div 
+                  key={member.clientId} 
+                  style={{ borderColor: member.color }}
+                  className="w-8 h-8 rounded-full border-2 bg-surface-container-high flex items-center justify-center relative cursor-pointer group"
+                >
+                  <span className="text-label-md font-bold text-on-surface-variant text-xs">
+                    {member.username.charAt(0).toUpperCase()}
+                  </span>
+                  <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 glass-panel rounded-lg px-3 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                    <div className="font-label-md text-label-md font-bold text-on-surface">
+                      {member.firstName} {member.lastName}
+                    </div>
+                    <div className="text-[12px] text-on-surface-variant">
+                      @{member.username} (Online)
                     </div>
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
 
             <button 
@@ -320,22 +317,25 @@ export const EditorRoom = () => {
             {/* Presence Panel (Right side floating) */}
             <div className="absolute top-md right-md flex flex-col gap-sm z-30 w-64 select-none pointer-events-auto">
               <div className="glass-panel rounded-xl p-sm bg-white/80 backdrop-blur-md border border-outline-variant/30 shadow-md">
-                <h3 className="font-label-md text-label-md font-bold text-on-surface mb-xs px-xs">Activity</h3>
+                <h3 className="font-label-md text-label-md font-bold text-on-surface mb-xs px-xs">Users Online ({collaborators.length})</h3>
                 <div className="flex flex-col gap-1">
-                  {activeRoom.members?.map((member) => (
+                  {collaborators.map((member) => (
                     <div 
-                      key={member.id} 
+                      key={member.clientId} 
                       className="flex items-center gap-sm p-xs rounded-lg hover:bg-surface-container-low transition-colors"
                     >
-                      <div className="w-6 h-6 rounded-full border-2 border-tertiary bg-surface-container-high flex items-center justify-center text-[10px] font-bold">
+                      <div 
+                        style={{ borderColor: member.color }}
+                        className="w-6 h-6 rounded-full border-2 bg-surface-container-high flex items-center justify-center text-[10px] font-bold"
+                      >
                         {member.username.charAt(0).toUpperCase()}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="font-label-md text-[12px] font-bold text-on-surface truncate">
-                          {member.firstName}
+                          {member.firstName} {member.lastName}
                         </div>
                         <div className="text-[10px] text-on-surface-variant truncate">
-                          Joined room ({member.role})
+                          @{member.username} (Online)
                         </div>
                       </div>
                     </div>

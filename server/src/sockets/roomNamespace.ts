@@ -75,6 +75,11 @@ export function registerRoomNamespace(io: SocketServer): void {
         // Relay the update to all other users in the room
         socket.to(roomChannel).emit('sync:update', update);
       });
+
+      // Handle awareness updates (cursors, selections)
+      socket.on('sync:awareness', (update: Uint8Array) => {
+        socket.to(roomChannel).emit('sync:awareness', update);
+      });
     } catch (err) {
       console.error(`Failed to initialize Yjs document for room ${roomId}:`, err);
       socket.emit('error', 'Failed to load document workspace');
