@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { io } from 'socket.io-client';
 import { MonacoEditor } from '../../components/editor/MonacoEditor';
 import { TerminalPanel } from '../../components/editor/TerminalPanel';
 import { useRoomStore } from '../../store/roomStore';
 import { useAuthStore } from '../../store/authStore';
+import { useYjsSync } from '../../hooks/useYjsSync';
 import { mockEditorService } from '../../services/mocks/mockEditorService';
 import BeaverideLogo from '../../assets/logos/beaveride-logo.png';
 
@@ -40,6 +40,7 @@ export const EditorRoom = () => {
   const navigate = useNavigate();
   const { activeRoom, isLoading, error, fetchRoomDetails, clearActiveRoom } = useRoomStore();
 
+  const [editor, setEditor] = useState<any>(null);
   const [activeFile, setActiveFile] = useState('main.js');
   const [files, setFiles] = useState<Record<string, string>>({});
   const [output, setOutput] = useState('');
@@ -56,33 +57,8 @@ export const EditorRoom = () => {
 
   const token = useAuthStore((state) => state.token);
 
-  useEffect(() => {
-    if (!roomId || !token) return;
-    const socketUrl = (import.meta.env.VITE_API_URL as string) || 'http://localhost:3000';
-    console.log(`Connecting to Socket.IO room namespace at: ${socketUrl}/room`);
-    const socket = io(`${socketUrl}/room`, {
-      auth: {
-        token,
-        roomId,
-      },
-    });
-
-    socket.on('connect', () => {
-      console.log('Successfully connected to Room namespace, socket id:', socket.id);
-    });
-
-    socket.on('room:joined', (data) => {
-      console.log('Successfully joined the room workspace:', data);
-    });
-
-    socket.on('connect_error', (err) => {
-      console.error('Socket connection error:', err.message);
-    });
-
-    return () => {
-      socket.disconnect();
-    };
-  }, [roomId, token]);
+  // Sync editor workspace using Yjs
+  useYjsSync({ roomId: roomId || '', token: token || '', editor });
 
   // Set up initial file and code snippet once the room is loaded
   useEffect(() => {
@@ -101,7 +77,8 @@ export const EditorRoom = () => {
     setOutput('Starting execution environment...');
     
     try {
-      const result = await mockEditorService.executeCode(activeRoom.language, files[activeFile] || '');
+      const code = editor ? editor.getValue() : '';
+      const result = await mockEditorService.executeCode(activeRoom.language, code);
       setOutput(result);
       setStatus('success');
     } catch (error) {
@@ -112,13 +89,6 @@ export const EditorRoom = () => {
 
   const handleFileClick = (filename: string) => {
     setActiveFile(filename);
-  };
-
-  const handleFileChange = (newVal: string | undefined) => {
-    setFiles((prev) => ({
-      ...prev,
-      [activeFile]: newVal || '',
-    }));
   };
 
   const getLanguageType = (filename: string) => {
@@ -344,8 +314,7 @@ export const EditorRoom = () => {
           <div className="flex-1 relative min-h-0">
             <MonacoEditor 
               language={getLanguageType(activeFile)} 
-              value={files[activeFile] || ''} 
-              onChange={handleFileChange} 
+              onMount={(editorInstance) => setEditor(editorInstance)}
             />
 
             {/* Presence Panel (Right side floating) */}

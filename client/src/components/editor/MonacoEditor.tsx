@@ -1,12 +1,14 @@
 import { Editor } from '@monaco-editor/react';
+import type { OnMount } from '@monaco-editor/react';
 
 interface MonacoEditorProps {
   language: string;
-  value: string;
-  onChange: (value: string | undefined) => void;
+  value?: string;
+  onChange?: (value: string | undefined) => void;
+  onMount?: OnMount;
 }
 
-export const MonacoEditor = ({ language, value, onChange }: MonacoEditorProps) => {
+export const MonacoEditor = ({ language, value, onChange, onMount }: MonacoEditorProps) => {
   return (
     <div className="flex-1 w-full h-full relative">
       <Editor
@@ -14,6 +16,7 @@ export const MonacoEditor = ({ language, value, onChange }: MonacoEditorProps) =
         language={language}
         value={value}
         onChange={onChange}
+        onMount={onMount}
         theme="light"
         options={{
           minimap: { enabled: false },
