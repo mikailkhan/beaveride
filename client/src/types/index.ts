@@ -11,10 +11,21 @@ export type RoomStatus = 'active' | 'archived' | 'trash' | 'deleted';
 export interface Room {
   id: string;
   title: string;
-  progLangId: number;
+  language: string;
   createdAt: string;
   updatedAt: string;
   status: RoomStatus;
+  role?: 'owner' | 'editor' | 'viewer';
+  canRun?: boolean;
+  members?: Array<{
+    id: string;
+    username: string;
+    firstName: string;
+    lastName: string;
+    role: 'owner' | 'editor' | 'viewer';
+    canRun: boolean;
+    joinedAt: string;
+  }>;
 }
 
 export interface UserRoom {
