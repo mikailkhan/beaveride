@@ -3,6 +3,7 @@ import { createApp } from './app.js';
 import { env } from './config/env.js';
 import { closeDb } from './db/client.js';
 import { createSocketServer } from './sockets/socketServer.js';
+import { cleanupDocStore, persistAllDirtyDocs } from './sockets/docStore.js';
 
 const app = createApp();
 const server = createServer(app);
@@ -14,6 +15,12 @@ server.listen(env.PORT, () => {
 
 const shutdown = async (signal: NodeJS.Signals) => {
   console.log(`${signal} received, shutting down`);
+  cleanupDocStore();
+  try {
+    await persistAllDirtyDocs();
+  } catch (err) {
+    console.error('Error persisting documents on shutdown:', err);
+  }
   server.close(async () => {
     await closeDb();
     process.exit(0);

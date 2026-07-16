@@ -167,7 +167,7 @@ export const EditorRoom = () => {
     return (
       <div className="flex flex-col items-center justify-center h-screen bg-surface p-lg text-center gap-md">
         <div className="text-error text-3xl font-headline-md font-bold">Access Denied</div>
-        <p className="text-on-surface-variant font-body-md max-w-md">{error}</p>
+        <p className="text-on-surface-variant font-body-md">{error}</p>
         <Link to="/dashboard" className="px-md py-sm bg-primary-container text-on-primary-container hover:bg-primary hover:text-on-primary rounded-lg font-label-md transition-colors shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
           Go to Dashboard
         </Link>
