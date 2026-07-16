@@ -38,7 +38,20 @@ export const TerminalPanel = ({ output }: TerminalPanelProps) => {
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
     term.open(terminalRef.current);
-    fitAddon.fit();
+    try {
+      fitAddon.fit();
+    } catch (e) {
+      console.warn('Initial xterm fit failed, retrying on next frame:', e);
+    }
+    
+    // Schedule a deferred fit once the DOM layout settles
+    const initialFitTimeout = setTimeout(() => {
+      try {
+        fitAddon.fit();
+      } catch (e) {
+        // Safe to ignore if container is still not fully rendered/visible
+      }
+    }, 50);
 
     // Store references
     xtermRef.current = term;
@@ -107,6 +120,7 @@ export const TerminalPanel = ({ output }: TerminalPanelProps) => {
 
     return () => {
       window.removeEventListener('resize', handleResize);
+      clearTimeout(initialFitTimeout);
       term.dispose();
     };
   }, []);
