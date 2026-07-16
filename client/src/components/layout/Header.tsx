@@ -1,8 +1,15 @@
-import { Link } from 'react-router-dom';
-
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../../store/authStore';
 import BeaverideLogo from "../../assets/logos/beaveride-logo.png";
 
 export const Header = () => {
+  const { isAuthenticated, logout } = useAuthStore();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+  };
  
   return (
     <header className="h-[80px]">
@@ -19,8 +26,22 @@ export const Header = () => {
           <Link to="/about" className="text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors px-3 py-2 rounded-md font-label-md text-label-md cursor-pointer">About</Link>
         </div>
         <div className="flex items-center gap-md">
-          <Link to="/login" className="hidden md:block font-label-md text-label-md text-on-surface-variant hover:text-primary px-4 py-2 transition-colors">Log In</Link>
-          <Link to="/register" className="font-label-md text-label-md bg-primary-container text-on-primary shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] px-4 py-2 rounded-lg hover:bg-surface-tint transition-all active:scale-95">Start Coding</Link>
+          {isAuthenticated ? (
+            <>
+              <Link to="/dashboard" className="font-label-md text-label-md bg-primary-container text-on-primary shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] px-4 py-2 rounded-lg hover:bg-surface-tint transition-all active:scale-95">Dashboard</Link>
+              <button 
+                onClick={handleLogout} 
+                className="hidden md:block font-label-md text-label-md text-error hover:text-error-container hover:bg-error-container/20 px-4 py-2 rounded-lg transition-colors cursor-pointer"
+              >
+                Log Out
+              </button>
+            </>
+          ) : (
+            <>
+              <Link to="/login" className="hidden md:block font-label-md text-label-md text-on-surface-variant hover:text-primary px-4 py-2 transition-colors">Log In</Link>
+              <Link to="/register" className="font-label-md text-label-md bg-primary-container text-on-primary shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] px-4 py-2 rounded-lg hover:bg-surface-tint transition-all active:scale-95">Start Coding</Link>
+            </>
+          )}
         </div>
       </nav>
     </header>
