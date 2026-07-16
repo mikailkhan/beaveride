@@ -1,6 +1,7 @@
 import { Server as HttpServer } from 'node:http';
 import { Server as SocketServer } from 'socket.io';
 import { env } from '../config/env.js';
+import { registerRoomNamespace } from './roomNamespace.js';
 
 let io: SocketServer | null = null;
 
@@ -11,6 +12,8 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
       methods: ['GET', 'POST'],
     },
   });
+
+  registerRoomNamespace(io);
 
   io.on('connection', (socket) => {
     console.log(`Socket connected: ${socket.id}`);

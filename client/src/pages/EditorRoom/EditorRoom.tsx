@@ -4,6 +4,7 @@ import { io } from 'socket.io-client';
 import { MonacoEditor } from '../../components/editor/MonacoEditor';
 import { TerminalPanel } from '../../components/editor/TerminalPanel';
 import { useRoomStore } from '../../store/roomStore';
+import { useAuthStore } from '../../store/authStore';
 import { mockEditorService } from '../../services/mocks/mockEditorService';
 import BeaverideLogo from '../../assets/logos/beaveride-logo.png';
 
@@ -53,17 +54,35 @@ export const EditorRoom = () => {
     };
   }, [roomId, fetchRoomDetails, clearActiveRoom]);
 
+  const token = useAuthStore((state) => state.token);
+
   useEffect(() => {
+    if (!roomId || !token) return;
     const socketUrl = (import.meta.env.VITE_API_URL as string) || 'http://localhost:3000';
-    console.log('Connecting to Socket.IO at:', socketUrl);
-    const socket = io(socketUrl);
-    socket.on('connect', () => {
-      console.log('Successfully connected to Socket.IO server, socket id:', socket.id);
+    console.log(`Connecting to Socket.IO room namespace at: ${socketUrl}/room`);
+    const socket = io(`${socketUrl}/room`, {
+      auth: {
+        token,
+        roomId,
+      },
     });
+
+    socket.on('connect', () => {
+      console.log('Successfully connected to Room namespace, socket id:', socket.id);
+    });
+
+    socket.on('room:joined', (data) => {
+      console.log('Successfully joined the room workspace:', data);
+    });
+
+    socket.on('connect_error', (err) => {
+      console.error('Socket connection error:', err.message);
+    });
+
     return () => {
       socket.disconnect();
     };
-  }, []);
+  }, [roomId, token]);
 
   // Set up initial file and code snippet once the room is loaded
   useEffect(() => {
