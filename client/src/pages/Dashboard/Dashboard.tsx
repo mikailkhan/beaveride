@@ -2,46 +2,86 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useRoomStore } from '../../store/roomStore';
 import { useAuthStore } from '../../store/authStore';
-import { mockRoomService } from '../../services/mocks/mockRoomService';
 import BeaverideLogo from '../../assets/logos/beaveride-logo.png';
 
 export const Dashboard = () => {
-  const { rooms, setRooms } = useRoomStore();
+  const { rooms, isLoading, error, fetchRooms, createRoom, joinRoom } = useRoomStore();
   const { user, logout } = useAuthStore();
-  const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const fetchRooms = async () => {
-      try {
-        const data = await mockRoomService.getRooms();
-        setRooms(data);
-      } catch (error) {
-        console.error('Failed to load rooms:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchRooms();
-  }, [setRooms]);
+  // Modals state
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isJoinOpen, setIsJoinOpen] = useState(false);
 
-  const handleCreateRoom = async () => {
+  // Form states
+  const [createTitle, setCreateTitle] = useState('');
+  const [createLang, setCreateLang] = useState('javascript');
+  const [joinRoomId, setJoinRoomId] = useState('');
+  const [formError, setFormError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    fetchRooms();
+  }, [fetchRooms]);
+
+  const handleOpenCreateModal = () => {
+    setCreateTitle('');
+    setCreateLang('javascript');
+    setFormError('');
+    setIsCreateOpen(true);
+  };
+
+  const handleOpenJoinModal = () => {
+    setJoinRoomId('');
+    setFormError('');
+    setIsJoinOpen(true);
+  };
+
+  const handleCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!createTitle.trim()) {
+      setFormError('Room title is required');
+      return;
+    }
+    setFormError('');
+    setIsSubmitting(true);
     try {
-      const newRoom = await mockRoomService.createRoom('Untitled Room', 1);
+      const newRoom = await createRoom(createTitle.trim(), createLang);
+      setIsCreateOpen(false);
       navigate(`/room/${newRoom.id}`);
-    } catch (error) {
-      console.error('Failed to create room', error);
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Failed to create room');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
+  const handleJoinSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!joinRoomId.trim()) {
+      setFormError('Room ID is required');
+      return;
+    }
+    setFormError('');
+    setIsSubmitting(true);
+    try {
+      await joinRoom(joinRoomId.trim());
+      setIsJoinOpen(false);
+      navigate(`/room/${joinRoomId.trim()}`);
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Failed to join room');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
-
-  const getLanguageSubtext = (progLangId: number) => {
-    switch (progLangId) {
-      case 1: return 'Node.js • Express';
-      case 2: return 'React • Tailwind';
-      case 3: return 'Python • FastAPI';
-      default: return 'Node.js • Custom';
+  const formatLanguageName = (lang: string) => {
+    switch (lang.toLowerCase()) {
+      case 'javascript': return 'JavaScript (Node.js)';
+      case 'typescript': return 'TypeScript (Node.js)';
+      case 'python': return 'Python 3';
+      case 'go': return 'Go (Golang)';
+      default: return lang.charAt(0).toUpperCase() + lang.slice(1);
     }
   };
 
@@ -72,8 +112,8 @@ export const Dashboard = () => {
           </Link>
         </div>
         
-        <div className="mb-lg px-sm">
-          <div className="flex items-center gap-sm p-sm bg-surface rounded-lg border border-surface-variant mb-md cursor-pointer hover:bg-surface-container transition-colors">
+        <div className="mb-lg px-sm space-y-sm">
+          <div className="flex items-center gap-sm p-sm bg-surface rounded-lg border border-surface-variant cursor-pointer hover:bg-surface-container transition-colors">
             <img 
               alt="User Profile Avatar" 
               className="w-10 h-10 rounded-full border-2 border-primary-container object-cover" 
@@ -86,11 +126,19 @@ export const Dashboard = () => {
           </div>
           
           <button 
-            onClick={handleCreateRoom}
+            onClick={handleOpenCreateModal}
             className="w-full bg-primary-container text-on-primary-container font-label-md text-label-md py-sm px-md rounded-lg flex items-center justify-center gap-xs hover:bg-primary hover:text-on-primary transition-colors shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] cursor-pointer"
           >
             <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>add</span>
             New Project
+          </button>
+
+          <button 
+            onClick={handleOpenJoinModal}
+            className="w-full bg-surface text-on-surface border border-surface-variant font-label-md text-label-md py-sm px-md rounded-lg flex items-center justify-center gap-xs hover:bg-surface-container transition-colors cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-sm">group_add</span>
+            Join Project
           </button>
         </div>
 
@@ -140,6 +188,12 @@ export const Dashboard = () => {
           </div>
         </header>
 
+        {error && (
+          <div className="mb-lg p-md bg-error-container text-on-error-container rounded-lg font-body-md text-sm border border-error/20">
+            {error}
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
           {/* Recent Projects */}
           <section className="lg:col-span-8 flex flex-col gap-md">
@@ -152,7 +206,7 @@ export const Dashboard = () => {
               <div className="text-center py-20 text-on-surface-variant font-body-md">Loading projects...</div>
             ) : rooms.length === 0 ? (
               <div 
-                onClick={handleCreateRoom}
+                onClick={handleOpenCreateModal}
                 className="glass-panel p-2xl rounded-xl shadow-sm hover:shadow-md transition-shadow group cursor-pointer border border-dashed border-outline-variant flex flex-col items-center justify-center text-center gap-sm min-h-[220px]"
               >
                 <div className="w-12 h-12 rounded-full bg-primary-fixed-dim flex items-center justify-center text-primary group-hover:bg-primary-container group-hover:text-on-primary transition-all">
@@ -182,7 +236,7 @@ export const Dashboard = () => {
                             {room.title}
                           </h3>
                           <p className="font-code-md text-xs text-on-surface-variant mt-xs">
-                            {getLanguageSubtext(room.progLangId)}
+                            {formatLanguageName(room.language)}
                           </p>
                         </div>
                       </div>
@@ -220,7 +274,7 @@ export const Dashboard = () => {
 
                 {/* New Project Card */}
                 <div 
-                  onClick={handleCreateRoom}
+                  onClick={handleOpenCreateModal}
                   className="glass-panel p-lg rounded-xl shadow-sm hover:shadow-md transition-shadow group cursor-pointer border border-dashed border-outline-variant flex flex-col items-center justify-center text-center gap-sm min-h-[140px] hover:border-primary-container bg-surface-container-lowest/50"
                 >
                   <div className="w-10 h-10 rounded-full bg-primary-fixed-dim flex items-center justify-center text-primary group-hover:bg-primary-container group-hover:text-on-primary transition-colors">
@@ -234,8 +288,6 @@ export const Dashboard = () => {
 
           {/* Cloud Environment Usage Stats */}
           <aside className="lg:col-span-4 flex flex-col gap-md">
-            
-
             {/* Mini Activity Log */}
             <div className="glass-panel rounded-xl p-lg border border-surface-variant shadow-sm mt-md flex-1">
               <h3 className="font-label-md text-sm font-semibold text-on-surface mb-md">Recent Activity</h3>
@@ -267,6 +319,121 @@ export const Dashboard = () => {
           </aside>
         </div>
       </main>
+
+      {/* CREATE ROOM MODAL */}
+      {isCreateOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs z-50 flex items-center justify-center p-md">
+          <div className="bg-surface rounded-xl shadow-xl border border-surface-variant max-w-3xl w-full p-lg flex flex-col gap-md">
+            <div>
+              <h3 className="font-headline-md text-lg text-on-surface font-semibold">Create New Project</h3>
+              <p className="font-body-md text-sm text-on-surface-variant mt-xs">Setup a new collaborative code editor room.</p>
+            </div>
+
+            <form onSubmit={handleCreateSubmit} className="flex flex-col gap-md">
+              {formError && (
+                <div className="p-sm bg-error-container text-on-error-container rounded-lg font-body-md text-xs border border-error/20">
+                  {formError}
+                </div>
+              )}
+
+              <div className="flex flex-col gap-xs">
+                <label className="font-label-md text-xs text-on-surface font-semibold">Project Title</label>
+                <input 
+                  type="text" 
+                  value={createTitle}
+                  onChange={(e) => setCreateTitle(e.target.value)}
+                  placeholder="e.g. My Awesome API"
+                  disabled={isSubmitting}
+                  className="w-full bg-surface-container-lowest border border-surface-variant rounded-lg p-sm font-body-md text-sm text-on-surface focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
+                />
+              </div>
+
+              <div className="flex flex-col gap-xs">
+                <label className="font-label-md text-xs text-on-surface font-semibold">Programming Language</label>
+                <select 
+                  value={createLang}
+                  onChange={(e) => setCreateLang(e.target.value)}
+                  disabled={isSubmitting}
+                  className="w-full bg-surface-container-lowest border border-surface-variant rounded-lg p-sm font-body-md text-sm text-on-surface focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
+                >
+                  <option value="javascript">JavaScript (Node.js)</option>
+                  <option value="typescript">TypeScript (Node.js)</option>
+                  <option value="python">Python 3</option>
+                  <option value="go">Go (Golang)</option>
+                </select>
+              </div>
+
+              <div className="flex justify-end gap-sm mt-md">
+                <button 
+                  type="button"
+                  onClick={() => setIsCreateOpen(false)}
+                  disabled={isSubmitting}
+                  className="px-md py-sm bg-surface border border-surface-variant rounded-lg font-label-md text-sm hover:bg-surface-container transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="px-md py-sm bg-primary-container text-on-primary-container hover:bg-primary hover:text-on-primary rounded-lg font-label-md text-sm transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmitting ? 'Creating...' : 'Create'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* JOIN ROOM MODAL */}
+      {isJoinOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs z-50 flex items-center justify-center p-md">
+          <div className="bg-surface rounded-xl shadow-xl border border-surface-variant max-w-3xl w-full p-lg flex flex-col gap-md">
+            <div>
+              <h3 className="font-headline-md text-lg text-on-surface font-semibold">Join Project</h3>
+              <p className="font-body-md text-sm text-on-surface-variant mt-xs">Collaborate in an existing coding room.</p>
+            </div>
+
+            <form onSubmit={handleJoinSubmit} className="flex flex-col gap-md">
+              {formError && (
+                <div className="p-sm bg-error-container text-on-error-container rounded-lg font-body-md text-xs border border-error/20">
+                  {formError}
+                </div>
+              )}
+
+              <div className="flex flex-col gap-xs">
+                <label className="font-label-md text-xs text-on-surface font-semibold">Room ID</label>
+                <input 
+                  type="text" 
+                  value={joinRoomId}
+                  onChange={(e) => setJoinRoomId(e.target.value)}
+                  placeholder="e.g. 1"
+                  disabled={isSubmitting}
+                  className="w-full bg-surface-container-lowest border border-surface-variant rounded-lg p-sm font-body-md text-sm text-on-surface focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
+                />
+              </div>
+
+              <div className="flex justify-end gap-sm mt-md">
+                <button 
+                  type="button"
+                  onClick={() => setIsJoinOpen(false)}
+                  disabled={isSubmitting}
+                  className="px-md py-sm bg-surface border border-surface-variant rounded-lg font-label-md text-sm hover:bg-surface-container transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="px-md py-sm bg-primary-container text-on-primary-container hover:bg-primary hover:text-on-primary rounded-lg font-label-md text-sm transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmitting ? 'Joining...' : 'Join'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
