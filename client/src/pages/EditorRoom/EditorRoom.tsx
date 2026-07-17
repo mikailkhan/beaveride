@@ -9,6 +9,14 @@ import { useYjsSync } from '../../hooks/useYjsSync';
 import { roomService } from '../../services/roomService';
 import BeaverideLogo from '../../assets/logos/beaveride-logo.png';
 
+type ActivityEventType = 'joined' | 'left' | 'global_run' | 'code_edit';
+
+interface ActivityEntry {
+  username: string;
+  event: ActivityEventType;
+  timestamp: string;
+}
+
 const getDefaultFileInfo = (language: string) => {
   const lang = language.toLowerCase();
   if (lang === 'python') {
@@ -42,6 +50,7 @@ export const EditorRoom = () => {
   const [globalRunStatus, setGlobalRunStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
   const [localOutput, setLocalOutput] = useState('');
   const [localRunStatus, setLocalRunStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
+  const [activities, setActivities] = useState<ActivityEntry[]>([]);
   const [activeTab, setActiveTab] = useState<'global' | 'local'>('global');
 
   useEffect(() => {
@@ -58,6 +67,7 @@ export const EditorRoom = () => {
   const [showChat, setShowChat] = useState(false);
   const [isPresenceExpanded, setIsPresenceExpanded] = useState(true);
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
+  const [isActivityExpanded, setIsActivityExpanded] = useState(true);
 
   // Sync editor workspace using Yjs
   const { collaborators, socket } = useYjsSync({ roomId: roomId || '', token: token || '', editor });
@@ -88,11 +98,17 @@ export const EditorRoom = () => {
     socket.on('run:global:end', onEnd);
     socket.on('run:global:locked', onLocked);
 
+    const onActivityUpdate = (entries: ActivityEntry[]) => {
+      setActivities(entries);
+    };
+    socket.on('activity:update', onActivityUpdate);
+
     return () => {
       socket.off('run:global:start', onStart);
       socket.off('run:global:output', onOutput);
       socket.off('run:global:end', onEnd);
       socket.off('run:global:locked', onLocked);
+      socket.off('activity:update', onActivityUpdate);
     };
   }, [socket]);
 
@@ -168,6 +184,41 @@ export const EditorRoom = () => {
       case 'python': return 'Python 3';
       case 'go': return 'Go (Golang)';
       default: return lang.charAt(0).toUpperCase() + lang.slice(1);
+    }
+  };
+
+  const formatActivity = (entry: ActivityEntry) => {
+    switch (entry.event) {
+      case 'joined':
+        return {
+          icon: 'login',
+          label: `${entry.username} joined`,
+          colorClass: 'text-green-600',
+        };
+      case 'left':
+        return {
+          icon: 'logout',
+          label: `${entry.username} left`,
+          colorClass: 'text-red-500',
+        };
+      case 'global_run':
+        return {
+          icon: 'play_arrow',
+          label: `${entry.username} ran code`,
+          colorClass: 'text-primary',
+        };
+      case 'code_edit':
+        return {
+          icon: 'edit',
+          label: `${entry.username} edited code`,
+          colorClass: 'text-tertiary',
+        };
+      default:
+        return {
+          icon: 'info',
+          label: `${entry.username} performed action`,
+          colorClass: 'text-outline',
+        };
     }
   };
 
@@ -427,6 +478,43 @@ export const EditorRoom = () => {
                           </div>
                         </div>
                       ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Activity Feed Panel */}
+                <div className="glass-panel rounded-xl p-sm bg-white/80 backdrop-blur-md border border-outline-variant/30 shadow-md">
+                  <div 
+                    onClick={() => setIsActivityExpanded(!isActivityExpanded)}
+                    className="flex items-center justify-between cursor-pointer font-label-md text-label-md font-bold text-on-surface px-xs py-xs select-none hover:bg-surface-container-low rounded-lg transition-colors"
+                  >
+                    <span>Activity Feed</span>
+                    <span 
+                      className="material-symbols-outlined text-[18px] transition-transform duration-200" 
+                      style={{ transform: isActivityExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                    >
+                      keyboard_arrow_down
+                    </span>
+                  </div>
+                  {isActivityExpanded && (
+                    <div className="flex flex-col gap-1 mt-xs max-h-48 overflow-y-auto">
+                      {activities.slice(0, 20).map((entry, index) => {
+                        const details = formatActivity(entry);
+                        return (
+                          <div key={index} className="flex items-center gap-xs p-xs rounded-lg text-[11px] text-on-surface-variant">
+                            <span className={`material-symbols-outlined text-[14px] ${details.colorClass}`}>
+                              {details.icon}
+                            </span>
+                            <span className="flex-1 truncate" title={details.label}>{details.label}</span>
+                            <span className="text-[10px] text-outline shrink-0">
+                              {new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                        );
+                      })}
+                      {activities.length === 0 && (
+                        <div className="text-[11px] text-outline px-xs py-xs">No activity yet.</div>
+                      )}
                     </div>
                   )}
                 </div>
