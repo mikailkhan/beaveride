@@ -29,6 +29,7 @@ export function useYjsSync({ roomId, token, editor }: UseYjsSyncProps): {
   isConnected: boolean;
   error: string | null;
   collaborators: Collaborator[];
+  socket: Socket | null;
 } {
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -246,5 +247,5 @@ export function useYjsSync({ roomId, token, editor }: UseYjsSyncProps): {
     };
   }, [editor]);
 
-  return { isConnected, error, collaborators };
+  return { isConnected, error, collaborators, socket: socketRef.current };
 }

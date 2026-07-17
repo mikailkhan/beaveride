@@ -2,10 +2,12 @@ import { Server as SocketServer } from 'socket.io';
 import * as Y from 'yjs';
 import { UserRepository } from '../repositories/userRepository.js';
 import { AuthService } from '../services/authService.js';
+import { ChatRepository } from '../repositories/chatRepository.js';
 import { getOrCreateDoc, updateDoc, decrementConnections } from './docStore.js';
 
 const userRepository = new UserRepository();
 const authService = new AuthService();
+const chatRepository = new ChatRepository();
 
 export function registerRoomNamespace(io: SocketServer): void {
   const roomNsp = io.of('/room');
@@ -63,6 +65,10 @@ export function registerRoomNamespace(io: SocketServer): void {
       // Emit confirmation
       socket.emit('room:joined', { userId, username, roomId });
 
+      // Load and emit chat history
+      const history = await chatRepository.getRecentMessages(roomId, 50);
+      socket.emit('chat:history', history);
+
       // Handle initial document sync request
       socket.on('sync:init', () => {
         const stateUpdate = Y.encodeStateAsUpdate(doc);
@@ -79,6 +85,19 @@ export function registerRoomNamespace(io: SocketServer): void {
       // Handle awareness updates (cursors, selections)
       socket.on('sync:awareness', (update: Uint8Array) => {
         socket.to(roomChannel).emit('sync:awareness', update);
+      });
+
+      // Handle incoming chat messages
+      socket.on('chat:send', async (data: { message: string }) => {
+        const messageText = data?.message?.trim();
+        if (!messageText || messageText.length > 2000) return;
+        try {
+          const chatMsg = await chatRepository.insertMessage(roomId, userId, messageText);
+          // Broadcast to all clients in the room including the sender
+          roomNsp.to(roomChannel).emit('chat:message', chatMsg);
+        } catch (err) {
+          console.error(`Failed to save chat message in room ${roomId}:`, err);
+        }
       });
     } catch (err) {
       console.error(`Failed to initialize Yjs document for room ${roomId}:`, err);

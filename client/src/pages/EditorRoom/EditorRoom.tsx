@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { MonacoEditor } from '../../components/editor/MonacoEditor';
 import { TerminalPanel } from '../../components/editor/TerminalPanel';
+import { ChatPanel } from '../../components/editor/ChatPanel';
 import { useRoomStore } from '../../store/roomStore';
 import { useAuthStore } from '../../store/authStore';
 import { useYjsSync } from '../../hooks/useYjsSync';
@@ -57,8 +58,10 @@ export const EditorRoom = () => {
 
   const token = useAuthStore((state) => state.token);
 
+  const [showChat, setShowChat] = useState(false);
+
   // Sync editor workspace using Yjs
-  const { collaborators } = useYjsSync({ roomId: roomId || '', token: token || '', editor });
+  const { collaborators, socket } = useYjsSync({ roomId: roomId || '', token: token || '', editor });
 
   // Set up initial file and code snippet once the room is loaded
   useEffect(() => {
@@ -283,6 +286,16 @@ export const EditorRoom = () => {
               <span className="material-symbols-outlined text-[18px]">share</span> Share
             </button>
             <button 
+              onClick={() => setShowChat((prev) => !prev)}
+              className={`px-md py-sm rounded-lg border font-label-md text-label-md transition-colors flex items-center gap-xs cursor-pointer ${
+                showChat 
+                  ? 'bg-secondary-container border-secondary text-on-secondary-container' 
+                  : 'border-outline-variant text-on-surface hover:bg-surface-container-high'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[18px]">chat</span> Chat
+            </button>
+            <button 
               onClick={handleRun} 
               disabled={status === 'running' || !activeRoom.canRun}
               className="px-md py-sm rounded-lg bg-primary-container text-white font-label-md text-label-md hover:bg-primary transition-colors flex items-center gap-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] cursor-pointer disabled:opacity-60"
@@ -292,61 +305,69 @@ export const EditorRoom = () => {
           </div>
         </header>
 
-        {/* Editor & Panels Area */}
-        <div className="flex-1 flex flex-col min-h-0 relative">
-          {/* Editor Header / Tabs */}
-          <div className="h-[40px] flex bg-surface-container-lowest border-b border-outline-variant/20 shrink-0 select-none">
-            {Object.keys(files).map((filename) => (
-              <div 
-                key={filename}
-                onClick={() => handleFileClick(filename)}
-                className={`flex items-center gap-sm px-md border-r border-outline-variant/20 font-label-md text-label-md cursor-pointer transition-colors ${activeFile === filename ? 'bg-[#ffffff] border-b-2 border-b-primary text-on-surface' : 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-low'}`}
-              >
-                {getFileIcon(filename)} {filename}
-              </div>
-            ))}
-          </div>
+        {/* Workspace Body (Editor + Chat Panel) */}
+        <div className="flex-1 flex flex-row min-h-0 w-full overflow-hidden">
+          {/* Editor & Panels Area */}
+          <div className="flex-1 flex flex-col min-h-0 relative">
+            {/* Editor Header / Tabs */}
+            <div className="h-[40px] flex bg-surface-container-lowest border-b border-outline-variant/20 shrink-0 select-none">
+              {Object.keys(files).map((filename) => (
+                <div 
+                  key={filename}
+                  onClick={() => handleFileClick(filename)}
+                  className={`flex items-center gap-sm px-md border-r border-outline-variant/20 font-label-md text-label-md cursor-pointer transition-colors ${activeFile === filename ? 'bg-[#ffffff] border-b-2 border-b-primary text-on-surface' : 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-low'}`}
+                >
+                  {getFileIcon(filename)} {filename}
+                </div>
+              ))}
+            </div>
 
-          {/* Monaco-inspired Editor Container */}
-          <div className="flex-1 relative min-h-0">
-            <MonacoEditor 
-              language={getLanguageType(activeFile)} 
-              onMount={(editorInstance) => setEditor(editorInstance)}
-            />
+            {/* Monaco-inspired Editor Container */}
+            <div className="flex-1 relative min-h-0">
+              <MonacoEditor 
+                language={getLanguageType(activeFile)} 
+                onMount={(editorInstance) => setEditor(editorInstance)}
+              />
 
-            {/* Presence Panel (Right side floating) */}
-            <div className="absolute top-md right-md flex flex-col gap-sm z-30 w-64 select-none pointer-events-auto">
-              <div className="glass-panel rounded-xl p-sm bg-white/80 backdrop-blur-md border border-outline-variant/30 shadow-md">
-                <h3 className="font-label-md text-label-md font-bold text-on-surface mb-xs px-xs">Users Online ({collaborators.length})</h3>
-                <div className="flex flex-col gap-1">
-                  {collaborators.map((member) => (
-                    <div 
-                      key={member.clientId} 
-                      className="flex items-center gap-sm p-xs rounded-lg hover:bg-surface-container-low transition-colors"
-                    >
+              {/* Presence Panel (Right side floating) */}
+              <div className="absolute top-md right-md flex flex-col gap-sm z-30 w-64 select-none pointer-events-auto">
+                <div className="glass-panel rounded-xl p-sm bg-white/80 backdrop-blur-md border border-outline-variant/30 shadow-md">
+                  <h3 className="font-label-md text-label-md font-bold text-on-surface mb-xs px-xs">Users Online ({collaborators.length})</h3>
+                  <div className="flex flex-col gap-1">
+                    {collaborators.map((member) => (
                       <div 
-                        style={{ borderColor: member.color }}
-                        className="w-6 h-6 rounded-full border-2 bg-surface-container-high flex items-center justify-center text-[10px] font-bold"
+                        key={member.clientId} 
+                        className="flex items-center gap-sm p-xs rounded-lg hover:bg-surface-container-low transition-colors"
                       >
-                        {member.username.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-label-md text-[12px] font-bold text-on-surface truncate">
-                          {member.firstName} {member.lastName}
+                        <div 
+                          style={{ borderColor: member.color }}
+                          className="w-6 h-6 rounded-full border-2 bg-surface-container-high flex items-center justify-center text-[10px] font-bold"
+                        >
+                          {member.username.charAt(0).toUpperCase()}
                         </div>
-                        <div className="text-[10px] text-on-surface-variant truncate">
-                          @{member.username} (Online)
+                        <div className="flex-1 min-w-0">
+                          <div className="font-label-md text-[12px] font-bold text-on-surface truncate">
+                            {member.firstName} {member.lastName}
+                          </div>
+                          <div className="text-[10px] text-on-surface-variant truncate">
+                            @{member.username} (Online)
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
+
+            {/* Terminal (Bottom Panel) */}
+            <TerminalPanel output={output} />
           </div>
 
-          {/* Terminal (Bottom Panel) */}
-          <TerminalPanel output={output} />
+          {/* Chat Sidebar */}
+          {showChat && (
+            <ChatPanel socket={socket} onClose={() => setShowChat(false)} />
+          )}
         </div>
       </main>
     </div>
