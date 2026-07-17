@@ -54,6 +54,7 @@ export const EditorRoom = () => {
 
   const [showChat, setShowChat] = useState(false);
   const [isPresenceExpanded, setIsPresenceExpanded] = useState(true);
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
 
   // Sync editor workspace using Yjs
   const { collaborators, socket } = useYjsSync({ roomId: roomId || '', token: token || '', editor });
@@ -149,70 +150,87 @@ export const EditorRoom = () => {
   return (
     <div className="h-screen bg-background text-on-surface font-body-md overflow-hidden flex font-[Inter] w-full">
       {/* Left Sidebar Menu */}
-      <aside className="h-screen w-[280px] bg-surface-container-low border-r border-outline-variant/30 flex flex-col justify-between py-md px-sm shrink-0 z-10 select-none">
-        <div className="mb-lg px-sm">
-          <div className="flex items-center justify-center mb-lg w-[140px] h-[54px] bg-surface-container-high rounded-lg overflow-hidden mt-sm">
-            <Link to="/dashboard">
-              <img src={BeaverideLogo} alt="BeaverIDE Logo" className="h-10 w-auto object-contain" />
-            </Link>
+      <aside className={`h-screen bg-surface-container-low border-r border-outline-variant/30 flex flex-col justify-between py-md px-sm shrink-0 z-10 select-none transition-all duration-300 ${isSidebarExpanded ? 'w-[280px]' : 'w-[70px] items-center'}`}>
+        <div className="mb-lg px-sm w-full">
+          <div className={`flex items-center mb-lg mt-sm ${isSidebarExpanded ? 'justify-between' : 'justify-center'}`}>
+            {isSidebarExpanded && (
+              <div className="flex items-center w-[140px] h-[54px] bg-surface-container-high rounded-lg overflow-hidden">
+                <Link to="/dashboard">
+                  <img src={BeaverideLogo} alt="BeaverIDE Logo" className="h-10 w-auto object-contain" />
+                </Link>
+              </div>
+            )}
+            <button 
+              onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
+              className="p-sm rounded-lg hover:bg-surface-container-high text-on-surface-variant transition-colors cursor-pointer"
+              title={isSidebarExpanded ? "Collapse Sidebar" : "Expand Sidebar"}
+            >
+              <span className="material-symbols-outlined text-[20px]">
+                {isSidebarExpanded ? 'menu_open' : 'menu'}
+              </span>
+            </button>
           </div>
           <button 
             onClick={() => alert("Creating a new file... (mock)")}
-            className="w-full bg-primary-container text-white rounded-lg font-label-md text-label-md shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] hover:bg-primary transition-colors flex items-center justify-center gap-xs py-md cursor-pointer"
+            className={`bg-primary-container text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] hover:bg-primary transition-all flex items-center justify-center gap-xs cursor-pointer ${isSidebarExpanded ? 'w-full rounded-lg font-label-md text-label-md py-md' : 'w-10 h-10 rounded-full p-0 mx-auto'}`}
+            title="New File"
           >
-            <span className="material-symbols-outlined text-[18px]">add</span> New File
+            <span className="material-symbols-outlined text-[18px]">add</span>
+            {isSidebarExpanded && <span>New File</span>}
           </button>
         </div>
 
         {/* Main Navigation */}
-        <nav className="flex-1 overflow-y-auto flex flex-col gap-sm">
+        <nav className="flex-1 overflow-y-auto flex flex-col gap-sm w-full">
           <div className="group">
-            <div className="flex items-center gap-sm px-sm py-sm rounded-lg bg-primary-container text-on-primary-container font-bold">
+            <div className={`flex items-center gap-sm px-sm py-sm rounded-lg bg-primary-container text-on-primary-container font-bold ${isSidebarExpanded ? '' : 'justify-center'}`} title="Explorer">
               <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>folder</span>
-              <span className="font-label-md text-label-md">Explorer</span>
-              <span className="material-symbols-outlined text-[16px] ml-auto rotate-90">chevron_right</span>
+              {isSidebarExpanded && <span className="font-label-md text-label-md">Explorer</span>}
+              {isSidebarExpanded && <span className="material-symbols-outlined text-[16px] ml-auto rotate-90">chevron_right</span>}
             </div>
             
             {/* Explorer Content */}
-            <div className="pl-md pr-sm py-xs flex flex-col gap-xs mt-xs">
-              <div className="flex items-center gap-xs px-sm py-xs rounded hover:bg-surface-container-high cursor-pointer text-on-surface font-label-md text-label-md">
-                <span className="material-symbols-outlined text-[16px] text-tertiary">folder</span> src
+            {isSidebarExpanded && (
+              <div className="pl-md pr-sm py-xs flex flex-col gap-xs mt-xs">
+                <div className="flex items-center gap-xs px-sm py-xs rounded hover:bg-surface-container-high cursor-pointer text-on-surface font-label-md text-label-md">
+                  <span className="material-symbols-outlined text-[16px] text-tertiary">folder</span> src
+                </div>
+                <div className="pl-md flex flex-col gap-xs">
+                  {Object.keys(files).map((filename) => (
+                    <div 
+                      key={filename}
+                      onClick={() => handleFileClick(filename)}
+                      className={`flex items-center gap-xs px-sm py-xs rounded hover:bg-surface-container-high cursor-pointer text-on-surface font-label-md text-label-md ${activeFile === filename ? 'bg-surface-container-high' : ''}`}
+                    >
+                      {getFileIcon(filename)} {filename}
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="pl-md flex flex-col gap-xs">
-                {Object.keys(files).map((filename) => (
-                  <div 
-                    key={filename}
-                    onClick={() => handleFileClick(filename)}
-                    className={`flex items-center gap-xs px-sm py-xs rounded hover:bg-surface-container-high cursor-pointer text-on-surface font-label-md text-label-md ${activeFile === filename ? 'bg-surface-container-high' : ''}`}
-                  >
-                    {getFileIcon(filename)} {filename}
-                  </div>
-                ))}
-              </div>
-            </div>
+            )}
           </div>
 
-          <a className="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-all" href="#search">
+          <a className={`flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-all ${isSidebarExpanded ? '' : 'justify-center'}`} href="#search" title="Search">
             <span className="material-symbols-outlined text-[20px]">search</span>
-            <span className="font-label-md text-label-md">Search</span>
+            {isSidebarExpanded && <span className="font-label-md text-label-md">Search</span>}
           </a>
         
-          <a className="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-all" href="#settings">
+          <a className={`flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-all ${isSidebarExpanded ? '' : 'justify-center'}`} href="#settings" title="Settings">
             <span className="material-symbols-outlined text-[20px]">settings</span>
-            <span className="font-label-md text-label-md">Settings</span>
+            {isSidebarExpanded && <span className="font-label-md text-label-md">Settings</span>}
           </a>
         </nav>
 
         {/* Footer Navigation */}
-        <div className="mt-md pt-sm border-t border-outline-variant/30 flex flex-col gap-xs">
-          <Link className="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-all" to="/dashboard">
+        <div className="mt-md pt-sm border-t border-outline-variant/30 flex flex-col gap-xs w-full">
+          <Link className={`flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-all ${isSidebarExpanded ? '' : 'justify-center'}`} to="/dashboard" title="Dashboard">
             <span className="material-symbols-outlined text-[20px]">folder_open</span>
-            <span className="font-label-md text-label-md">Dashboard</span>
+            {isSidebarExpanded && <span className="font-label-md text-label-md">Dashboard</span>}
           </Link>
-          <a className="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-all relative" href="#notifications">
+          <a className={`flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-all relative ${isSidebarExpanded ? '' : 'justify-center'}`} href="#notifications" title="Notifications">
             <span className="material-symbols-outlined text-[20px]">notifications</span>
-            <span className="font-label-md text-label-md">Notifications</span>
-            <span className="absolute top-2 left-6 w-2 h-2 bg-primary rounded-full border border-surface-container-low"></span>
+            {isSidebarExpanded && <span className="font-label-md text-label-md">Notifications</span>}
+            <span className={`absolute bg-primary rounded-full border border-surface-container-low ${isSidebarExpanded ? 'top-2 left-6 w-2 h-2' : 'top-1 right-2 w-1.5 h-1.5'}`}></span>
           </a>
         </div>
       </aside>
