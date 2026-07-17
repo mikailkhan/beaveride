@@ -19,6 +19,7 @@ export const DashboardLayout = () => {
   const [joinRoomId, setJoinRoomId] = useState('');
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
 
   const handleOpenCreateModal = () => {
     setCreateTitle('');
@@ -75,7 +76,9 @@ export const DashboardLayout = () => {
   const displayEmail = user ? user.email : 'pro@beaveride.com';
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center gap-md px-md py-sm rounded-lg font-label-md text-label-md transition-all active:translate-x-1 ${
+    `flex items-center gap-md rounded-lg font-label-md text-label-md transition-all active:translate-x-1 ${
+      isSidebarExpanded ? 'px-md py-sm w-full' : 'p-sm justify-center w-10 h-10 mx-auto'
+    } ${
       isActive
         ? 'bg-primary-container text-on-primary-container font-semibold'
         : 'text-on-surface-variant hover:bg-surface-container-highest'
@@ -84,87 +87,108 @@ export const DashboardLayout = () => {
   return (
     <div className="text-on-surface antialiased flex h-screen overflow-hidden w-full bg-surface">
       {/* SideNavBar */}
-      <nav className="fixed left-0 top-0 h-full flex flex-col p-md bg-surface-container-low w-72 z-40 hidden md:flex border-r border-surface-variant">
-        <div className="mb-xl flex items-center gap-sm px-sm mt-sm">
-          <Link to="/">
-            <img alt="BeaverIDE Logo" className="h-16 w-auto" src={BeaverideLogo} />
-          </Link>
+      <nav className={`fixed left-0 top-0 h-full flex flex-col bg-surface-container-low z-40 hidden md:flex border-r border-surface-variant transition-all duration-300 ${isSidebarExpanded ? 'w-72 p-md' : 'w-[70px] py-md px-xs items-center'}`}>
+        <div className={`mb-xl flex items-center mt-sm w-full ${isSidebarExpanded ? 'justify-between px-sm' : 'justify-center'}`}>
+          {isSidebarExpanded && (
+            <Link to="/">
+              <img alt="BeaverIDE Logo" className="h-16 w-auto" src={BeaverideLogo} />
+            </Link>
+          )}
+          <button 
+            onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
+            className="p-sm rounded-lg hover:bg-surface-container-high text-on-surface-variant transition-colors cursor-pointer"
+            title={isSidebarExpanded ? "Collapse Sidebar" : "Expand Sidebar"}
+          >
+            <span className="material-symbols-outlined text-[20px]">
+              {isSidebarExpanded ? 'menu_open' : 'menu'}
+            </span>
+          </button>
         </div>
 
-        <div className="mb-lg px-sm space-y-sm">
+        <div className={`mb-lg space-y-sm w-full ${isSidebarExpanded ? 'px-sm' : 'px-0'}`}>
           <Link 
             to="/dashboard/settings"
-            className="flex items-center gap-sm p-sm bg-surface rounded-lg border border-surface-variant cursor-pointer hover:bg-surface-container transition-colors"
+            className={`flex items-center gap-sm bg-surface border border-surface-variant cursor-pointer hover:bg-surface-container transition-colors ${isSidebarExpanded ? 'p-sm w-full rounded-lg' : 'w-10 h-10 rounded-full justify-center p-0 mx-auto'}`}
+            title="Settings"
           >
-            <img
-              alt="User Profile Avatar"
-              className="w-10 h-10 rounded-full border-2 border-primary-container object-cover"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuBNkOZEkCu2AprexCFCsvJXOpZLv53DVKcel7waC9Azezg6wawU3xFOhERlB6zleyXPLMJJR9zqziiq1D502_BUqjXml_hH52FOtSbzftwTpNVo44wUKjf3qi5bij0DfFh7DZrQU3jWGXMYj26_EJNk0_-j3ka1f6oryihMIel8vCSNHAWYsbcdRo2VEgIGFHZeDmweouDuqv23igV0LwXnCX0bcE3Nd7M0A_ObOOQdP1PhZVeUYXk_rEFynUiSHMDdISvi-TvvGds"
-            />
-            <div className="flex flex-col min-w-0">
-              <span className="font-label-md text-label-md text-on-surface font-semibold truncate">
-                {displayName} Workspace
-              </span>
-              <span className="font-code-md text-xs text-on-surface-variant truncate">
-                {displayEmail}
-              </span>
-            </div>
+            {isSidebarExpanded ? (
+              <>
+                <img
+                  alt="User Profile Avatar"
+                  className="w-10 h-10 rounded-full border-2 border-primary-container object-cover"
+                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuBNkOZEkCu2AprexCFCsvJXOpZLv53DVKcel7waC9Azezg6wawU3xFOhERlB6zleyXPLMJJR9zqziiq1D502_BUqjXml_hH52FOtSbzftwTpNVo44wUKjf3qi5bij0DfFh7DZrQU3jWGXMYj26_EJNk0_-j3ka1f6oryihMIel8vCSNHAWYsbcdRo2VEgIGFHZeDmweouDuqv23igV0LwXnCX0bcE3Nd7M0A_ObOOQdP1PhZVeUYXk_rEFynUiSHMDdISvi-TvvGds"
+                />
+                <div className="flex flex-col min-w-0">
+                  <span className="font-label-md text-label-md text-on-surface font-semibold truncate">
+                    {displayName} Workspace
+                  </span>
+                  <span className="font-code-md text-xs text-on-surface-variant truncate">
+                    {displayEmail}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <span className="material-symbols-outlined text-[20px] text-on-surface-variant">person</span>
+            )}
           </Link>
 
           <button
             onClick={handleOpenCreateModal}
-            className="w-full bg-primary-container text-on-primary-container font-label-md text-label-md py-sm px-md rounded-lg flex items-center justify-center gap-xs hover:bg-primary hover:text-on-primary transition-colors shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] cursor-pointer"
+            className={`bg-primary-container text-on-primary-container font-label-md text-label-md shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] hover:bg-primary hover:text-on-primary transition-all flex items-center justify-center gap-xs cursor-pointer ${isSidebarExpanded ? 'w-full py-sm px-md rounded-lg' : 'w-10 h-10 rounded-full p-0 mx-auto'}`}
+            title="New Project"
           >
             <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>
               add
             </span>
-            New Project
+            {isSidebarExpanded && <span>New Project</span>}
           </button>
 
           <button
             onClick={handleOpenJoinModal}
-            className="w-full bg-surface text-on-surface border border-surface-variant font-label-md text-label-md py-sm px-md rounded-lg flex items-center justify-center gap-xs hover:bg-surface-container transition-colors cursor-pointer"
+            className={`bg-surface text-on-surface border border-surface-variant font-label-md text-label-md hover:bg-surface-container transition-all flex items-center justify-center gap-xs cursor-pointer ${isSidebarExpanded ? 'w-full py-sm px-md rounded-lg' : 'w-10 h-10 rounded-full p-0 mx-auto'}`}
+            title="Join Project"
           >
             <span className="material-symbols-outlined text-sm">group_add</span>
-            Join Project
+            {isSidebarExpanded && <span>Join Project</span>}
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto space-y-1 px-sm">
-          <NavLink end to="/dashboard" className={linkClass}>
+        <div className={`flex-1 overflow-y-auto space-y-1 w-full ${isSidebarExpanded ? 'px-sm' : 'px-0'}`}>
+          <NavLink end to="/dashboard" className={linkClass} title="Projects">
             <span className="material-symbols-outlined">folder_open</span>
-            Projects
+            {isSidebarExpanded && <span>Projects</span>}
           </NavLink>
-          <NavLink to="/dashboard/shared" className={linkClass}>
+          <NavLink to="/dashboard/shared" className={linkClass} title="Shared">
             <span className="material-symbols-outlined">group</span>
-            Shared
+            {isSidebarExpanded && <span>Shared</span>}
           </NavLink>
-          <NavLink to="/dashboard/archived" className={linkClass}>
+          <NavLink to="/dashboard/archived" className={linkClass} title="Archived">
             <span className="material-symbols-outlined">archive</span>
-            Archived
+            {isSidebarExpanded && <span>Archived</span>}
           </NavLink>
-          <NavLink to="/dashboard/settings" className={linkClass}>
+          <NavLink to="/dashboard/settings" className={linkClass} title="Settings">
             <span className="material-symbols-outlined">settings</span>
-            Settings
+            {isSidebarExpanded && <span>Settings</span>}
           </NavLink>
         </div>
 
-        <div className="mt-auto px-sm pt-md border-t border-surface-variant space-y-1">
+        <div className="mt-auto px-sm pt-md border-t border-surface-variant space-y-1 w-full">
           <button
             onClick={() => {
               logout();
               navigate('/');
             }}
-            className="w-full flex items-center gap-md px-md py-sm text-error hover:bg-error-container/20 transition-all rounded-lg font-label-md text-label-md cursor-pointer text-left"
+            className={`flex items-center gap-md text-error hover:bg-error-container/20 transition-all rounded-lg font-label-md text-label-md cursor-pointer text-left ${isSidebarExpanded ? 'w-full px-md py-sm' : 'p-sm justify-center w-10 h-10 mx-auto'}`}
+            title="Log Out"
           >
             <span className="material-symbols-outlined">logout</span>
-            Log Out
+            {isSidebarExpanded && <span>Log Out</span>}
           </button>
         </div>
       </nav>
 
       {/* Main Content Render */}
-      <div className="flex-1 ml-0 md:ml-72 h-full overflow-hidden">
+      <div className={`flex-1 h-full overflow-hidden transition-all duration-300 ${isSidebarExpanded ? 'ml-0 md:ml-72' : 'ml-0 md:ml-[70px]'}`}>
         <Outlet />
       </div>
 
