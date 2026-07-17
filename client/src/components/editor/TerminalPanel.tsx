@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 
@@ -10,6 +10,10 @@ export const TerminalPanel = ({ output }: TerminalPanelProps) => {
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
+  
+  // Height state and dragging refs
+  const [height, setHeight] = useState(200);
+  const isDraggingRef = useRef(false);
 
   useEffect(() => {
     if (!terminalRef.current) return;
@@ -122,8 +126,50 @@ export const TerminalPanel = ({ output }: TerminalPanelProps) => {
     }
   }, [output]);
 
+  // Fit terminal when panel height changes
+  useEffect(() => {
+    if (fitAddonRef.current) {
+      try {
+        fitAddonRef.current.fit();
+      } catch (e) {
+        // Ignore fitting errors during drag resize cycles
+      }
+    }
+  }, [height]);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    isDraggingRef.current = true;
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (!isDraggingRef.current) return;
+    const newHeight = window.innerHeight - e.clientY;
+    // Constraints: minimum 100px, maximum 80% of window height
+    if (newHeight >= 100 && newHeight <= window.innerHeight * 0.8) {
+      setHeight(newHeight);
+    }
+  };
+
+  const handleMouseUp = () => {
+    isDraggingRef.current = false;
+    document.removeEventListener('mousemove', handleMouseMove);
+    document.removeEventListener('mouseup', handleMouseUp);
+  };
+
   return (
-    <div className="h-[200px] bg-[#0D0D0D] border-t border-outline-variant/20 shrink-0 flex flex-col font-code-md text-code-md">
+    <div 
+      className="relative bg-[#0D0D0D] border-t border-outline-variant/20 shrink-0 flex flex-col font-code-md text-code-md"
+      style={{ height: `${height}px` }}
+    >
+      {/* Resizing Drag Handle */}
+      <div 
+        onMouseDown={handleMouseDown}
+        className="absolute top-0 left-0 right-0 h-[6px] -mt-[3px] cursor-ns-resize z-40 hover:bg-primary/50 transition-colors"
+      />
+
       {/* Terminal Tabs */}
       <div className="flex items-center gap-md px-md py-xs bg-[#1A1A1A] border-b border-[#333] shrink-0 select-none">
         <div className="text-white font-bold border-b-2 border-primary pb-1 cursor-pointer text-[13px]">Terminal</div>
@@ -145,4 +191,5 @@ export const TerminalPanel = ({ output }: TerminalPanelProps) => {
     </div>
   );
 };
+
 export default TerminalPanel;
