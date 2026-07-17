@@ -4,10 +4,13 @@ import { UserRepository } from '../repositories/userRepository.js';
 import { AuthService } from '../services/authService.js';
 import { ChatRepository } from '../repositories/chatRepository.js';
 import { getOrCreateDoc, updateDoc, decrementConnections } from './docStore.js';
+import { ExecutorService } from '../services/executorService.js';
 
 const userRepository = new UserRepository();
 const authService = new AuthService();
 const chatRepository = new ChatRepository();
+const executorService = new ExecutorService();
+const globalRunLock = new Map<number, boolean>();
 
 export function registerRoomNamespace(io: SocketServer): void {
   const roomNsp = io.of('/room');
@@ -97,6 +100,30 @@ export function registerRoomNamespace(io: SocketServer): void {
           roomNsp.to(roomChannel).emit('chat:message', chatMsg);
         } catch (err) {
           console.error(`Failed to save chat message in room ${roomId}:`, err);
+        }
+      });
+
+      // Handle global code run requests with mutex locking
+      socket.on('run:global', async (data: { code: string; language: string }) => {
+        if (globalRunLock.get(roomId)) {
+          socket.emit('run:global:locked', { message: 'A global execution is already in progress.' });
+          return;
+        }
+        
+        globalRunLock.set(roomId, true);
+        roomNsp.to(roomChannel).emit('run:global:start', { initiatedBy: username });
+
+        try {
+          const resultOutput = await executorService.executeCode(data.language, data.code);
+          roomNsp.to(roomChannel).emit('run:global:output', { chunk: resultOutput });
+          roomNsp.to(roomChannel).emit('run:global:end', { success: true });
+        } catch (err) {
+          roomNsp.to(roomChannel).emit('run:global:output', {
+            chunk: `Execution Error: ${(err as Error).message}`,
+          });
+          roomNsp.to(roomChannel).emit('run:global:end', { success: false });
+        } finally {
+          globalRunLock.delete(roomId);
         }
       });
     } catch (err) {
