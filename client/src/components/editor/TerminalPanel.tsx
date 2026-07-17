@@ -13,6 +13,7 @@ export const TerminalPanel = ({ output }: TerminalPanelProps) => {
   
   // Height state and dragging refs
   const [height, setHeight] = useState(200);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const isDraggingRef = useRef(false);
 
   useEffect(() => {
@@ -128,14 +129,14 @@ export const TerminalPanel = ({ output }: TerminalPanelProps) => {
 
   // Fit terminal when panel height changes
   useEffect(() => {
-    if (fitAddonRef.current) {
+    if (fitAddonRef.current && !isCollapsed) {
       try {
         fitAddonRef.current.fit();
       } catch (e) {
         // Ignore fitting errors during drag resize cycles
       }
     }
-  }, [height]);
+  }, [height, isCollapsed]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -162,24 +163,32 @@ export const TerminalPanel = ({ output }: TerminalPanelProps) => {
   return (
     <div 
       className="relative bg-[#0D0D0D] border-t border-outline-variant/20 shrink-0 flex flex-col font-code-md text-code-md"
-      style={{ height: `${height}px` }}
+      style={{ height: isCollapsed ? '36px' : `${height}px` }}
     >
       {/* Resizing Drag Handle */}
-      <div 
-        onMouseDown={handleMouseDown}
-        className="absolute top-0 left-0 right-0 h-[6px] -mt-[3px] cursor-ns-resize z-40 hover:bg-primary/50 transition-colors"
-      />
+      {!isCollapsed && (
+        <div 
+          onMouseDown={handleMouseDown}
+          className="absolute top-0 left-0 right-0 h-[6px] -mt-[3px] cursor-ns-resize z-40 hover:bg-primary/50 transition-colors"
+        />
+      )}
 
       {/* Terminal Tabs */}
       <div className="flex items-center gap-md px-md py-xs bg-[#1A1A1A] border-b border-[#333] shrink-0 select-none">
         <div className="text-white font-bold border-b-2 border-primary pb-1 cursor-pointer text-[13px]">Terminal</div>
         <div className="text-[#888] hover:text-white cursor-pointer pb-1 text-[13px]">Local Terminal</div>
         <div className="ml-auto flex gap-sm text-[#888]">
-          <span className="material-symbols-outlined text-[16px] hover:text-white cursor-pointer">keyboard_arrow_up</span>
+          <button 
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="material-symbols-outlined text-[16px] hover:text-white cursor-pointer transition-transform duration-200"
+            title={isCollapsed ? "Expand Terminal" : "Collapse Terminal"}
+          >
+            {isCollapsed ? 'keyboard_arrow_up' : 'keyboard_arrow_down'}
+          </button>
         </div>
       </div>
       {/* Terminal Output */}
-      <div className="flex-1 min-h-0 relative p-sm bg-[#0D0D0D]">
+      <div className={`flex-1 min-h-0 relative p-sm bg-[#0D0D0D] ${isCollapsed ? 'hidden' : ''}`}>
         <div ref={terminalRef} className="absolute inset-2 overflow-hidden" />
       </div>
     </div>
