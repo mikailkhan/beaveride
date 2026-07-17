@@ -4,11 +4,12 @@ import { FitAddon } from 'xterm-addon-fit';
 
 interface TerminalPanelProps {
   globalOutput: string;
+  localOutput: string;
   activeTab: 'global' | 'local';
   onTabChange: (tab: 'global' | 'local') => void;
 }
 
-export const TerminalPanel = ({ globalOutput, activeTab, onTabChange }: TerminalPanelProps) => {
+export const TerminalPanel = ({ globalOutput, localOutput, activeTab, onTabChange }: TerminalPanelProps) => {
   const globalTerminalRef = useRef<HTMLDivElement>(null);
   const xtermGlobalRef = useRef<Terminal | null>(null);
   const fitGlobalRef = useRef<FitAddon | null>(null);
@@ -152,6 +153,15 @@ export const TerminalPanel = ({ globalOutput, activeTab, onTabChange }: Terminal
       xtermGlobalRef.current.write('\r\n\x1b[32m➜\x1b[0m \x1b[36mworkspace\x1b[0m ');
     }
   }, [globalOutput]);
+
+  // Update local output dynamically
+  useEffect(() => {
+    if (xtermLocalRef.current && localOutput) {
+      xtermLocalRef.current.writeln('');
+      xtermLocalRef.current.writeln(localOutput);
+      xtermLocalRef.current.write('\r\n\x1b[32m➜\x1b[0m \x1b[36mworkspace\x1b[0m ');
+    }
+  }, [localOutput]);
 
   // Fit terminal when activeTab changes
   useEffect(() => {

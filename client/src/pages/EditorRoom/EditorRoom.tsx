@@ -40,6 +40,8 @@ export const EditorRoom = () => {
   const [files, setFiles] = useState<Record<string, string>>({});
   const [globalOutput, setGlobalOutput] = useState('');
   const [globalRunStatus, setGlobalRunStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
+  const [localOutput, setLocalOutput] = useState('');
+  const [localRunStatus, setLocalRunStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
   const [activeTab, setActiveTab] = useState<'global' | 'local'>('global');
 
   useEffect(() => {
@@ -109,6 +111,21 @@ export const EditorRoom = () => {
     if (!socket || !activeRoom || globalRunStatus === 'running') return;
     const code = editor ? editor.getValue() : '';
     socket.emit('run:global', { code, language: activeRoom.language });
+  };
+
+  const handleLocalRun = async () => {
+    if (!activeRoom || !roomId || localRunStatus === 'running') return;
+    setLocalRunStatus('running');
+    setLocalOutput('\r\n\x1b[33m[Local Run started...]\x1b[0m\r\n');
+    try {
+      const code = editor ? editor.getValue() : '';
+      const result = await roomService.runCode(roomId, code);
+      setLocalOutput(result);
+      setLocalRunStatus('success');
+    } catch (err) {
+      setLocalOutput((err as Error).message);
+      setLocalRunStatus('error');
+    }
   };
 
   const handleFileClick = (filename: string) => {
@@ -333,7 +350,14 @@ export const EditorRoom = () => {
               disabled={globalRunStatus === 'running' || !activeRoom.canRun}
               className="px-md py-sm rounded-lg bg-primary-container text-white font-label-md text-label-md hover:bg-primary transition-colors flex items-center gap-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] cursor-pointer disabled:opacity-60"
             >
-              <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>play_arrow</span> Run
+              <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>play_arrow</span> Global Run
+            </button>
+            <button 
+              onClick={handleLocalRun} 
+              disabled={localRunStatus === 'running' || !activeRoom.canRun}
+              className="px-md py-sm rounded-lg bg-secondary-container text-on-secondary-container font-label-md text-label-md hover:bg-secondary hover:text-on-secondary transition-colors flex items-center gap-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] cursor-pointer disabled:opacity-60"
+            >
+              <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>play_circle</span> Local Run
             </button>
           </div>
         </header>
@@ -410,6 +434,7 @@ export const EditorRoom = () => {
             {/* Terminal (Bottom Panel) */}
             <TerminalPanel 
               globalOutput={globalOutput} 
+              localOutput={localOutput}
               activeTab={activeTab}
               onTabChange={setActiveTab}
             />
