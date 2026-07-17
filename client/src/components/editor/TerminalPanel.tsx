@@ -3,12 +3,12 @@ import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 
 interface TerminalPanelProps {
-  output: string;
+  globalOutput: string;
   activeTab: 'global' | 'local';
   onTabChange: (tab: 'global' | 'local') => void;
 }
 
-export const TerminalPanel = ({ output, activeTab, onTabChange }: TerminalPanelProps) => {
+export const TerminalPanel = ({ globalOutput, activeTab, onTabChange }: TerminalPanelProps) => {
   const globalTerminalRef = useRef<HTMLDivElement>(null);
   const xtermGlobalRef = useRef<Terminal | null>(null);
   const fitGlobalRef = useRef<FitAddon | null>(null);
@@ -144,14 +144,14 @@ export const TerminalPanel = ({ output, activeTab, onTabChange }: TerminalPanelP
     };
   }, []);
 
-  // Update output dynamically if standard print events trigger (routes to global terminal in Step 2)
+  // Update output dynamically if standard print events trigger
   useEffect(() => {
-    if (xtermGlobalRef.current && output) {
+    if (xtermGlobalRef.current && globalOutput) {
       xtermGlobalRef.current.writeln('');
-      xtermGlobalRef.current.writeln(output);
+      xtermGlobalRef.current.writeln(globalOutput);
       xtermGlobalRef.current.write('\r\n\x1b[32m➜\x1b[0m \x1b[36mworkspace\x1b[0m ');
     }
-  }, [output]);
+  }, [globalOutput]);
 
   // Fit terminal when activeTab changes
   useEffect(() => {

@@ -38,8 +38,8 @@ export const EditorRoom = () => {
   const [editor, setEditor] = useState<any>(null);
   const [activeFile, setActiveFile] = useState('main.js');
   const [files, setFiles] = useState<Record<string, string>>({});
-  const [output, setOutput] = useState('');
-  const [status, setStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
+  const [globalOutput, setGlobalOutput] = useState('');
+  const [globalRunStatus, setGlobalRunStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
   const [activeTab, setActiveTab] = useState<'global' | 'local'>('global');
 
   useEffect(() => {
@@ -60,6 +60,40 @@ export const EditorRoom = () => {
   // Sync editor workspace using Yjs
   const { collaborators, socket } = useYjsSync({ roomId: roomId || '', token: token || '', editor });
 
+  // Register socket listeners for global run lifecycle
+  useEffect(() => {
+    if (!socket) return;
+
+    const onStart = ({ initiatedBy }: { initiatedBy: string }) => {
+      setGlobalRunStatus('running');
+      setGlobalOutput(`\r\n\x1b[33m[Global Run started by ${initiatedBy}...]\x1b[0m\r\n`);
+    };
+
+    const onOutput = ({ chunk }: { chunk: string }) => {
+      setGlobalOutput(chunk);
+    };
+
+    const onEnd = ({ success }: { success: boolean }) => {
+      setGlobalRunStatus(success ? 'success' : 'error');
+    };
+
+    const onLocked = ({ message }: { message: string }) => {
+      setGlobalOutput(`\r\n\x1b[31m[${message}]\x1b[0m\r\n`);
+    };
+
+    socket.on('run:global:start', onStart);
+    socket.on('run:global:output', onOutput);
+    socket.on('run:global:end', onEnd);
+    socket.on('run:global:locked', onLocked);
+
+    return () => {
+      socket.off('run:global:start', onStart);
+      socket.off('run:global:output', onOutput);
+      socket.off('run:global:end', onEnd);
+      socket.off('run:global:locked', onLocked);
+    };
+  }, [socket]);
+
   // Set up initial file and code snippet once the room is loaded
   useEffect(() => {
     if (activeRoom) {
@@ -71,20 +105,10 @@ export const EditorRoom = () => {
     }
   }, [activeRoom]);
 
-  const handleRun = async () => {
-    if (!activeRoom || !roomId) return;
-    setStatus('running');
-    setOutput('Starting isolated execution container...');
-    
-    try {
-      const code = editor ? editor.getValue() : '';
-      const output = await roomService.runCode(roomId, code);
-      setOutput(output);
-      setStatus('success');
-    } catch (error) {
-      setOutput((error as Error).message);
-      setStatus('error');
-    }
+  const handleGlobalRun = () => {
+    if (!socket || !activeRoom || globalRunStatus === 'running') return;
+    const code = editor ? editor.getValue() : '';
+    socket.emit('run:global', { code, language: activeRoom.language });
   };
 
   const handleFileClick = (filename: string) => {
@@ -305,8 +329,8 @@ export const EditorRoom = () => {
               <span className="material-symbols-outlined text-[18px]">chat</span> Chat
             </button>
             <button 
-              onClick={handleRun} 
-              disabled={status === 'running' || !activeRoom.canRun}
+              onClick={handleGlobalRun} 
+              disabled={globalRunStatus === 'running' || !activeRoom.canRun}
               className="px-md py-sm rounded-lg bg-primary-container text-white font-label-md text-label-md hover:bg-primary transition-colors flex items-center gap-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] cursor-pointer disabled:opacity-60"
             >
               <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>play_arrow</span> Run
@@ -385,7 +409,7 @@ export const EditorRoom = () => {
 
             {/* Terminal (Bottom Panel) */}
             <TerminalPanel 
-              output={output} 
+              globalOutput={globalOutput} 
               activeTab={activeTab}
               onTabChange={setActiveTab}
             />
