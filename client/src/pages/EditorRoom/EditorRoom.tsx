@@ -109,12 +109,14 @@ export const EditorRoom = () => {
 
   const handleGlobalRun = () => {
     if (!socket || !activeRoom || globalRunStatus === 'running') return;
+    setActiveTab('global');
     const code = editor ? editor.getValue() : '';
     socket.emit('run:global', { code, language: activeRoom.language });
   };
 
   const handleLocalRun = async () => {
     if (!activeRoom || !roomId || localRunStatus === 'running') return;
+    setActiveTab('local');
     setLocalRunStatus('running');
     setLocalOutput('\r\n\x1b[33m[Local Run started...]\x1b[0m\r\n');
     try {
