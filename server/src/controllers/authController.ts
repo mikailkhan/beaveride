@@ -23,6 +23,20 @@ const loginSchema = z.object({
   password: z.string().min(1, 'Password is required'),
 });
 
+const updateProfileSchema = z.object({
+  firstName: z.string().min(1).max(120).optional(),
+  lastName: z.string().max(120).optional(),
+  email: z.string().email().optional(),
+});
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'Current password is required'),
+  newPassword: z
+    .string()
+    .min(8, 'New password must be at least 8 characters')
+    .max(128, 'New password must be under 128 characters'),
+});
+
 export class AuthController {
   constructor(private readonly authService = new AuthService()) {}
 
@@ -45,5 +59,23 @@ export class AuthController {
 
     const result = await this.authService.getCurrentUser(req.user.sub);
     res.status(200).json({ data: result });
+  };
+
+  updateProfile = async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) throw new HttpError(401, 'Unauthorized');
+    const parsed = updateProfileSchema.parse(req.body);
+    // Build a clean dto without undefined entries (required by exactOptionalPropertyTypes)
+    const dto = Object.fromEntries(
+      Object.entries(parsed).filter(([, v]) => v !== undefined)
+    ) as { firstName?: string; lastName?: string; email?: string };
+    const user = await this.authService.updateProfile(req.user.sub, dto);
+    res.status(200).json({ data: { user } });
+  };
+
+  changePassword = async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) throw new HttpError(401, 'Unauthorized');
+    const dto = changePasswordSchema.parse(req.body);
+    await this.authService.changePassword(req.user.sub, dto);
+    res.status(200).json({ message: 'Password changed successfully' });
   };
 }

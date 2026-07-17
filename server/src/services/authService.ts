@@ -36,6 +36,17 @@ type LoginDto = {
   password: string;
 };
 
+type UpdateProfileDto = {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+};
+
+type ChangePasswordDto = {
+  currentPassword: string;
+  newPassword: string;
+};
+
 const toSafeUser = ({ passwordHash: _passwordHash, ...rest }: User): SafeUser => rest;
 
 export class AuthService {
@@ -99,6 +110,32 @@ export class AuthService {
     }
 
     return { user: toSafeUser(user) };
+  }
+
+  async updateProfile(userId: number, dto: UpdateProfileDto): Promise<SafeUser> {
+    // Verify email uniqueness if changing email
+    if (dto.email) {
+      const existing = await this.userRepository.findByEmail(dto.email);
+      if (existing && existing.id !== userId) {
+        throw new HttpError(409, 'This email is already in use');
+      }
+    }
+
+    const updated = await this.userRepository.update(userId, dto);
+    return toSafeUser(updated);
+  }
+
+  async changePassword(userId: number, dto: ChangePasswordDto): Promise<void> {
+    const user = await this.userRepository.findById(userId);
+    if (!user) throw new HttpError(404, 'User not found');
+
+    const passwordMatches = await bcrypt.compare(dto.currentPassword, user.passwordHash);
+    if (!passwordMatches) {
+      throw new HttpError(400, 'Current password is incorrect');
+    }
+
+    const passwordHash = await bcrypt.hash(dto.newPassword, BCRYPT_ROUNDS);
+    await this.userRepository.update(userId, { passwordHash });
   }
 
   verifyToken(token: string): JwtPayload {

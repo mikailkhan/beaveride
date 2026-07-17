@@ -23,60 +23,86 @@ export class RoomController {
   ) {}
 
   createRoom = async (req: Request, res: Response): Promise<void> => {
-    if (!req.user) {
-      throw new HttpError(401, 'Unauthorized');
-    }
-
+    if (!req.user) throw new HttpError(401, 'Unauthorized');
     const { title, language } = createRoomSchema.parse(req.body);
     const room = await this.roomService.createRoom(req.user.sub, title, language);
-
     res.status(201).json({ data: room });
   };
 
   getUserRooms = async (req: Request, res: Response): Promise<void> => {
-    if (!req.user) {
-      throw new HttpError(401, 'Unauthorized');
-    }
-
+    if (!req.user) throw new HttpError(401, 'Unauthorized');
     const rooms = await this.roomService.getUserRooms(req.user.sub);
     res.status(200).json({ data: rooms });
   };
 
-  getRoomDetails = async (req: Request, res: Response): Promise<void> => {
-    if (!req.user) {
-      throw new HttpError(401, 'Unauthorized');
-    }
+  getArchivedRooms = async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) throw new HttpError(401, 'Unauthorized');
+    const rooms = await this.roomService.getArchivedRooms(req.user.sub);
+    res.status(200).json({ data: rooms });
+  };
 
+  getSharedRooms = async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) throw new HttpError(401, 'Unauthorized');
+    const rooms = await this.roomService.getSharedRooms(req.user.sub);
+    res.status(200).json({ data: rooms });
+  };
+
+  getRoomDetails = async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) throw new HttpError(401, 'Unauthorized');
     const { id: roomId } = roomParamsSchema.parse(req.params);
     const roomDetails = await this.roomService.getRoomDetails(req.user.sub, roomId);
-
     res.status(200).json({ data: roomDetails });
   };
 
   joinRoom = async (req: Request, res: Response): Promise<void> => {
-    if (!req.user) {
-      throw new HttpError(401, 'Unauthorized');
-    }
-
+    if (!req.user) throw new HttpError(401, 'Unauthorized');
     const { id: roomId } = roomParamsSchema.parse(req.params);
     const membership = await this.roomService.joinRoom(req.user.sub, roomId);
-
     res.status(200).json({ data: membership });
   };
 
-  runCode = async (req: Request, res: Response): Promise<void> => {
-    if (!req.user) {
-      throw new HttpError(401, 'Unauthorized');
-    }
+  archiveRoom = async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) throw new HttpError(401, 'Unauthorized');
+    const { id: roomId } = roomParamsSchema.parse(req.params);
+    await this.roomService.archiveRoom(req.user.sub, roomId);
+    res.status(200).json({ message: 'Room archived successfully' });
+  };
 
+  trashRoom = async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) throw new HttpError(401, 'Unauthorized');
+    const { id: roomId } = roomParamsSchema.parse(req.params);
+    await this.roomService.trashRoom(req.user.sub, roomId);
+    res.status(200).json({ message: 'Room moved to trash successfully' });
+  };
+
+  restoreRoom = async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) throw new HttpError(401, 'Unauthorized');
+    const { id: roomId } = roomParamsSchema.parse(req.params);
+    await this.roomService.restoreRoom(req.user.sub, roomId);
+    res.status(200).json({ message: 'Room restored successfully' });
+  };
+
+  deleteRoom = async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) throw new HttpError(401, 'Unauthorized');
+    const { id: roomId } = roomParamsSchema.parse(req.params);
+    await this.roomService.deleteRoom(req.user.sub, roomId);
+    res.status(200).json({ message: 'Room permanently deleted' });
+  };
+
+  trashAllRooms = async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) throw new HttpError(401, 'Unauthorized');
+    await this.roomService.trashAllRooms(req.user.sub);
+    res.status(200).json({ message: 'All active owner rooms moved to trash' });
+  };
+
+  runCode = async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) throw new HttpError(401, 'Unauthorized');
     const { id: roomId } = roomParamsSchema.parse(req.params);
     const { code } = z.object({ code: z.string() }).parse(req.body);
-
     const roomDetails = await this.roomService.getRoomDetails(req.user.sub, roomId);
     if (!roomDetails.canRun) {
       throw new HttpError(403, 'You do not have execution privileges in this room');
     }
-
     const output = await this.executorService.executeCode(roomDetails.language, code);
     res.status(200).json({ output });
   };

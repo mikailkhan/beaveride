@@ -35,6 +35,14 @@ export class RoomService {
     return this.roomRepository.findByUserId(userId);
   }
 
+  async getArchivedRooms(userId: number) {
+    return this.roomRepository.findArchivedByUserId(userId);
+  }
+
+  async getSharedRooms(userId: number) {
+    return this.roomRepository.findSharedByUserId(userId);
+  }
+
   async getRoomDetails(userId: number, roomId: number) {
     const room = await this.roomRepository.findById(roomId);
     if (!room) {
@@ -74,5 +82,45 @@ export class RoomService {
 
     // Default joining role is 'editor' with canRun set to true
     return this.roomRepository.addMember(roomId, userId, 'editor', true);
+  }
+
+  private async requireOwner(userId: number, roomId: number) {
+    const membership = await this.roomRepository.findMembership(roomId, userId);
+    if (!membership || membership.role !== 'owner') {
+      throw new HttpError(403, 'Only the room owner can perform this action');
+    }
+    return membership;
+  }
+
+  async archiveRoom(userId: number, roomId: number) {
+    await this.requireOwner(userId, roomId);
+    const status = await this.roomRepository.findStatusByState('archived');
+    if (!status) throw new HttpError(500, 'Status "archived" not found');
+    await this.roomRepository.updateStatus(roomId, status.id);
+  }
+
+  async trashRoom(userId: number, roomId: number) {
+    await this.requireOwner(userId, roomId);
+    const status = await this.roomRepository.findStatusByState('trash');
+    if (!status) throw new HttpError(500, 'Status "trash" not found');
+    await this.roomRepository.updateStatus(roomId, status.id);
+  }
+
+  async restoreRoom(userId: number, roomId: number) {
+    await this.requireOwner(userId, roomId);
+    const status = await this.roomRepository.findStatusByState('active');
+    if (!status) throw new HttpError(500, 'Status "active" not found');
+    await this.roomRepository.updateStatus(roomId, status.id);
+  }
+
+  async deleteRoom(userId: number, roomId: number) {
+    await this.requireOwner(userId, roomId);
+    await this.roomRepository.deleteRoom(roomId);
+  }
+
+  async trashAllRooms(userId: number) {
+    const status = await this.roomRepository.findStatusByState('trash');
+    if (!status) throw new HttpError(500, 'Status "trash" not found');
+    await this.roomRepository.trashAllOwnerRooms(userId, status.id);
   }
 }

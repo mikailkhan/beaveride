@@ -38,4 +38,12 @@ export class UserRepository {
     }
     return user;
   }
+
+  async update(id: number, data: Partial<Pick<User, 'email' | 'firstName' | 'lastName' | 'passwordHash'>>): Promise<User> {
+    const [user] = await db.update(users).set(data).where(eq(users.id, id)).returning();
+    if (!user) {
+      throw new Error('User update returned no rows');
+    }
+    return user;
+  }
 }
