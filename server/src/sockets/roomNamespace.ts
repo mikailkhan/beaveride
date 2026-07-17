@@ -5,12 +5,15 @@ import { AuthService } from '../services/authService.js';
 import { ChatRepository } from '../repositories/chatRepository.js';
 import { getOrCreateDoc, updateDoc, decrementConnections } from './docStore.js';
 import { ExecutorService } from '../services/executorService.js';
+import { addActivity, getActivities } from './activityStore.js';
 
 const userRepository = new UserRepository();
 const authService = new AuthService();
 const chatRepository = new ChatRepository();
 const executorService = new ExecutorService();
 const globalRunLock = new Map<number, boolean>();
+const codeEditDebounce = new Map<string, number>(); // key: `${roomId}:${userId}`
+const CODE_EDIT_DEBOUNCE_MS = 10_000;
 
 export function registerRoomNamespace(io: SocketServer): void {
   const roomNsp = io.of('/room');
@@ -68,6 +71,11 @@ export function registerRoomNamespace(io: SocketServer): void {
       // Emit confirmation
       socket.emit('room:joined', { userId, username, roomId });
 
+      // Add joined activity log and broadcast updates
+      addActivity(roomId, { username, event: 'joined', timestamp: new Date().toISOString() });
+      roomNsp.to(roomChannel).emit('activity:update', getActivities(roomId));
+      socket.emit('activity:update', getActivities(roomId));
+
       // Load and emit chat history
       const history = await chatRepository.getRecentMessages(roomId, 50);
       socket.emit('chat:history', history);
@@ -83,6 +91,16 @@ export function registerRoomNamespace(io: SocketServer): void {
         updateDoc(roomId, update, userId);
         // Relay the update to all other users in the room
         socket.to(roomChannel).emit('sync:update', update);
+
+        // Record a code_edit activity with a 10s debounce per user
+        const debounceKey = `${roomId}:${userId}`;
+        const lastEdit = codeEditDebounce.get(debounceKey) ?? 0;
+        const now = Date.now();
+        if (now - lastEdit > CODE_EDIT_DEBOUNCE_MS) {
+          codeEditDebounce.set(debounceKey, now);
+          addActivity(roomId, { username, event: 'code_edit', timestamp: new Date().toISOString() });
+          roomNsp.to(roomChannel).emit('activity:update', getActivities(roomId));
+        }
       });
 
       // Handle awareness updates (cursors, selections)
@@ -111,6 +129,8 @@ export function registerRoomNamespace(io: SocketServer): void {
         }
         
         globalRunLock.set(roomId, true);
+        addActivity(roomId, { username, event: 'global_run', timestamp: new Date().toISOString() });
+        roomNsp.to(roomChannel).emit('activity:update', getActivities(roomId));
         roomNsp.to(roomChannel).emit('run:global:start', { initiatedBy: username });
 
         try {
@@ -135,6 +155,9 @@ export function registerRoomNamespace(io: SocketServer): void {
       console.log(`Socket ${socket.id} disconnected from room namespace (user: ${username})`);
       try {
         await decrementConnections(roomId);
+        addActivity(roomId, { username, event: 'left', timestamp: new Date().toISOString() });
+        roomNsp.to(roomChannel).emit('activity:update', getActivities(roomId));
+        codeEditDebounce.delete(`${roomId}:${userId}`);
       } catch (err) {
         console.error(`Error decrementing connections on room ${roomId}:`, err);
       }
