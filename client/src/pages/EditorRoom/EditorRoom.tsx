@@ -53,6 +53,7 @@ export const EditorRoom = () => {
   const token = useAuthStore((state) => state.token);
 
   const [showChat, setShowChat] = useState(false);
+  const [isPresenceExpanded, setIsPresenceExpanded] = useState(true);
 
   // Sync editor workspace using Yjs
   const { collaborators, socket } = useYjsSync({ roomId: roomId || '', token: token || '', editor });
@@ -321,30 +322,44 @@ export const EditorRoom = () => {
               {/* Presence Panel (Right side floating) */}
               <div className="absolute top-md right-md flex flex-col gap-sm z-30 w-64 select-none pointer-events-auto">
                 <div className="glass-panel rounded-xl p-sm bg-white/80 backdrop-blur-md border border-outline-variant/30 shadow-md">
-                  <h3 className="font-label-md text-label-md font-bold text-on-surface mb-xs px-xs">Users Online ({collaborators.length})</h3>
-                  <div className="flex flex-col gap-1">
-                    {collaborators.map((member) => (
-                      <div 
-                        key={member.clientId} 
-                        className="flex items-center gap-sm p-xs rounded-lg hover:bg-surface-container-low transition-colors"
-                      >
-                        <div 
-                          style={{ borderColor: member.color }}
-                          className="w-6 h-6 rounded-full border-2 bg-surface-container-high flex items-center justify-center text-[10px] font-bold"
-                        >
-                          {member.username.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="font-label-md text-[12px] font-bold text-on-surface truncate">
-                            {member.firstName} {member.lastName}
-                          </div>
-                          <div className="text-[10px] text-on-surface-variant truncate">
-                            @{member.username} (Online)
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                  <div 
+                    onClick={() => setIsPresenceExpanded(!isPresenceExpanded)}
+                    className="flex items-center justify-between cursor-pointer font-label-md text-label-md font-bold text-on-surface px-xs py-xs select-none hover:bg-surface-container-low rounded-lg transition-colors"
+                  >
+                    <span>Users Online ({collaborators.length})</span>
+                    <span 
+                      className="material-symbols-outlined text-[18px] transition-transform duration-200" 
+                      style={{ transform: isPresenceExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                    >
+                      keyboard_arrow_down
+                    </span>
                   </div>
+
+                  {isPresenceExpanded && (
+                    <div className="flex flex-col gap-1 mt-xs max-h-48 overflow-y-auto">
+                      {collaborators.map((member) => (
+                        <div 
+                          key={member.clientId} 
+                          className="flex items-center gap-sm p-xs rounded-lg hover:bg-surface-container-low transition-colors"
+                        >
+                          <div 
+                            style={{ borderColor: member.color }}
+                            className="w-6 h-6 rounded-full border-2 bg-surface-container-high flex items-center justify-center text-[10px] font-bold"
+                          >
+                            {member.username.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-label-md text-[12px] font-bold text-on-surface truncate">
+                              {member.firstName} {member.lastName}
+                            </div>
+                            <div className="text-[10px] text-on-surface-variant truncate">
+                              @{member.username} (Online)
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
