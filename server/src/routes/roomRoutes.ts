@@ -10,3 +10,4 @@ roomRoutes.post('/', requireAuth, roomController.createRoom);
 roomRoutes.get('/', requireAuth, roomController.getUserRooms);
 roomRoutes.get('/:id', requireAuth, roomController.getRoomDetails);
 roomRoutes.post('/:id/join', requireAuth, roomController.joinRoom);
+roomRoutes.post('/:id/run', requireAuth, roomController.runCode);

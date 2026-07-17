@@ -89,6 +89,11 @@ class RoomService {
     const response = await api.post<ApiResponse<BackendUserRoom>>(`/api/rooms/${roomId}/join`);
     return mapUserRoom(response.data);
   }
+
+  async runCode(roomId: string, code: string): Promise<string> {
+    const response = await api.post<{ output: string }>(`/api/rooms/${roomId}/run`, { code });
+    return response.output;
+  }
 }
 
 export const roomService = new RoomService();

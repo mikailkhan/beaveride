@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { RoomService } from '../services/roomService.js';
+import { ExecutorService } from '../services/executorService.js';
 import { HttpError } from '../middleware/errorMiddleware.js';
 
 const createRoomSchema = z.object({
@@ -16,7 +17,10 @@ const roomParamsSchema = z.object({
 });
 
 export class RoomController {
-  constructor(private readonly roomService = new RoomService()) {}
+  constructor(
+    private readonly roomService = new RoomService(),
+    private readonly executorService = new ExecutorService()
+  ) {}
 
   createRoom = async (req: Request, res: Response): Promise<void> => {
     if (!req.user) {
@@ -58,5 +62,22 @@ export class RoomController {
     const membership = await this.roomService.joinRoom(req.user.sub, roomId);
 
     res.status(200).json({ data: membership });
+  };
+
+  runCode = async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) {
+      throw new HttpError(401, 'Unauthorized');
+    }
+
+    const { id: roomId } = roomParamsSchema.parse(req.params);
+    const { code } = z.object({ code: z.string() }).parse(req.body);
+
+    const roomDetails = await this.roomService.getRoomDetails(req.user.sub, roomId);
+    if (!roomDetails.canRun) {
+      throw new HttpError(403, 'You do not have execution privileges in this room');
+    }
+
+    const output = await this.executorService.executeCode(roomDetails.language, code);
+    res.status(200).json({ output });
   };
 }

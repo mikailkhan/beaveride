@@ -6,17 +6,11 @@ import { ChatPanel } from '../../components/editor/ChatPanel';
 import { useRoomStore } from '../../store/roomStore';
 import { useAuthStore } from '../../store/authStore';
 import { useYjsSync } from '../../hooks/useYjsSync';
-import { mockEditorService } from '../../services/mocks/mockEditorService';
+import { roomService } from '../../services/roomService';
 import BeaverideLogo from '../../assets/logos/beaveride-logo.png';
 
 const getDefaultFileInfo = (language: string) => {
   const lang = language.toLowerCase();
-  if (lang === 'typescript') {
-    return {
-      filename: 'main.ts',
-      code: `// TypeScript execution environment\nconst message: string = "Hello, TypeScript!";\nconsole.log(message);\n`,
-    };
-  }
   if (lang === 'python') {
     return {
       filename: 'main.py',
@@ -75,14 +69,14 @@ export const EditorRoom = () => {
   }, [activeRoom]);
 
   const handleRun = async () => {
-    if (!activeRoom) return;
+    if (!activeRoom || !roomId) return;
     setStatus('running');
-    setOutput('Starting execution environment...');
+    setOutput('Starting isolated execution container...');
     
     try {
       const code = editor ? editor.getValue() : '';
-      const result = await mockEditorService.executeCode(activeRoom.language, code);
-      setOutput(result);
+      const output = await roomService.runCode(roomId, code);
+      setOutput(output);
       setStatus('success');
     } catch (error) {
       setOutput((error as Error).message);
@@ -96,7 +90,6 @@ export const EditorRoom = () => {
 
   const getLanguageType = (filename: string) => {
     if (filename.endsWith('.js')) return 'javascript';
-    if (filename.endsWith('.ts')) return 'typescript';
     if (filename.endsWith('.go')) return 'go';
     if (filename.endsWith('.py')) return 'python';
     if (filename.endsWith('.css')) return 'css';
@@ -107,9 +100,6 @@ export const EditorRoom = () => {
   const getFileIcon = (filename: string) => {
     if (filename.endsWith('.js')) {
       return <span className="material-symbols-outlined text-[16px] text-[#f0db4f]">javascript</span>;
-    }
-    if (filename.endsWith('.ts')) {
-      return <span className="material-symbols-outlined text-[16px] text-[#007acc]">code</span>;
     }
     if (filename.endsWith('.go')) {
       return <span className="material-symbols-outlined text-[16px] text-[#00add8]">code</span>;
@@ -129,7 +119,6 @@ export const EditorRoom = () => {
   const formatLanguageName = (lang: string) => {
     switch (lang.toLowerCase()) {
       case 'javascript': return 'JavaScript (Node.js)';
-      case 'typescript': return 'TypeScript (Node.js)';
       case 'python': return 'Python 3';
       case 'go': return 'Go (Golang)';
       default: return lang.charAt(0).toUpperCase() + lang.slice(1);

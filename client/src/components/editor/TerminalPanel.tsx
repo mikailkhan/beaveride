@@ -58,15 +58,9 @@ export const TerminalPanel = ({ output }: TerminalPanelProps) => {
     fitAddonRef.current = fitAddon;
 
     // Print starting command output
-    term.writeln('\x1b[32m➜\x1b[0m \x1b[36mworkspace\x1b[0m npm run dev');
-    term.writeln('> beaveride-project@1.0.0 dev');
-    term.writeln('> nodemon src/main.js');
-    term.writeln('\x1b[90m[nodemon] 2.0.22\x1b[0m');
-    term.writeln('\x1b[90m[nodemon] watching path(s): *.*\x1b[0m');
-    term.writeln('\x1b[90m[nodemon] starting `node src/main.js`\x1b[0m');
-    term.writeln('\x1b[44m\x1b[37m\x1b[1m INFO \x1b[0m Server running successfully on port 3000');
-    term.writeln('\x1b[42m\x1b[37m\x1b[1m BUILD \x1b[0m \x1b[32mHot-module replacement enabled. Watching for changes...\x1b[0m');
-    term.write('\r\n\x1b[32m➜\x1b[0m \x1b[36mworkspace\x1b[0m ');
+    term.writeln('BeaverIDE Code Execution Console active.');
+    term.writeln('Write code in the editor and click the "Run" button in the header to execute.');
+    term.write('\x1b[32m➜\x1b[0m \x1b[36mworkspace\x1b[0m ');
 
     // Input command line buffer
     let currentLine = '';
@@ -83,13 +77,7 @@ export const TerminalPanel = ({ output }: TerminalPanelProps) => {
         if (trimmedCommand === 'clear') {
           term.clear();
         } else if (trimmedCommand === 'help') {
-          term.writeln('Available commands: help, clear, run, ls, npm run dev');
-        } else if (trimmedCommand === 'ls') {
-          term.writeln('package.json   README.md   src/   server.go   style.css');
-        } else if (trimmedCommand === 'npm run dev') {
-          term.writeln('> beaveride-project@1.0.0 dev');
-          term.writeln('> nodemon src/main.js');
-          term.writeln('\x1b[44m\x1b[37m\x1b[1m INFO \x1b[0m Server running successfully on port 3000');
+          term.writeln('Available commands: help, clear');
         } else if (trimmedCommand !== '') {
           term.writeln(`bash: command not found: ${trimmedCommand}`);
         }
