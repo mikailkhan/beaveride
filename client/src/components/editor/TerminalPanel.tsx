@@ -173,15 +173,9 @@ export const TerminalPanel = ({ output }: TerminalPanelProps) => {
       {/* Terminal Tabs */}
       <div className="flex items-center gap-md px-md py-xs bg-[#1A1A1A] border-b border-[#333] shrink-0 select-none">
         <div className="text-white font-bold border-b-2 border-primary pb-1 cursor-pointer text-[13px]">Terminal</div>
-        <div className="text-[#888] hover:text-white cursor-pointer pb-1 text-[13px]">Output</div>
-        <div className="text-[#888] hover:text-white cursor-pointer pb-1 text-[13px]">
-          Problems <span className="bg-[#333] px-1.5 py-0.5 rounded-full text-[10px] ml-1">0</span>
-        </div>
+        <div className="text-[#888] hover:text-white cursor-pointer pb-1 text-[13px]">Local Terminal</div>
         <div className="ml-auto flex gap-sm text-[#888]">
-          <span className="material-symbols-outlined text-[16px] hover:text-white cursor-pointer">add</span>
-          <span className="material-symbols-outlined text-[16px] hover:text-white cursor-pointer">delete</span>
           <span className="material-symbols-outlined text-[16px] hover:text-white cursor-pointer">keyboard_arrow_up</span>
-          <span className="material-symbols-outlined text-[16px] hover:text-white cursor-pointer">close</span>
         </div>
       </div>
       {/* Terminal Output */}
