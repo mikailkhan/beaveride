@@ -75,6 +75,16 @@ class RoomService {
     return response.data.map(mapRoom);
   }
 
+  async getArchivedRooms(): Promise<Room[]> {
+    const response = await api.get<ApiResponse<BackendRoom[]>>('/api/rooms/archived');
+    return response.data.map(mapRoom);
+  }
+
+  async getSharedRooms(): Promise<Room[]> {
+    const response = await api.get<ApiResponse<BackendRoom[]>>('/api/rooms/shared');
+    return response.data.map(mapRoom);
+  }
+
   async createRoom(title: string, language: string): Promise<Room> {
     const response = await api.post<ApiResponse<BackendRoom>>('/api/rooms', { title, language });
     return mapRoom(response.data);
@@ -88,6 +98,26 @@ class RoomService {
   async joinRoom(roomId: string): Promise<UserRoom> {
     const response = await api.post<ApiResponse<BackendUserRoom>>(`/api/rooms/${roomId}/join`);
     return mapUserRoom(response.data);
+  }
+
+  async archiveRoom(roomId: string): Promise<void> {
+    await api.patch(`/api/rooms/${roomId}/archive`);
+  }
+
+  async trashRoom(roomId: string): Promise<void> {
+    await api.patch(`/api/rooms/${roomId}/trash`);
+  }
+
+  async restoreRoom(roomId: string): Promise<void> {
+    await api.patch(`/api/rooms/${roomId}/restore`);
+  }
+
+  async deleteRoom(roomId: string): Promise<void> {
+    await api.delete(`/api/rooms/${roomId}`);
+  }
+
+  async trashAllRooms(): Promise<void> {
+    await api.patch('/api/rooms/trash-all');
   }
 
   async runCode(roomId: string, code: string): Promise<string> {

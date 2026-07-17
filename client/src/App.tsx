@@ -5,6 +5,9 @@ import { Contact } from './pages/Contact/Contact';
 import { Login } from './pages/Login/Login';
 import { Register } from './pages/Register/Register';
 import { Dashboard } from './pages/Dashboard/Dashboard';
+import { SharedProjects } from './pages/Dashboard/SharedProjects';
+import { ArchivedProjects } from './pages/Dashboard/ArchivedProjects';
+import { Settings } from './pages/Dashboard/Settings';
 import { EditorRoom } from './pages/EditorRoom/EditorRoom';
 import { Features } from './pages/Features/Features';
 import { Pricing } from './pages/Pricing/Pricing';
@@ -21,6 +24,7 @@ import { Outlet } from 'react-router-dom';
 import { AuthProvider } from './components/common/AuthProvider';
 import { ProtectedRoute } from './components/common/ProtectedRoute';
 import { PublicOnlyRoute } from './components/common/PublicOnlyRoute';
+import { DashboardLayout } from './components/layout/DashboardLayout';
 
 // Layout route to wrap pages in Header/Footer automatically
 const AppLayout = () => {
@@ -60,7 +64,15 @@ const router = createBrowserRouter([
       {
         element: <ProtectedRoute />,
         children: [
-          { path: '/dashboard', element: <Dashboard /> },
+          {
+            element: <DashboardLayout />,
+            children: [
+              { path: '/dashboard', element: <Dashboard /> },
+              { path: '/dashboard/shared', element: <SharedProjects /> },
+              { path: '/dashboard/archived', element: <ArchivedProjects /> },
+              { path: '/dashboard/settings', element: <Settings /> },
+            ],
+          },
           { path: '/room/:roomId', element: <EditorRoom /> },
         ],
       },

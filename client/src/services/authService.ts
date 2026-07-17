@@ -70,6 +70,17 @@ class AuthService {
       user: mapUser(response.data.user),
     };
   }
+
+  async updateProfile(data: { firstName?: string; lastName?: string; email?: string }): Promise<{ user: User }> {
+    const response = await api.patch<ApiResponse<CurrentUserResponseData>>('/api/auth/me', data);
+    return {
+      user: mapUser(response.data.user),
+    };
+  }
+
+  async changePassword(data: { currentPassword: string; newPassword: string }): Promise<void> {
+    await api.patch('/api/auth/me/password', data);
+  }
 }
 
 export const authService = new AuthService();

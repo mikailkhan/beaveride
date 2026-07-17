@@ -55,7 +55,7 @@ class ApiClient {
     );
   }
 
-  async request<T>(path: string, options: { method: 'GET' | 'POST'; data?: unknown }): Promise<T> {
+  async request<T>(path: string, options: { method: 'GET' | 'POST' | 'PATCH' | 'DELETE'; data?: unknown }): Promise<T> {
     try {
       const response = await this.client.request<T>({
         url: path,
@@ -85,6 +85,19 @@ class ApiClient {
     return this.request<T>(path, {
       method: 'POST',
       data: body,
+    });
+  }
+
+  patch<T>(path: string, body?: unknown): Promise<T> {
+    return this.request<T>(path, {
+      method: 'PATCH',
+      data: body,
+    });
+  }
+
+  delete<T>(path: string): Promise<T> {
+    return this.request<T>(path, {
+      method: 'DELETE',
     });
   }
 }
