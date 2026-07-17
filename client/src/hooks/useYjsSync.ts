@@ -174,14 +174,24 @@ export function useYjsSync({ roomId, token, editor }: UseYjsSyncProps): {
       }
       styleEl.innerHTML = styleText;
 
-      const collabs = states.map(([clientId, state]) => ({
-        clientId,
-        userId: state.user?.userId || 0,
-        username: state.user?.name || 'Anonymous',
-        firstName: state.user?.firstName || 'Anonymous',
-        lastName: state.user?.lastName || '',
-        color: state.user?.color || '#f66317',
-      }));
+      const seen = new Set<number>();
+      const collabs: Collaborator[] = [];
+      states.forEach(([clientId, state]) => {
+        const uId = state.user?.userId;
+        if (uId) {
+          if (!seen.has(uId)) {
+            seen.add(uId);
+            collabs.push({
+              clientId,
+              userId: uId,
+              username: state.user?.name || 'Anonymous',
+              firstName: state.user?.firstName || 'Anonymous',
+              lastName: state.user?.lastName || '',
+              color: state.user?.color || '#f66317',
+            });
+          }
+        }
+      });
       setCollaborators(collabs);
     };
     awareness.on('change', handleAwarenessChange);
