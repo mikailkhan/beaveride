@@ -40,6 +40,7 @@ export const EditorRoom = () => {
   const [files, setFiles] = useState<Record<string, string>>({});
   const [output, setOutput] = useState('');
   const [status, setStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
+  const [activeTab, setActiveTab] = useState<'global' | 'local'>('global');
 
   useEffect(() => {
     if (!roomId) return;
@@ -383,7 +384,11 @@ export const EditorRoom = () => {
             </div>
 
             {/* Terminal (Bottom Panel) */}
-            <TerminalPanel output={output} />
+            <TerminalPanel 
+              output={output} 
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+            />
           </div>
 
           {/* Chat Sidebar */}

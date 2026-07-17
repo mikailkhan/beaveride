@@ -4,9 +4,11 @@ import { FitAddon } from 'xterm-addon-fit';
 
 interface TerminalPanelProps {
   output: string;
+  activeTab: 'global' | 'local';
+  onTabChange: (tab: 'global' | 'local') => void;
 }
 
-export const TerminalPanel = ({ output }: TerminalPanelProps) => {
+export const TerminalPanel = ({ output, activeTab, onTabChange }: TerminalPanelProps) => {
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -175,8 +177,18 @@ export const TerminalPanel = ({ output }: TerminalPanelProps) => {
 
       {/* Terminal Tabs */}
       <div className="flex items-center gap-md px-md py-xs bg-[#1A1A1A] border-b border-[#333] shrink-0 select-none">
-        <div className="text-white font-bold border-b-2 border-primary pb-1 cursor-pointer text-[13px]">Terminal</div>
-        <div className="text-[#888] hover:text-white cursor-pointer pb-1 text-[13px]">Local Terminal</div>
+        <button 
+          onClick={() => onTabChange('global')}
+          className={`${activeTab === 'global' ? 'text-white font-bold border-b-2 border-primary' : 'text-[#888] hover:text-white'} pb-1 cursor-pointer text-[13px] bg-transparent border-0 outline-none`}
+        >
+          Terminal
+        </button>
+        <button 
+          onClick={() => onTabChange('local')}
+          className={`${activeTab === 'local' ? 'text-white font-bold border-b-2 border-primary' : 'text-[#888] hover:text-white'} pb-1 cursor-pointer text-[13px] bg-transparent border-0 outline-none`}
+        >
+          Local Terminal
+        </button>
         <div className="ml-auto flex gap-sm text-[#888]">
           <button 
             onClick={() => setIsCollapsed(!isCollapsed)}
