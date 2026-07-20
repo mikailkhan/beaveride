@@ -15,6 +15,7 @@ import { relations } from 'drizzle-orm';
 
 export const userRoomRoleEnum = pgEnum('user_room_role', ['owner', 'editor', 'viewer']);
 export const runStatusEnum = pgEnum('run_status', ['queued', 'running', 'success', 'error', 'cancelled']);
+export const fileNodeTypeEnum = pgEnum('file_node_type', ['file', 'directory']);
 
 const bytea = customType<{ data: Buffer }>({
   dataType() {
@@ -181,6 +182,7 @@ export const roomsRelations = relations(rooms, ({ one, many }) => ({
   chatMessages: many(chatMessages),
   codeSnapshots: many(codeSnapshots),
   runSnapshots: many(runSnapshots),
+  projectFiles: many(projectFiles),
 }));
 
 export const userRoomsRelations = relations(userRooms, ({ one }) => ({
@@ -191,5 +193,35 @@ export const userRoomsRelations = relations(userRooms, ({ one }) => ({
   room: one(rooms, {
     fields: [userRooms.roomId],
     references: [rooms.id],
+  }),
+}));
+
+export const projectFiles = pgTable(
+  'project_files',
+  {
+    id: serial('id').primaryKey(),
+    roomId: integer('room_id')
+      .notNull()
+      .references(() => rooms.id, { onDelete: 'cascade' }),
+    parentId: integer('parent_id'),   // null = root level
+    name: varchar('name', { length: 255 }).notNull(),
+    type: fileNodeTypeEnum('type').notNull(),
+    content: text('content'),          // null for directories
+    ...timestamps,
+  },
+  (table) => ({
+    roomParentIdx: index('project_files_room_parent_idx').on(table.roomId, table.parentId),
+    uniqueNameInParent: uniqueIndex('project_files_unique_name_idx').on(table.roomId, table.parentId, table.name),
+  }),
+);
+
+export const projectFilesRelations = relations(projectFiles, ({ one }) => ({
+  room: one(rooms, {
+    fields: [projectFiles.roomId],
+    references: [rooms.id],
+  }),
+  parent: one(projectFiles, {
+    fields: [projectFiles.parentId],
+    references: [projectFiles.id],
   }),
 }));
