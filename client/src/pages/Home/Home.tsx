@@ -331,7 +331,7 @@ export const Home = () => {
                       <img
                         src={step.image}
                         alt={step.title}
-                        className="w-full h-full object-contain rounded-lg drop-shadow-[0_8px_20px_rgba(0,0,0,0.06)]"
+                        className="w-full h-full object-contain rounded-3xl drop-shadow-[0_8px_20px_rgba(0,0,0,0.06)]"
                       />
                     </div>
                   ))}
