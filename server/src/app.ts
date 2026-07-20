@@ -6,6 +6,7 @@ import { errorHandler, notFoundHandler } from './middleware/errorMiddleware.js';
 import { authRoutes } from './routes/authRoutes.js';
 import { healthRoutes, rootHealthRoutes } from './routes/healthRoutes.js';
 import { roomRoutes } from './routes/roomRoutes.js';
+import { fileRoutes } from './routes/fileRoutes.js';
 
 export const createApp = () => {
   const app = express();
@@ -23,6 +24,7 @@ export const createApp = () => {
   app.use('/api', healthRoutes);
   app.use('/api/auth', authRoutes);
   app.use('/api/rooms', roomRoutes);
+  app.use('/api/rooms', fileRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
