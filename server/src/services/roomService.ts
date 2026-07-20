@@ -1,8 +1,24 @@
 import { HttpError } from '../middleware/errorMiddleware.js';
 import { RoomRepository } from '../repositories/roomRepository.js';
+import { FileRepository } from '../repositories/fileRepository.js';
 
 export class RoomService {
-  constructor(private readonly roomRepository = new RoomRepository()) {}
+  constructor(
+    private readonly roomRepository = new RoomRepository(),
+    private readonly fileRepository = new FileRepository()
+  ) {}
+
+  private getDefaultFile(language: string) {
+    const clean = language.trim().toLowerCase();
+    switch (clean) {
+      case 'python':
+        return { name: 'main.py', content: '# Python 3\nprint("Hello, World!")\n' };
+      case 'go':
+        return { name: 'main.go', content: 'package main\n\nimport "fmt"\n\nfunc main() {\n\tfmt.Println("Hello, World!")\n}\n' };
+      default:
+        return { name: 'main.js', content: '// JavaScript\nconsole.log("Hello, World!");\n' };
+    }
+  }
 
   async createRoom(userId: number, title: string, languageName: string) {
     const cleanLanguageName = languageName.trim().toLowerCase();
@@ -20,6 +36,16 @@ export class RoomService {
 
     // Creator is assigned the 'owner' role and canRun is set to true
     await this.roomRepository.addMember(room.id, userId, 'owner', true);
+
+    // Seed default starter file
+    const defaultFile = this.getDefaultFile(language.language);
+    await this.fileRepository.createFile({
+      roomId: room.id,
+      parentId: null,
+      name: defaultFile.name,
+      type: 'file',
+      content: defaultFile.content,
+    });
 
     return {
       id: room.id,
