@@ -148,11 +148,26 @@ export const EditorRoom = () => {
     };
   }, [socket]);
 
+  const getExecutionLanguage = (filename: string): string => {
+    const ext = filename.split('.').pop()?.toLowerCase();
+    switch (ext) {
+      case 'js':
+        return 'javascript';
+      case 'py':
+        return 'python';
+      case 'go':
+        return 'go';
+      default:
+        return activeRoom?.language || 'javascript';
+    }
+  };
+
   const handleGlobalRun = () => {
     if (!socket || !activeRoom || globalRunStatus === 'running') return;
     setActiveTab('global');
     const code = activeFile?.content || '';
-    socket.emit('run:global', { code, language: activeRoom.language });
+    const executionLang = activeFile ? getExecutionLanguage(activeFile.name) : activeRoom.language;
+    socket.emit('run:global', { code, language: executionLang });
   };
 
   const handleLocalRun = async () => {
@@ -162,7 +177,8 @@ export const EditorRoom = () => {
     setLocalOutput('\r\n\x1b[33m[Local Run started...]\x1b[0m\r\n');
     try {
       const code = activeFile?.content || '';
-      const result = await roomService.runCode(roomId, code);
+      const executionLang = activeFile ? getExecutionLanguage(activeFile.name) : activeRoom.language;
+      const result = await roomService.runCode(roomId, code, executionLang);
       setLocalOutput(result);
       setLocalRunStatus('success');
     } catch (err) {
