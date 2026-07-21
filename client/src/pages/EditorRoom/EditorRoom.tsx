@@ -11,6 +11,7 @@ import BeaverideLogo from '../../assets/logos/beaveride-logo.png';
 import { FileExplorer } from '../../components/editor/FileExplorer';
 import { EditorTabs } from '../../components/editor/EditorTabs';
 import { useFileStore } from '../../store/fileStore';
+import { fileService } from '../../services/fileService';
 
 type ActivityEventType = 'joined' | 'left' | 'global_run' | 'code_edit';
 
@@ -35,6 +36,25 @@ export const EditorRoom = () => {
   const [localRunStatus, setLocalRunStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
   const [activities, setActivities] = useState<ActivityEntry[]>([]);
   const [activeTab, setActiveTab] = useState<'global' | 'local'>('global');
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved');
+
+  // Debounced auto-save effect
+  useEffect(() => {
+    if (!activeFile || !roomId) return;
+
+    setSaveStatus('saving');
+    const delayDebounceFn = setTimeout(async () => {
+      try {
+        await fileService.updateFileContent(roomId, activeFile.id, activeFile.content || '');
+        setSaveStatus('saved');
+      } catch (err) {
+        console.error('Failed to auto-save file:', err);
+        setSaveStatus('error');
+      }
+    }, 1000);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [activeFile?.content, activeFile?.id, roomId]);
 
   useEffect(() => {
     if (!roomId) return;
@@ -284,6 +304,25 @@ export const EditorRoom = () => {
               <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse"></span>
               {formatLanguageName(activeRoom.language)} • {activeRoom.role}
             </span>
+
+            {saveStatus === 'saving' && (
+              <span className="text-xs text-on-surface-variant/70 flex items-center gap-xs ml-sm">
+                <span className="material-symbols-outlined text-[14px] animate-spin">sync</span>
+                Saving...
+              </span>
+            )}
+            {saveStatus === 'saved' && (
+              <span className="text-xs text-green-600/70 flex items-center gap-xs ml-sm" title="All changes saved to database">
+                <span className="material-symbols-outlined text-[14px]">cloud_done</span>
+                Saved
+              </span>
+            )}
+            {saveStatus === 'error' && (
+              <span className="text-xs text-error flex items-center gap-xs ml-sm" title="Failed to save changes">
+                <span className="material-symbols-outlined text-[14px]">cloud_off</span>
+                Save Error
+              </span>
+            )}
           </div>
 
           {/* Actions */}
