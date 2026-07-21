@@ -8,6 +8,66 @@ interface FileExplorerProps {
   roomId: string;
 }
 
+const InlineInput: React.FC<{
+  type: 'file' | 'directory';
+  onSave: (val: string) => void;
+  onCancel: () => void;
+}> = ({ type, onSave, onCancel }) => {
+  const [value, setValue] = useState('');
+  const [isInvalid, setIsInvalid] = useState(false);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  // Guard against double-submission (Enter fires keydown, which can also trigger blur)
+  const submittedRef = React.useRef(false);
+
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, []);
+
+  const handleSubmit = () => {
+    if (submittedRef.current) return;
+    const clean = value.trim();
+    if (!clean || /[\/]/.test(clean)) {
+      setIsInvalid(true);
+      return;
+    }
+    submittedRef.current = true;
+    onSave(clean);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSubmit();
+    } else if (e.key === 'Escape') {
+      submittedRef.current = true; // prevent blur from re-triggering
+      onCancel();
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-xs py-[2px] px-sm w-full pl-3">
+      <span className="material-symbols-outlined text-[18px] opacity-80 shrink-0">
+        {type === 'directory' ? 'folder' : 'description'}
+      </span>
+      <input
+        ref={inputRef}
+        value={value}
+        onChange={(e) => {
+          setValue(e.target.value);
+          setIsInvalid(false);
+        }}
+        onKeyDown={handleKeyDown}
+        onBlur={onCancel}
+        className={`bg-surface border text-[13px] px-[4px] py-[2px] rounded outline-none w-full max-w-[180px] ${
+          isInvalid ? 'border-error shadow-[0_0_4px_rgba(186,26,26,0.3)]' : 'border-outline/35 focus:border-primary/50'
+        }`}
+      />
+    </div>
+  );
+};
+
 export const FileExplorer: React.FC<FileExplorerProps> = ({ roomId }) => {
   const { files, fetchFileTree, createNode, openFile } = useFileStore();
   const [creatingNode, setCreatingNode] = useState<{ parentId: string | null; type: 'file' | 'directory' } | null>(null);
@@ -50,13 +110,14 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ roomId }) => {
 
   const handleCreateRoot = async (name: string) => {
     if (!creatingNode) return;
+    const type = creatingNode.type;
     try {
       const created = await createNode(roomId, {
         name,
-        type: creatingNode.type,
+        type,
         content: '',
       });
-      if (creatingNode.type === 'file') {
+      if (type === 'file') {
         openFile(created);
       }
     } catch (err) {
@@ -69,60 +130,6 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ roomId }) => {
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     setContextMenu({ x: e.clientX, y: e.clientY });
-  };
-
-  const InlineInput: React.FC<{
-    type: 'file' | 'directory';
-    onSave: (val: string) => void;
-    onCancel: () => void;
-  }> = ({ type, onSave, onCancel }) => {
-    const [value, setValue] = useState('');
-    const [isInvalid, setIsInvalid] = useState(false);
-    const inputRef = React.useRef<HTMLInputElement>(null);
-
-    useEffect(() => {
-      if (inputRef.current) {
-        inputRef.current.focus();
-      }
-    }, []);
-
-    const handleSubmit = () => {
-      const clean = value.trim();
-      if (!clean || /[\\/]/.test(clean)) {
-        setIsInvalid(true);
-        return;
-      }
-      onSave(clean);
-    };
-
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter') {
-        handleSubmit();
-      } else if (e.key === 'Escape') {
-        onCancel();
-      }
-    };
-
-    return (
-      <div className="flex items-center gap-xs py-[2px] px-sm w-full pl-3">
-        <span className="material-symbols-outlined text-[18px] opacity-80 shrink-0">
-          {type === 'directory' ? 'folder' : 'description'}
-        </span>
-        <input
-          ref={inputRef}
-          value={value}
-          onChange={(e) => {
-            setValue(e.target.value);
-            setIsInvalid(false);
-          }}
-          onKeyDown={handleKeyDown}
-          onBlur={handleSubmit}
-          className={`bg-surface border text-[13px] px-[4px] py-[2px] rounded outline-none w-full max-w-[180px] ${
-            isInvalid ? 'border-error shadow-[0_0_4px_rgba(186,26,26,0.3)]' : 'border-outline/35 focus:border-primary/50'
-          }`}
-        />
-      </div>
-    );
   };
 
   const emptyAreaMenuItems = [

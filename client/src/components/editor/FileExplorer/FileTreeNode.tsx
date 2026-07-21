@@ -24,6 +24,8 @@ const InlineInput: React.FC<{
   const [value, setValue] = useState(initialValue);
   const [isInvalid, setIsInvalid] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Guard against double-submission (Enter fires keydown, which can also trigger blur)
+  const submittedRef = useRef(false);
 
   useEffect(() => {
     if (inputRef.current) {
@@ -40,18 +42,22 @@ const InlineInput: React.FC<{
   }, [initialValue, type]);
 
   const handleSubmit = () => {
+    if (submittedRef.current) return;
     const clean = value.trim();
-    if (!clean || /[\\/]/.test(clean)) {
+    if (!clean || /[\/]/.test(clean)) {
       setIsInvalid(true);
       return;
     }
+    submittedRef.current = true;
     onSave(clean);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
+      e.preventDefault();
       handleSubmit();
     } else if (e.key === 'Escape') {
+      submittedRef.current = true; // prevent blur from re-triggering
       onCancel();
     }
   };
@@ -72,7 +78,7 @@ const InlineInput: React.FC<{
           setIsInvalid(false);
         }}
         onKeyDown={handleKeyDown}
-        onBlur={handleSubmit}
+        onBlur={onCancel}
         className={`bg-surface border text-[13px] px-[4px] py-[2px] rounded outline-none w-full max-w-[180px] ${
           isInvalid ? 'border-error shadow-[0_0_4px_rgba(186,26,26,0.3)]' : 'border-outline/35 focus:border-primary/50'
         }`}
@@ -131,14 +137,15 @@ export const FileTreeNode: React.FC<FileTreeNodeProps> = ({
 
   const handleCreateChild = async (name: string) => {
     if (!creatingNode) return;
+    const type = creatingNode.type;
     try {
       const created = await createNode(roomId, {
         name,
-        type: creatingNode.type,
+        type,
         parentId: node.id,
         content: '',
       });
-      if (creatingNode.type === 'file') {
+      if (type === 'file') {
         openFile(created);
       }
     } catch (err) {
