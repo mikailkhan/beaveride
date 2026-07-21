@@ -217,7 +217,7 @@ export const EditorRoom = () => {
     <div className="h-screen bg-background text-on-surface font-body-md overflow-hidden flex font-[Inter] w-full">
       {/* Left Sidebar Menu */}
       <aside className={`h-screen bg-surface-container-low border-r border-outline-variant/30 flex flex-col justify-between py-md px-sm shrink-0 z-10 select-none transition-all duration-300 ${isSidebarExpanded ? 'w-[280px]' : 'w-[70px] items-center'}`}>
-        <div className="mb-lg px-sm w-full">
+        <div className="px-sm w-full">
           <div className={`flex items-center mb-lg mt-sm ${isSidebarExpanded ? 'justify-between' : 'justify-center'}`}>
             {isSidebarExpanded && (
               <div className="flex items-center w-[140px] h-[54px] bg-surface-container-high rounded-lg overflow-hidden">
@@ -236,14 +236,6 @@ export const EditorRoom = () => {
               </span>
             </button>
           </div>
-          <button 
-            onClick={() => alert("Creating a new file... (mock)")}
-            className={`bg-primary-container text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] hover:bg-primary transition-all flex items-center justify-center gap-xs cursor-pointer ${isSidebarExpanded ? 'w-full rounded-lg font-label-md text-label-md py-md' : 'w-10 h-10 rounded-full p-0 mx-auto'}`}
-            title="New File"
-          >
-            <span className="material-symbols-outlined text-[18px]">add</span>
-            {isSidebarExpanded && <span>New File</span>}
-          </button>
         </div>
 
         {/* Main Navigation */}
