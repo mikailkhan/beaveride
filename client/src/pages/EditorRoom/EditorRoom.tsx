@@ -75,6 +75,36 @@ export const EditorRoom = () => {
   const [isExplorerExpanded, setIsExplorerExpanded] = useState(true);
   const [isActivityExpanded, setIsActivityExpanded] = useState(true);
 
+  // Sidebar resizing state & handlers
+  const [sidebarWidth, setSidebarWidth] = useState(280);
+  const [isResizingSidebar, setIsResizingSidebar] = useState(false);
+
+  useEffect(() => {
+    if (!isResizingSidebar) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const newWidth = Math.max(200, Math.min(450, e.clientX));
+      setSidebarWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizingSidebar(false);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizingSidebar]);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizingSidebar(true);
+  };
+
   // Sync editor workspace using Yjs
   const { collaborators, socket } = useYjsSync({ roomId: roomId || '', token: token || '', editor });
 
@@ -217,7 +247,12 @@ export const EditorRoom = () => {
   return (
     <div className="h-screen bg-background text-on-surface font-body-md overflow-hidden flex font-[Inter] w-full">
       {/* Left Sidebar Menu */}
-      <aside className={`h-screen bg-surface-container-low border-r border-outline-variant/30 flex flex-col justify-between py-md px-sm shrink-0 z-10 select-none transition-all duration-300 ${isSidebarExpanded ? 'w-[280px]' : 'w-[70px] items-center'}`}>
+      <aside
+        style={{ width: isSidebarExpanded ? `${sidebarWidth}px` : '70px' }}
+        className={`h-screen bg-surface-container-low border-r border-outline-variant/30 flex flex-col justify-between py-md px-sm shrink-0 z-10 select-none relative ${
+          isResizingSidebar ? '' : 'transition-[width] duration-300'
+        } ${isSidebarExpanded ? '' : 'items-center'}`}
+      >
         <div className="px-sm w-full">
           <div className={`flex items-center mb-lg mt-sm ${isSidebarExpanded ? 'justify-between' : 'justify-center'}`}>
             {isSidebarExpanded && (
@@ -297,6 +332,16 @@ export const EditorRoom = () => {
             <span className={`absolute bg-primary rounded-full border border-surface-container-low ${isSidebarExpanded ? 'top-2 left-6 w-2 h-2' : 'top-1 right-2 w-1.5 h-1.5'}`}></span>
           </a>
         </div>
+
+        {/* Resize Handle */}
+        {isSidebarExpanded && (
+          <div
+            onMouseDown={handleMouseDown}
+            className={`absolute top-0 right-0 w-[4px] h-full cursor-col-resize hover:bg-primary/45 transition-colors z-20 ${
+              isResizingSidebar ? 'bg-primary/50' : 'bg-transparent'
+            }`}
+          />
+        )}
       </aside>
 
       {/* Main Content Area */}
