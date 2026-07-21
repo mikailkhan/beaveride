@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { MonacoEditor } from '../../components/editor/MonacoEditor';
 import { TerminalPanel } from '../../components/editor/TerminalPanel';
 import { ChatPanel } from '../../components/editor/ChatPanel';
@@ -23,7 +23,7 @@ interface ActivityEntry {
 
 export const EditorRoom = () => {
   const { roomId } = useParams<{ roomId: string }>();
-  const navigate = useNavigate();
+  
   const { activeRoom, isLoading, error, fetchRoomDetails, clearActiveRoom } = useRoomStore();
 
   const { files, activeFileId, fetchFileTree, clearFileStore, updateFileContent } = useFileStore();
@@ -72,6 +72,7 @@ export const EditorRoom = () => {
   const [showChat, setShowChat] = useState(false);
   const [isPresenceExpanded, setIsPresenceExpanded] = useState(true);
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
+  const [isExplorerExpanded, setIsExplorerExpanded] = useState(true);
   const [isActivityExpanded, setIsActivityExpanded] = useState(true);
 
   // Sync editor workspace using Yjs
@@ -239,17 +240,28 @@ export const EditorRoom = () => {
         </div>
 
         {/* Main Navigation */}
-        <nav className="flex-1 overflow-y-auto flex flex-col gap-sm w-full">
+        <nav className="flex-1 overflow-hidden flex flex-col gap-sm w-full">
           <div className="group flex-1 min-h-0 flex flex-col">
-            <div className={`flex items-center gap-sm px-sm py-sm rounded-lg bg-primary-container text-on-primary-container font-bold shrink-0 ${isSidebarExpanded ? '' : 'justify-center'}`} title="Explorer">
+            <button
+              onClick={() => isSidebarExpanded && setIsExplorerExpanded(!isExplorerExpanded)}
+              className={`flex items-center gap-sm px-sm py-sm rounded-lg bg-primary-container text-on-primary-container font-bold shrink-0 w-full transition-colors hover:bg-primary-container/80 ${isSidebarExpanded ? '' : 'justify-center'}`}
+              title="Explorer"
+            >
               <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>folder</span>
               {isSidebarExpanded && <span className="font-label-md text-label-md">Explorer</span>}
-              {isSidebarExpanded && <span className="material-symbols-outlined text-[16px] ml-auto rotate-90">chevron_right</span>}
-            </div>
-            
+              {isSidebarExpanded && (
+                <span
+                  className="material-symbols-outlined text-[16px] ml-auto transition-transform duration-200"
+                  style={{ transform: isExplorerExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}
+                >
+                  chevron_right
+                </span>
+              )}
+            </button>
+
             {/* Explorer Content */}
-            {isSidebarExpanded && (
-              <div className="flex-1 min-h-0 overflow-y-auto mt-xs">
+            {isSidebarExpanded && isExplorerExpanded && (
+              <div className="flex-1 min-h-0 overflow-hidden mt-xs">
                 <FileExplorer roomId={roomId || ''} />
               </div>
             )}
