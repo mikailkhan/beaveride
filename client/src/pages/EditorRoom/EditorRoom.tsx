@@ -6,6 +6,7 @@ import { ChatPanel } from '../../components/editor/ChatPanel';
 import { useRoomStore } from '../../store/roomStore';
 import { useAuthStore } from '../../store/authStore';
 import { useYjsSync } from '../../hooks/useYjsSync';
+import { useFileBinding } from '../../hooks/useFileBinding';
 import { roomService } from '../../services/roomService';
 import BeaverideLogo from '../../assets/logos/beaveride-logo.png';
 import { FileExplorer } from '../../components/editor/FileExplorer';
@@ -26,7 +27,17 @@ export const EditorRoom = () => {
   
   const { activeRoom, isLoading, error, fetchRoomDetails, clearActiveRoom } = useRoomStore();
 
-  const { files, activeFileId, fetchFileTree, clearFileStore, updateFileContent, validationError } = useFileStore();
+  const {
+    files,
+    activeFileId,
+    fetchFileTree,
+    clearFileStore,
+    validationError,
+    setSocket,
+    addNodeFromSocket,
+    renameNodeFromSocket,
+    deleteNodeFromSocket
+  } = useFileStore();
   const activeFile = files.find((f) => f.id === activeFileId) || null;
 
   const [editor, setEditor] = useState<any>(null);
@@ -36,25 +47,6 @@ export const EditorRoom = () => {
   const [localRunStatus, setLocalRunStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
   const [activities, setActivities] = useState<ActivityEntry[]>([]);
   const [activeTab, setActiveTab] = useState<'global' | 'local'>('global');
-  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved');
-
-  // Debounced auto-save effect
-  useEffect(() => {
-    if (!activeFile || !roomId) return;
-
-    setSaveStatus('saving');
-    const delayDebounceFn = setTimeout(async () => {
-      try {
-        await fileService.updateFileContent(roomId, activeFile.id, activeFile.content || '');
-        setSaveStatus('saved');
-      } catch (err) {
-        console.error('Failed to auto-save file:', err);
-        setSaveStatus('error');
-      }
-    }, 1000);
-
-    return () => clearTimeout(delayDebounceFn);
-  }, [activeFile?.content, activeFile?.id, roomId]);
 
   useEffect(() => {
     if (!roomId) return;
@@ -106,7 +98,41 @@ export const EditorRoom = () => {
   };
 
   // Sync editor workspace using Yjs
-  const { collaborators, socket } = useYjsSync({ roomId: roomId || '', token: token || '', editor });
+  const { collaborators, socket, doc, awareness, isSynced } = useYjsSync({ roomId: roomId || '', token: token || '' });
+
+  // Dynamically bind Monaco editor to active file's Y.Text inside Yjs doc
+  useFileBinding({ doc, awareness, editor, activeFileId, isSynced });
+
+  // Handle local activeFileId updates in Yjs awareness
+  useEffect(() => {
+    if (awareness && activeFileId) {
+      awareness.setLocalStateField('activeFileId', activeFileId);
+    }
+  }, [awareness, activeFileId]);
+
+  // Sync socket state in fileStore and listen to broadcast mutations
+  useEffect(() => {
+    if (!socket) return;
+    setSocket(socket);
+
+    const onFiletreeMutate = (data: { type: string; fileId?: string; newName?: string; node?: any }) => {
+      console.log('Received filetree mutation event:', data);
+      if (data.type === 'create' && data.node) {
+        addNodeFromSocket(data.node);
+      } else if (data.type === 'rename' && data.fileId && data.newName) {
+        renameNodeFromSocket(data.fileId, data.newName);
+      } else if (data.type === 'delete' && data.fileId) {
+        deleteNodeFromSocket(data.fileId);
+      }
+    };
+
+    socket.on('filetree:mutate', onFiletreeMutate);
+
+    return () => {
+      socket.off('filetree:mutate', onFiletreeMutate);
+      setSocket(null);
+    };
+  }, [socket, setSocket, addNodeFromSocket, renameNodeFromSocket, deleteNodeFromSocket]);
 
   // Register socket listeners for global run lifecycle
   useEffect(() => {
@@ -165,7 +191,7 @@ export const EditorRoom = () => {
   const handleGlobalRun = () => {
     if (!socket || !activeRoom || globalRunStatus === 'running') return;
     setActiveTab('global');
-    const code = activeFile?.content || '';
+    const code = editor ? editor.getValue() : (activeFile?.content || '');
     const executionLang = activeFile ? getExecutionLanguage(activeFile.name) : activeRoom.language;
     socket.emit('run:global', { code, language: executionLang });
   };
@@ -176,7 +202,7 @@ export const EditorRoom = () => {
     setLocalRunStatus('running');
     setLocalOutput('\r\n\x1b[33m[Local Run started...]\x1b[0m\r\n');
     try {
-      const code = activeFile?.content || '';
+      const code = editor ? editor.getValue() : (activeFile?.content || '');
       const executionLang = activeFile ? getExecutionLanguage(activeFile.name) : activeRoom.language;
       const result = await roomService.runCode(roomId, code, executionLang);
       setLocalOutput(result);
@@ -203,6 +229,12 @@ export const EditorRoom = () => {
       case 'go': return 'Go (Golang)';
       default: return lang.charAt(0).toUpperCase() + lang.slice(1);
     }
+  };
+
+  const getFileName = (fileId: string | null) => {
+    if (!fileId) return 'No active file';
+    const file = files.find((f) => f.id === fileId);
+    return file ? file.name : 'Unknown file';
   };
 
   const formatActivity = (entry: ActivityEntry) => {
@@ -377,24 +409,10 @@ export const EditorRoom = () => {
               {formatLanguageName(activeRoom.language)} • {activeRoom.role}
             </span>
 
-            {saveStatus === 'saving' && (
-              <span className="text-xs text-on-surface-variant/70 flex items-center gap-xs ml-sm">
-                <span className="material-symbols-outlined text-[14px] animate-spin">sync</span>
-                Saving...
-              </span>
-            )}
-            {saveStatus === 'saved' && (
-              <span className="text-xs text-green-600/70 flex items-center gap-xs ml-sm" title="All changes saved to database">
-                <span className="material-symbols-outlined text-[14px]">cloud_done</span>
-                Saved
-              </span>
-            )}
-            {saveStatus === 'error' && (
-              <span className="text-xs text-error flex items-center gap-xs ml-sm" title="Failed to save changes">
-                <span className="material-symbols-outlined text-[14px]">cloud_off</span>
-                Save Error
-              </span>
-            )}
+            <span className="text-xs text-green-600/70 flex items-center gap-xs ml-sm" title="Real-time collaboration active">
+              <span className="material-symbols-outlined text-[14px]">bolt</span>
+              Live Syncing
+            </span>
           </div>
 
           {/* Actions */}
@@ -411,11 +429,14 @@ export const EditorRoom = () => {
                     {member.username.charAt(0).toUpperCase()}
                   </span>
                   <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 glass-panel rounded-lg px-3 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                    <div className="font-label-md text-label-md font-bold text-on-surface">
+                    <div className="font-label-md text-label-md text-on-surface font-bold">
                       {member.firstName} {member.lastName}
                     </div>
                     <div className="text-[12px] text-on-surface-variant">
                       @{member.username} (Online)
+                    </div>
+                    <div className="text-[10px] text-primary font-semibold mt-0.5">
+                      Editing: {getFileName(member.activeFileId)}
                     </div>
                   </div>
                 </div>
@@ -476,12 +497,6 @@ export const EditorRoom = () => {
               {activeFile ? (
                 <MonacoEditor 
                   language={getLanguageType(activeFile.name)} 
-                  value={activeFile.content || ''}
-                  onChange={(val) => {
-                    if (val !== undefined) {
-                      updateFileContent(activeFile.id, val);
-                    }
-                  }}
                   onMount={(editorInstance) => setEditor(editorInstance)}
                 />
               ) : (
@@ -525,7 +540,7 @@ export const EditorRoom = () => {
                               {member.firstName} {member.lastName}
                             </div>
                             <div className="text-[10px] text-on-surface-variant truncate">
-                              @{member.username} (Online)
+                              @{member.username} • {getFileName(member.activeFileId)}
                             </div>
                           </div>
                         </div>

@@ -3,14 +3,16 @@ import * as Y from 'yjs';
 import { UserRepository } from '../repositories/userRepository.js';
 import { AuthService } from '../services/authService.js';
 import { ChatRepository } from '../repositories/chatRepository.js';
-import { getOrCreateDoc, updateDoc, decrementConnections } from './docStore.js';
+import { getOrCreateDoc, updateDoc, decrementConnections, getOrCreateFileText, deleteFileText } from './docStore.js';
 import { ExecutorService } from '../services/executorService.js';
+import { FileService } from '../services/fileService.js';
 import { addActivity, getActivities } from './activityStore.js';
 
 const userRepository = new UserRepository();
 const authService = new AuthService();
 const chatRepository = new ChatRepository();
 const executorService = new ExecutorService();
+const fileService = new FileService();
 const globalRunLock = new Map<number, boolean>();
 const codeEditDebounce = new Map<string, number>(); // key: `${roomId}:${userId}`
 const CODE_EDIT_DEBOUNCE_MS = 10_000;
@@ -106,6 +108,127 @@ export function registerRoomNamespace(io: SocketServer): void {
       // Handle awareness updates (cursors, selections)
       socket.on('sync:awareness', (update: Uint8Array) => {
         socket.to(roomChannel).emit('sync:awareness', update);
+      });
+
+      // Relay client-side filetree mutations to other clients in room
+      socket.on('filetree:mutate', (data: any) => {
+        socket.to(roomChannel).emit('filetree:mutate', data);
+      });
+
+      // Handle file tree creation event
+      socket.on('filetree:create', async (data: {
+        name: string;
+        type: 'file' | 'directory';
+        parentId?: string;
+        content?: string;
+      }) => {
+        try {
+          const parentIdNum = data.parentId ? parseInt(data.parentId, 10) : null;
+          const node = await fileService.createFile(
+            userId,
+            roomId,
+            parentIdNum,
+            data.name,
+            data.type,
+            data.content
+          );
+
+          if (node.type === 'file') {
+            // Eagerly get/create the Y.Text for this file to ensure it's seeded
+            getOrCreateFileText(roomId, node.id);
+          }
+
+          // Broadcast created event to all peers in the room channel (including sender)
+          const mappedNode = {
+            id: String(node.id),
+            roomId: String(node.roomId),
+            parentId: node.parentId !== null ? String(node.parentId) : null,
+            name: node.name,
+            type: node.type,
+            content: node.content,
+            createdAt: node.createdAt.toISOString(),
+            updatedAt: node.updatedAt.toISOString(),
+          };
+
+          roomNsp.to(roomChannel).emit('filetree:created', mappedNode);
+        } catch (err) {
+          console.error(`Failed to create file node over socket in room ${roomId}:`, err);
+          socket.emit('error', err instanceof Error ? err.message : 'Failed to create file');
+        }
+      });
+
+      // Handle file tree rename event
+      socket.on('filetree:rename', async (data: {
+        fileId: string;
+        newName: string;
+      }) => {
+        try {
+          const fileIdNum = parseInt(data.fileId, 10);
+          if (isNaN(fileIdNum)) throw new Error('Invalid fileId');
+          await fileService.renameFile(userId, roomId, fileIdNum, data.newName);
+
+          // Broadcast renamed event to all peers
+          roomNsp.to(roomChannel).emit('filetree:renamed', {
+            fileId: data.fileId,
+            newName: data.newName,
+          });
+        } catch (err) {
+          console.error(`Failed to rename file node over socket in room ${roomId}:`, err);
+          socket.emit('error', err instanceof Error ? err.message : 'Failed to rename file');
+        }
+      });
+
+      // Handle file tree delete event
+      socket.on('filetree:delete', async (data: {
+        fileId: string;
+      }) => {
+        try {
+          const fileIdNum = parseInt(data.fileId, 10);
+          if (isNaN(fileIdNum)) throw new Error('Invalid fileId');
+
+          // Retrieve all files in room to compute descendants before deleting
+          const allFiles = await fileService.getFileTree(userId, roomId);
+          const childrenMap = new Map<string, string[]>();
+          for (const f of allFiles) {
+            if (f.parentId !== null) {
+              const pid = String(f.parentId);
+              if (!childrenMap.has(pid)) {
+                childrenMap.set(pid, []);
+              }
+              childrenMap.get(pid)!.push(String(f.id));
+            }
+          }
+
+          const descendantIds: string[] = [];
+          const traverse = (currentId: string) => {
+            const children = childrenMap.get(currentId) || [];
+            for (const childId of children) {
+              traverse(childId);
+            }
+            descendantIds.push(currentId);
+          };
+          traverse(data.fileId);
+
+          // Perform deletion in database
+          await fileService.deleteFile(userId, roomId, fileIdNum);
+
+          // Also remove any of these deleted file texts from the Yjs document map
+          for (const idStr of descendantIds) {
+            const idNum = parseInt(idStr, 10);
+            if (!isNaN(idNum)) {
+              deleteFileText(roomId, idNum);
+            }
+          }
+
+          // Broadcast deleted event to all peers
+          roomNsp.to(roomChannel).emit('filetree:deleted', {
+            fileId: data.fileId,
+            descendantIds: descendantIds.filter(id => id !== data.fileId),
+          });
+        } catch (err) {
+          console.error(`Failed to delete file node over socket in room ${roomId}:`, err);
+          socket.emit('error', err instanceof Error ? err.message : 'Failed to delete file');
+        }
       });
 
       // Handle incoming chat messages

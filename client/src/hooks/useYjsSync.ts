@@ -1,6 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
 import * as Y from 'yjs';
-import { MonacoBinding } from 'y-monaco';
 import { io, Socket } from 'socket.io-client';
 import { Awareness, encodeAwarenessUpdate, applyAwarenessUpdate } from 'y-protocols/awareness';
 import { useAuthStore } from '../store/authStore';
@@ -8,7 +7,6 @@ import { useAuthStore } from '../store/authStore';
 interface UseYjsSyncProps {
   roomId: string;
   token: string;
-  editor: any;
 }
 
 export interface Collaborator {
@@ -18,6 +16,7 @@ export interface Collaborator {
   firstName: string;
   lastName: string;
   color: string;
+  activeFileId: string | null;
 }
 
 const getRandomColor = (): string => {
@@ -25,19 +24,22 @@ const getRandomColor = (): string => {
   return `hsl(${hue}, 85%, 40%)`; // Bright, high-contrast, premium color palette
 };
 
-export function useYjsSync({ roomId, token, editor }: UseYjsSyncProps): {
+export function useYjsSync({ roomId, token }: UseYjsSyncProps): {
   isConnected: boolean;
+  isSynced: boolean;
   error: string | null;
   collaborators: Collaborator[];
   socket: Socket | null;
+  doc: Y.Doc | null;
+  awareness: Awareness | null;
 } {
   const [isConnected, setIsConnected] = useState(false);
+  const [isSynced, setIsSynced] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const socketRef = useRef<Socket | null>(null);
   const docRef = useRef<Y.Doc | null>(null);
   const awarenessRef = useRef<Awareness | null>(null);
-  const bindingRef = useRef<MonacoBinding | null>(null);
 
   const authUser = useAuthStore((state) => state.user);
   const username = authUser?.username || 'Anonymous';
@@ -89,6 +91,7 @@ export function useYjsSync({ roomId, token, editor }: UseYjsSyncProps): {
     socket.on('sync:init', (stateUpdate: ArrayBuffer | Uint8Array) => {
       console.log('Received initial document sync snapshot');
       Y.applyUpdate(doc, new Uint8Array(stateUpdate));
+      setIsSynced(true);
     });
 
     socket.on('sync:update', (update: ArrayBuffer | Uint8Array) => {
@@ -108,7 +111,7 @@ export function useYjsSync({ roomId, token, editor }: UseYjsSyncProps): {
     };
     doc.on('update', handleDocUpdate);
 
-    // Broadcast local awareness (cursor, selection) updates
+    // Broadcast local awareness (cursor, selection, file) updates
     const handleAwarenessUpdate = ({ added, updated, removed }: any) => {
       const changes = [...added, ...updated, ...removed];
       const update = encodeAwarenessUpdate(awareness, changes);
@@ -188,6 +191,7 @@ export function useYjsSync({ roomId, token, editor }: UseYjsSyncProps): {
               firstName: state.user?.firstName || 'Anonymous',
               lastName: state.user?.lastName || '',
               color: state.user?.color || '#f66317',
+              activeFileId: state.activeFileId || null,
             });
           }
         }
@@ -201,6 +205,7 @@ export function useYjsSync({ roomId, token, editor }: UseYjsSyncProps): {
 
     socket.on('disconnect', () => {
       setIsConnected(false);
+      setIsSynced(false);
     });
 
     return () => {
@@ -209,10 +214,6 @@ export function useYjsSync({ roomId, token, editor }: UseYjsSyncProps): {
       awareness.off('update', handleAwarenessUpdate);
       awareness.off('change', handleAwarenessChange);
       socket.disconnect();
-      if (bindingRef.current) {
-        bindingRef.current.destroy();
-        bindingRef.current = null;
-      }
       const styleEl = document.getElementById('yjs-awareness-styles');
       if (styleEl) {
         styleEl.remove();
@@ -224,38 +225,13 @@ export function useYjsSync({ roomId, token, editor }: UseYjsSyncProps): {
     };
   }, [roomId, token, userId, username, authUser]);
 
-  // Bind Yjs document and awareness to Monaco once mounted
-  useEffect(() => {
-    if (!editor || !docRef.current || !awarenessRef.current) return;
-
-    const doc = docRef.current;
-    const yText = doc.getText('content');
-    const model = editor.getModel();
-    const awareness = awarenessRef.current;
-
-    if (!model) {
-      console.warn('Monaco editor has no text model, delaying Yjs binding');
-      return;
-    }
-
-    console.log('Binding Yjs doc and awareness to Monaco');
-    
-    // Create new binding with active awareness mapping
-    const binding = new MonacoBinding(
-      yText,
-      model,
-      new Set([editor]),
-      awareness
-    );
-    bindingRef.current = binding;
-
-    return () => {
-      if (bindingRef.current) {
-        bindingRef.current.destroy();
-        bindingRef.current = null;
-      }
-    };
-  }, [editor]);
-
-  return { isConnected, error, collaborators, socket: socketRef.current };
+  return {
+    isConnected,
+    isSynced,
+    error,
+    collaborators,
+    socket: socketRef.current,
+    doc: docRef.current,
+    awareness: awarenessRef.current,
+  };
 }

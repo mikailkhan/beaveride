@@ -7,6 +7,8 @@ interface FileState {
   openTabs: FileTab[];
   activeFileId: string | null;
   validationError: string | null;
+  socket: any | null;
+  setSocket: (socket: any | null) => void;
   setValidationError: (err: string | null) => void;
   setFiles: (files: ProjectFile[]) => void;
   fetchFileTree: (roomId: string) => Promise<void>;
@@ -21,6 +23,9 @@ interface FileState {
   reorderTabs: (fromIndex: number, toIndex: number) => void;
   updateFileContent: (fileId: string, content: string) => void;
   deleteNode: (roomId: string, fileId: string) => Promise<void>;
+  addNodeFromSocket: (node: ProjectFile) => void;
+  renameNodeFromSocket: (fileId: string, newName: string) => void;
+  deleteNodeFromSocket: (fileId: string) => void;
   clearFileStore: () => void;
 }
 
@@ -43,7 +48,9 @@ export const useFileStore = create<FileState>((set, get) => ({
   openTabs: [],
   activeFileId: null,
   validationError: null,
+  socket: null,
 
+  setSocket: (socket) => set({ socket }),
   setValidationError: (err) => set({ validationError: err }),
   setFiles: (files) => set({ files }),
 
@@ -69,6 +76,12 @@ export const useFileStore = create<FileState>((set, get) => ({
     set((state) => ({
       files: [...state.files, node],
     }));
+
+    // Broadcast file creation via socket if connected
+    const socket = get().socket;
+    if (socket) {
+      socket.emit('filetree:mutate', { type: 'create', node });
+    }
     return node;
   },
 
@@ -79,6 +92,13 @@ export const useFileStore = create<FileState>((set, get) => ({
       const updatedTabs = state.openTabs.map((t) =>
         t.id === fileId ? { ...t, name: newName, language: getMonacoLanguage(newName) } : t
       );
+
+      // Broadcast file rename via socket if connected
+      const socket = state.socket;
+      if (socket) {
+        socket.emit('filetree:mutate', { type: 'rename', fileId, newName });
+      }
+
       return {
         files: updatedFiles,
         openTabs: updatedTabs,
@@ -166,6 +186,65 @@ export const useFileStore = create<FileState>((set, get) => ({
         }
       }
 
+      // Broadcast file deletion via socket if connected
+      const socket = state.socket;
+      if (socket) {
+        socket.emit('filetree:mutate', { type: 'delete', fileId });
+      }
+
+      return {
+        files: updatedFiles,
+        openTabs: updatedTabs,
+        activeFileId: nextActiveId,
+      };
+    });
+  },
+
+  addNodeFromSocket: (node) => {
+    set((state) => {
+      // Prevent duplicates
+      if (state.files.some((f) => f.id === node.id)) return {};
+      return {
+        files: [...state.files, node],
+      };
+    });
+  },
+
+  renameNodeFromSocket: (fileId, newName) => {
+    set((state) => {
+      const updatedFiles = state.files.map((f) => (f.id === fileId ? { ...f, name: newName } : f));
+      const updatedTabs = state.openTabs.map((t) =>
+        t.id === fileId ? { ...t, name: newName, language: getMonacoLanguage(newName) } : t
+      );
+      return {
+        files: updatedFiles,
+        openTabs: updatedTabs,
+      };
+    });
+  },
+
+  deleteNodeFromSocket: (fileId) => {
+    set((state) => {
+      const getDescendantIds = (parentId: string, filesList: ProjectFile[]): string[] => {
+        const children = filesList.filter((f) => f.parentId === parentId);
+        const childIds = children.map((c) => c.id);
+        const grandchildIds = children.flatMap((c) => getDescendantIds(c.id, filesList));
+        return [...childIds, ...grandchildIds];
+      };
+
+      const deletedIds = [fileId, ...getDescendantIds(fileId, state.files)];
+      const updatedFiles = state.files.filter((f) => !deletedIds.includes(f.id));
+      const updatedTabs = state.openTabs.filter((t) => !deletedIds.includes(t.id));
+
+      let nextActiveId = state.activeFileId;
+      if (state.activeFileId && deletedIds.includes(state.activeFileId)) {
+        if (updatedTabs.length > 0) {
+          nextActiveId = updatedTabs[updatedTabs.length - 1].id;
+        } else {
+          nextActiveId = null;
+        }
+      }
+
       return {
         files: updatedFiles,
         openTabs: updatedTabs,
@@ -179,5 +258,6 @@ export const useFileStore = create<FileState>((set, get) => ({
       files: [],
       openTabs: [],
       activeFileId: null,
+      socket: null,
     }),
 }));
