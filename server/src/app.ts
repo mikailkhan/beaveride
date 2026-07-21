@@ -23,8 +23,8 @@ export const createApp = () => {
   app.use(rootHealthRoutes);
   app.use('/api', healthRoutes);
   app.use('/api/auth', authRoutes);
-  app.use('/api/rooms', roomRoutes);
   app.use('/api/rooms', fileRoutes);
+  app.use('/api/rooms', roomRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
