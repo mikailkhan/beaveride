@@ -98,6 +98,7 @@ export const FileTreeNode: React.FC<FileTreeNodeProps> = ({
   const openFile = useFileStore((state) => state.openFile);
   const renameNode = useFileStore((state) => state.renameNode);
   const createNode = useFileStore((state) => state.createNode);
+  const deleteNode = useFileStore((state) => state.deleteNode);
 
   const isDirectory = node.type === 'directory';
   const isActive = node.id === activeFileId;
@@ -154,6 +155,21 @@ export const FileTreeNode: React.FC<FileTreeNodeProps> = ({
     }
   }, [creatingNode, node.id]);
 
+  const handleDelete = async () => {
+    const isFolder = node.type === 'directory';
+    const msg = isFolder
+      ? `Are you sure you want to delete "${node.name}" and all of its contents?`
+      : `Are you sure you want to delete "${node.name}"?`;
+
+    if (window.confirm(msg)) {
+      try {
+        await deleteNode(roomId, node.id);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  };
+
   const menuItems = isDirectory
     ? [
         {
@@ -171,12 +187,22 @@ export const FileTreeNode: React.FC<FileTreeNodeProps> = ({
           icon: 'edit',
           onClick: () => setRenamingNodeId(node.id),
         },
+        {
+          label: 'Delete',
+          icon: 'delete',
+          onClick: handleDelete,
+        },
       ]
     : [
         {
           label: 'Rename',
           icon: 'edit',
           onClick: () => setRenamingNodeId(node.id),
+        },
+        {
+          label: 'Delete',
+          icon: 'delete',
+          onClick: handleDelete,
         },
       ];
 

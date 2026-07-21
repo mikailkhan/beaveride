@@ -18,6 +18,7 @@ interface FileState {
   setActiveFile: (fileId: string) => void;
   reorderTabs: (fromIndex: number, toIndex: number) => void;
   updateFileContent: (fileId: string, content: string) => void;
+  deleteNode: (roomId: string, fileId: string) => Promise<void>;
   clearFileStore: () => void;
 }
 
@@ -135,6 +136,38 @@ export const useFileStore = create<FileState>((set, get) => ({
     set((state) => ({
       files: state.files.map((f) => (f.id === fileId ? { ...f, content } : f)),
     }));
+  },
+
+  deleteNode: async (roomId, fileId) => {
+    await fileService.deleteNode(roomId, fileId);
+
+    const getDescendantIds = (parentId: string, filesList: ProjectFile[]): string[] => {
+      const children = filesList.filter((f) => f.parentId === parentId);
+      const childIds = children.map((c) => c.id);
+      const grandchildIds = children.flatMap((c) => getDescendantIds(c.id, filesList));
+      return [...childIds, ...grandchildIds];
+    };
+
+    set((state) => {
+      const deletedIds = [fileId, ...getDescendantIds(fileId, state.files)];
+      const updatedFiles = state.files.filter((f) => !deletedIds.includes(f.id));
+      const updatedTabs = state.openTabs.filter((t) => !deletedIds.includes(t.id));
+
+      let nextActiveId = state.activeFileId;
+      if (state.activeFileId && deletedIds.includes(state.activeFileId)) {
+        if (updatedTabs.length > 0) {
+          nextActiveId = updatedTabs[updatedTabs.length - 1].id;
+        } else {
+          nextActiveId = null;
+        }
+      }
+
+      return {
+        files: updatedFiles,
+        openTabs: updatedTabs,
+        activeFileId: nextActiveId,
+      };
+    });
   },
 
   clearFileStore: () =>
