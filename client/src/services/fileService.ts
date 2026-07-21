@@ -33,8 +33,8 @@ const mapProjectFile = (file: BackendProjectFile): ProjectFile => ({
 
 export class FileService {
   async getFileTree(roomId: string): Promise<ProjectFile[]> {
-    const response = await api.get<ApiResponse<BackendProjectFile[]>>(`/rooms/${roomId}/files`);
-    return response.data.data.map(mapProjectFile);
+    const response = await api.get<ApiResponse<BackendProjectFile[]>>(`/api/rooms/${roomId}/files`);
+    return response.data.map(mapProjectFile);
   }
 
   async createNode(
@@ -52,25 +52,25 @@ export class FileService {
       parentId: data.parentId ? Number(data.parentId) : null,
       content: data.content,
     };
-    const response = await api.post<ApiResponse<BackendProjectFile>>(`/rooms/${roomId}/files`, payload);
-    return mapProjectFile(response.data.data);
+    const response = await api.post<ApiResponse<BackendProjectFile>>(`/api/rooms/${roomId}/files`, payload);
+    return mapProjectFile(response.data);
   }
 
   async getFileContent(roomId: string, fileId: string): Promise<ProjectFile> {
-    const response = await api.get<ApiResponse<BackendProjectFile>>(`/rooms/${roomId}/files/${fileId}`);
-    return mapProjectFile(response.data.data);
+    const response = await api.get<ApiResponse<BackendProjectFile>>(`/api/rooms/${roomId}/files/${fileId}`);
+    return mapProjectFile(response.data);
   }
 
   async updateFileContent(roomId: string, fileId: string, content: string): Promise<void> {
-    await api.put(`/rooms/${roomId}/files/${fileId}`, { content });
+    await api.put(`/api/rooms/${roomId}/files/${fileId}`, { content });
   }
 
   async renameNode(roomId: string, fileId: string, name: string): Promise<void> {
-    await api.patch(`/rooms/${roomId}/files/${fileId}/rename`, { name });
+    await api.patch(`/api/rooms/${roomId}/files/${fileId}/rename`, { name });
   }
 
   async deleteNode(roomId: string, fileId: string): Promise<void> {
-    await api.delete(`/rooms/${roomId}/files/${fileId}`);
+    await api.delete(`/api/rooms/${roomId}/files/${fileId}`);
   }
 }
 
