@@ -81,13 +81,13 @@ export const DashboardLayout = () => {
     } ${
       isActive
         ? 'bg-primary-container text-on-primary-container font-semibold'
-        : 'text-on-surface-variant hover:bg-surface-container-highest'
+        : 'text-on-surface-variant hover:bg-primary-container/10 hover:text-primary'
     }`;
 
   return (
     <div className="text-on-surface antialiased flex h-screen overflow-hidden w-full bg-surface">
       {/* SideNavBar */}
-      <nav className={`fixed left-0 top-0 h-full flex flex-col bg-surface-container-low z-40 hidden md:flex border-r border-surface-variant transition-all duration-300 ${isSidebarExpanded ? 'w-72 p-md' : 'w-[70px] py-md px-xs items-center'}`}>
+      <nav className={`fixed left-0 top-0 h-full flex flex-col bg-white z-40 hidden md:flex border-r border-[#e8e8ed] transition-all duration-300 ${isSidebarExpanded ? 'w-72 p-md' : 'w-[70px] py-md px-xs items-center'}`}>
         <div className={`mb-xl flex items-center mt-sm w-full ${isSidebarExpanded ? 'justify-between px-sm' : 'justify-center'}`}>
           {isSidebarExpanded && (
             <Link to="/">
@@ -108,14 +108,14 @@ export const DashboardLayout = () => {
         <div className={`mb-lg space-y-sm w-full ${isSidebarExpanded ? 'px-sm' : 'px-0'}`}>
           <Link 
             to="/dashboard/settings"
-            className={`flex items-center gap-sm bg-surface border border-surface-variant cursor-pointer hover:bg-surface-container transition-colors ${isSidebarExpanded ? 'p-sm w-full rounded-lg' : 'w-10 h-10 rounded-full justify-center p-0 mx-auto'}`}
+            className={`flex items-center gap-sm bg-white border border-[#e8e8ed] hover:border-primary-container cursor-pointer transition-all duration-200 shadow-[0_1px_2px_rgba(0,0,0,0.02)] ${isSidebarExpanded ? 'p-sm w-full rounded-lg' : 'w-10 h-10 rounded-full justify-center p-0 mx-auto'}`}
             title="Settings"
           >
             {isSidebarExpanded ? (
               <>
                 <img
                   alt="User Profile Avatar"
-                  className="w-10 h-10 rounded-full border-2 border-primary-container object-cover"
+                  className="w-10 h-10 rounded-full border border-[#e8e8ed] object-cover"
                   src="https://lh3.googleusercontent.com/aida-public/AB6AXuBNkOZEkCu2AprexCFCsvJXOpZLv53DVKcel7waC9Azezg6wawU3xFOhERlB6zleyXPLMJJR9zqziiq1D502_BUqjXml_hH52FOtSbzftwTpNVo44wUKjf3qi5bij0DfFh7DZrQU3jWGXMYj26_EJNk0_-j3ka1f6oryihMIel8vCSNHAWYsbcdRo2VEgIGFHZeDmweouDuqv23igV0LwXnCX0bcE3Nd7M0A_ObOOQdP1PhZVeUYXk_rEFynUiSHMDdISvi-TvvGds"
                 />
                 <div className="flex flex-col min-w-0">
@@ -134,7 +134,7 @@ export const DashboardLayout = () => {
 
           <button
             onClick={handleOpenCreateModal}
-            className={`bg-primary-container text-on-primary-container font-label-md text-label-md shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] hover:bg-primary hover:text-on-primary transition-all flex items-center justify-center gap-xs cursor-pointer ${isSidebarExpanded ? 'w-full py-sm px-md rounded-lg' : 'w-10 h-10 rounded-full p-0 mx-auto'}`}
+            className={`bg-primary-container text-on-primary-container font-label-md text-label-md shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] hover:bg-primary hover:text-on-primary transition-all flex items-center justify-center gap-xs cursor-pointer ${isSidebarExpanded ? 'w-full py-sm px-md rounded-lg text-xs font-semibold' : 'w-10 h-10 rounded-full p-0 mx-auto'}`}
             title="New Project"
           >
             <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>
@@ -145,7 +145,7 @@ export const DashboardLayout = () => {
 
           <button
             onClick={handleOpenJoinModal}
-            className={`bg-surface text-on-surface border border-surface-variant font-label-md text-label-md hover:bg-surface-container transition-all flex items-center justify-center gap-xs cursor-pointer ${isSidebarExpanded ? 'w-full py-sm px-md rounded-lg' : 'w-10 h-10 rounded-full p-0 mx-auto'}`}
+            className={`bg-white text-on-surface border border-outline-variant hover:bg-surface-container transition-all flex items-center justify-center gap-xs cursor-pointer ${isSidebarExpanded ? 'w-full py-sm px-md rounded-lg text-xs font-semibold' : 'w-10 h-10 rounded-full p-0 mx-auto'}`}
             title="Join Project"
           >
             <span className="material-symbols-outlined text-sm">group_add</span>
@@ -172,7 +172,7 @@ export const DashboardLayout = () => {
           </NavLink>
         </div>
 
-        <div className="mt-auto px-sm pt-md border-t border-surface-variant space-y-1 w-full">
+        <div className="mt-auto px-sm pt-md border-t border-[#e8e8ed] space-y-1 w-full">
           <button
             onClick={() => {
               logout();

@@ -48,10 +48,19 @@ export const Dashboard = () => {
 
   const formatLanguageName = (lang: string) => {
     switch (lang.toLowerCase()) {
-      case 'javascript': return 'JavaScript (Node.js)';
-      case 'python': return 'Python 3';
-      case 'go': return 'Go (Golang)';
+      case 'javascript': return 'JavaScript';
+      case 'python': return 'Python';
+      case 'go': return 'Go';
       default: return lang.charAt(0).toUpperCase() + lang.slice(1);
+    }
+  };
+
+  const getLanguageColor = (lang: string) => {
+    switch (lang.toLowerCase()) {
+      case 'javascript': return 'text-[#f0db4f]';
+      case 'python': return 'text-[#3572A5]';
+      case 'go': return 'text-[#00add8]';
+      default: return 'text-[#86868b]';
     }
   };
 
@@ -72,81 +81,81 @@ export const Dashboard = () => {
   const displayName = user ? `${user.firstName}` : 'Developer';
 
   return (
-    <main className="flex-1 h-full overflow-y-auto bg-surface-container-lowest p-margin md:p-2xl">
+    <main className="flex-1 h-full overflow-y-auto bg-[#f5f5f7] p-8 md:p-12 font-sans text-[#1d1d1f]">
       {/* Header */}
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-end mb-xl gap-md">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 gap-6 border-b border-[#e8e8ed] pb-6">
         <div>
-          <h1 className="font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">Your Projects</h1>
-          <p className="font-body-md text-body-md text-on-surface-variant mt-sm">
+          <h1 className="text-3xl font-semibold tracking-tight text-[#1d1d1f]">Your Projects</h1>
+          <p className="text-[14px] text-[#86868b] mt-1.5">
             Good Morning, {displayName}. You have {rooms.length} active project{rooms.length !== 1 ? 's' : ''}.
           </p>
         </div>
         {rooms.length > 0 && (
           <button
             onClick={handleTrashAll}
-            className="flex items-center gap-xs px-md py-sm bg-error-container text-on-error-container hover:bg-error hover:text-on-error rounded-lg font-label-md text-sm transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-4 py-2 border border-outline-variant hover:bg-primary hover:text-on-primary hover:border-primary rounded-full text-xs font-semibold transition-all duration-250 cursor-pointer text-primary bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)]"
           >
-            <span className="material-symbols-outlined text-[18px]">delete_sweep</span>
+            <span className="material-symbols-outlined text-[16px]">delete_sweep</span>
             Trash All
           </button>
         )}
       </header>
 
       {error && (
-        <div className="mb-lg p-md bg-error-container text-on-error-container rounded-lg font-body-md text-sm border border-error/20">
+        <div className="mb-6 p-4 bg-error-container text-on-error-container rounded-lg text-xs border border-error/20 flex items-center gap-2">
+          <span className="material-symbols-outlined text-[16px]">error_outline</span>
           {error}
         </div>
       )}
 
       <div className="w-full">
         {isLoading ? (
-          <div className="text-center py-20 text-on-surface-variant font-body-md">Loading projects...</div>
+          <div className="text-center py-20 text-[#86868b] text-sm font-medium animate-pulse">Loading projects...</div>
         ) : rooms.length === 0 ? (
-          <div className="glass-panel p-2xl rounded-xl shadow-sm border border-dashed border-outline-variant flex flex-col items-center justify-center text-center gap-sm min-h-[220px]">
-            <div className="w-12 h-12 rounded-full bg-primary-fixed-dim flex items-center justify-center text-primary">
-              <span className="material-symbols-outlined text-2xl">folder</span>
+          <div className="bg-white p-12 rounded-2xl border border-[#e8e8ed] flex flex-col items-center justify-center text-center gap-4 min-h-[220px]">
+            <div className="w-12 h-12 rounded-full bg-[#f5f5f7] flex items-center justify-center text-primary">
+              <span className="material-symbols-outlined text-xl">folder_open</span>
             </div>
             <div>
-              <h3 className="font-label-md text-label-md font-bold text-on-surface mt-sm">No active projects</h3>
-              <p className="font-body-md text-sm text-on-surface-variant mt-xs">Create a new project using the side navigation.</p>
+              <h3 className="text-sm font-semibold text-[#1d1d1f]">No active projects</h3>
+              <p className="text-xs text-[#86868b] mt-1">Create a new project using the sidebar layout.</p>
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-md">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {rooms.map((room) => (
               <div
                 key={room.id}
-                className="glass-panel p-lg rounded-xl shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group border border-surface-variant flex flex-col justify-between min-h-[180px] bg-surface-container-lowest"
+                className="bg-white p-6 rounded-2xl border border-[#e8e8ed] flex flex-col justify-between min-h-[170px] relative overflow-hidden group hover:border-primary/30 hover:shadow-[0_8px_30px_rgba(165,60,0,0.04)] transition-all duration-300"
               >
-                <div className="absolute top-0 left-0 w-1 h-full bg-primary-container"></div>
-                
                 {/* Card Top */}
                 <div>
-                  <div className="flex justify-between items-start mb-md">
-                    <Link to={`/room/${room.id}`} className="flex items-center gap-sm min-w-0 flex-1 hover:opacity-80 transition-opacity">
-                      <div className="w-8 h-8 rounded bg-primary-fixed flex items-center justify-center text-primary shrink-0">
+                  <div className="flex justify-between items-start mb-4">
+                    <Link to={`/room/${room.id}`} className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="w-9 h-9 rounded-xl bg-[#f5f5f7] flex items-center justify-center text-on-surface-variant group-hover:bg-primary-container group-hover:text-on-primary-container transition-colors duration-300 shrink-0">
                         <span className="material-symbols-outlined text-sm">terminal</span>
                       </div>
                       <div className="min-w-0">
-                        <h3 className="font-label-md text-label-md font-bold text-on-surface group-hover:text-primary transition-colors truncate">
+                        <h3 className="text-sm font-semibold text-[#1d1d1f] group-hover:text-primary transition-colors truncate">
                           {room.title}
                         </h3>
-                        <p className="font-code-md text-xs text-on-surface-variant mt-xs">
+                        <p className="text-[11px] font-mono text-[#86868b] mt-0.5 uppercase tracking-wider flex items-center gap-1.5">
+                          <span className={`w-1.5 h-1.5 rounded-full ${getLanguageColor(room.language)} bg-current`}></span>
                           {formatLanguageName(room.language)}
                         </p>
                       </div>
                     </Link>
 
-                    <div className="flex items-center gap-xs shrink-0">
+                    <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                       {/* Owner actions */}
                       {room.role === 'owner' && (
                         <>
                           <button
                             title="Archive Project"
                             onClick={(e) => handleArchive(room.id, e)}
-                            className="p-xs rounded-full hover:bg-surface-variant text-on-surface-variant transition-colors cursor-pointer"
+                            className="p-1.5 rounded-full hover:bg-[#f5f5f7] text-[#86868b] hover:text-primary transition-all cursor-pointer"
                           >
-                            <span className="material-symbols-outlined text-[18px]">archive</span>
+                            <span className="material-symbols-outlined text-[16px]">archive</span>
                           </button>
                           <button
                             title="Move to Trash"
@@ -155,9 +164,9 @@ export const Dashboard = () => {
                               e.stopPropagation();
                               setConfirmTrashId(room.id);
                             }}
-                            className="p-xs rounded-full hover:bg-error-container/20 text-error transition-colors cursor-pointer"
+                            className="p-1.5 rounded-full hover:bg-error-container/20 text-error transition-all cursor-pointer"
                           >
-                            <span className="material-symbols-outlined text-[18px]">delete</span>
+                            <span className="material-symbols-outlined text-[16px]">delete</span>
                           </button>
                         </>
                       )}
@@ -167,23 +176,23 @@ export const Dashboard = () => {
 
                 {/* Inline Confirmation Overlays */}
                 {confirmTrashId === room.id && (
-                  <div className="absolute inset-0 bg-surface/95 backdrop-blur-xs flex flex-col justify-center items-center p-md text-center z-10">
-                    <p className="font-label-md text-on-surface font-bold">Move to Trash?</p>
-                    <p className="font-body-md text-xs text-on-surface-variant mt-xs">You can restore it later.</p>
-                    <div className="flex gap-sm mt-md">
+                  <div className="absolute inset-0 bg-white/95 backdrop-blur-xs flex flex-col justify-center items-center p-4 text-center z-10">
+                    <p className="text-sm font-semibold text-[#1d1d1f]">Move to Trash?</p>
+                    <p className="text-xs text-[#86868b] mt-0.5">You can restore it later.</p>
+                    <div className="flex gap-2 mt-4">
                       <button
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
                           setConfirmTrashId(null);
                         }}
-                        className="px-sm py-xs bg-surface border border-surface-variant rounded-md text-xs font-label-md transition-colors cursor-pointer"
+                        className="px-3 py-1.5 border border-outline-variant/30 hover:bg-[#f5f5f7] rounded-full text-xs font-semibold transition-colors cursor-pointer text-[#1d1d1f]"
                       >
                         Cancel
                       </button>
                       <button
                         onClick={(e) => handleTrash(room.id, e)}
-                        className="px-sm py-xs bg-error text-on-error rounded-md text-xs font-label-md transition-colors cursor-pointer"
+                        className="px-3 py-1.5 bg-error text-on-error hover:bg-error/95 rounded-full text-xs font-semibold transition-colors cursor-pointer"
                       >
                         Move
                       </button>
@@ -192,12 +201,12 @@ export const Dashboard = () => {
                 )}
 
                 {/* Card Bottom */}
-                <div className="flex justify-between items-end mt-lg border-t border-surface-variant/30 pt-sm">
-                  <span className="flex items-center gap-xs font-label-md text-[11px] text-secondary px-sm py-[2px] bg-secondary-container rounded-full shrink-0">
+                <div className="flex justify-between items-end mt-4 border-t border-[#f5f5f7] pt-3.5">
+                  <span className="flex items-center gap-1.5 text-[11px] font-semibold text-secondary bg-secondary-container px-2.5 py-0.5 rounded-full shrink-0">
                     <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse"></span>
                     Active
                   </span>
-                  <span className="font-label-md text-xs text-on-surface-variant">
+                  <span className="text-[11px] text-[#86868b]">
                     Updated {getRelativeTimeString(room.updatedAt)}
                   </span>
                 </div>

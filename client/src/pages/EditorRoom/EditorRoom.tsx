@@ -265,16 +265,16 @@ export const EditorRoom = () => {
       {/* Left Sidebar Menu */}
       <aside
         style={{ width: isSidebarExpanded ? `${sidebarWidth}px` : '70px' }}
-        className={`h-screen bg-surface-container-low border-r border-outline-variant/30 flex flex-col justify-between py-md px-sm shrink-0 z-10 select-none relative ${
+        className={`h-screen bg-white border-r border-[#e8e8ed] flex flex-col justify-between py-md px-sm shrink-0 z-10 select-none relative ${
           isResizingSidebar ? '' : 'transition-[width] duration-300'
         } ${isSidebarExpanded ? '' : 'items-center'}`}
       >
         <div className="px-sm w-full">
           <div className={`flex items-center mb-lg mt-sm ${isSidebarExpanded ? 'justify-between' : 'justify-center'}`}>
             {isSidebarExpanded && (
-              <div className="flex items-center w-[140px] h-[54px] bg-surface-container-high rounded-lg overflow-hidden">
-                <Link to="/dashboard">
-                  <img src={BeaverideLogo} alt="BeaverIDE Logo" className="h-10 w-auto object-contain" />
+              <div className="flex items-center w-[140px] h-[54px] bg-[#f5f5f7] rounded-lg overflow-hidden border border-[#e8e8ed]">
+                <Link to="/dashboard" className="px-2">
+                  <img src={BeaverideLogo} alt="BeaverIDE Logo" className="h-8 w-auto object-contain" />
                 </Link>
               </div>
             )}
@@ -295,7 +295,7 @@ export const EditorRoom = () => {
           <div className="group flex-1 min-h-0 flex flex-col">
             <button
               onClick={() => isSidebarExpanded && setIsExplorerExpanded(!isExplorerExpanded)}
-              className={`flex items-center gap-sm px-sm py-sm rounded-lg bg-primary-container text-on-primary-container font-bold shrink-0 w-full transition-colors hover:bg-primary-container/80 ${isSidebarExpanded ? '' : 'justify-center'}`}
+              className={`flex items-center gap-sm px-sm py-sm rounded-lg bg-primary-container text-on-primary-container font-bold shrink-0 w-full transition-colors hover:bg-primary hover:text-on-primary ${isSidebarExpanded ? '' : 'justify-center'}`}
               title="Explorer"
             >
               <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>folder</span>
@@ -325,24 +325,24 @@ export const EditorRoom = () => {
             )}
           </div>
 
-          <a className={`flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-all ${isSidebarExpanded ? '' : 'justify-center'}`} href="#search" title="Search">
+          <a className={`flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface-variant hover:bg-primary-container/10 hover:text-primary transition-all ${isSidebarExpanded ? '' : 'justify-center'}`} href="#search" title="Search">
             <span className="material-symbols-outlined text-[20px]">search</span>
             {isSidebarExpanded && <span className="font-label-md text-label-md">Search</span>}
           </a>
         
-          <a className={`flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-all ${isSidebarExpanded ? '' : 'justify-center'}`} href="#settings" title="Settings">
+          <a className={`flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface-variant hover:bg-primary-container/10 hover:text-primary transition-all ${isSidebarExpanded ? '' : 'justify-center'}`} href="#settings" title="Settings">
             <span className="material-symbols-outlined text-[20px]">settings</span>
             {isSidebarExpanded && <span className="font-label-md text-label-md">Settings</span>}
           </a>
         </nav>
 
         {/* Footer Navigation */}
-        <div className="mt-md pt-sm border-t border-outline-variant/30 flex flex-col gap-xs w-full">
-          <Link className={`flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-all ${isSidebarExpanded ? '' : 'justify-center'}`} to="/dashboard" title="Dashboard">
+        <div className="mt-md pt-sm border-t border-[#e8e8ed] flex flex-col gap-xs w-full">
+          <Link className={`flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface-variant hover:bg-primary-container/10 hover:text-primary transition-all ${isSidebarExpanded ? '' : 'justify-center'}`} to="/dashboard" title="Dashboard">
             <span className="material-symbols-outlined text-[20px]">folder_open</span>
             {isSidebarExpanded && <span className="font-label-md text-label-md">Dashboard</span>}
           </Link>
-          <a className={`flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-all relative ${isSidebarExpanded ? '' : 'justify-center'}`} href="#notifications" title="Notifications">
+          <a className={`flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface-variant hover:bg-primary-container/10 hover:text-primary transition-all relative ${isSidebarExpanded ? '' : 'justify-center'}`} href="#notifications" title="Notifications">
             <span className="material-symbols-outlined text-[20px]">notifications</span>
             {isSidebarExpanded && <span className="font-label-md text-label-md">Notifications</span>}
             <span className={`absolute bg-primary rounded-full border border-surface-container-low ${isSidebarExpanded ? 'top-2 left-6 w-2 h-2' : 'top-1 right-2 w-1.5 h-1.5'}`}></span>
