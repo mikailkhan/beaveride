@@ -37,3 +37,22 @@ export interface UserRoom {
   joinedAt: string;
   updatedAt: string;
 }
+
+export type FileNodeType = 'file' | 'directory';
+
+export interface ProjectFile {
+  id: string;
+  roomId: string;
+  parentId: string | null;
+  name: string;
+  type: FileNodeType;
+  content: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FileTab {
+  id: string;           // ProjectFile.id
+  name: string;         // filename for display
+  language: string;     // Monaco language id (e.g., 'javascript', 'python', 'go')
+}
