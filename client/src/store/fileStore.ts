@@ -6,6 +6,8 @@ interface FileState {
   files: ProjectFile[];
   openTabs: FileTab[];
   activeFileId: string | null;
+  validationError: string | null;
+  setValidationError: (err: string | null) => void;
   setFiles: (files: ProjectFile[]) => void;
   fetchFileTree: (roomId: string) => Promise<void>;
   createNode: (
@@ -40,7 +42,9 @@ export const useFileStore = create<FileState>((set, get) => ({
   files: [],
   openTabs: [],
   activeFileId: null,
+  validationError: null,
 
+  setValidationError: (err) => set({ validationError: err }),
   setFiles: (files) => set({ files }),
 
   fetchFileTree: async (roomId) => {

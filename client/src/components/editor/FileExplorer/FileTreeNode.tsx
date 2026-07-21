@@ -14,6 +14,20 @@ interface FileTreeNodeProps {
   setRenamingNodeId: (val: string | null) => void;
 }
 
+const getFileIcon = (filename: string) => {
+  const ext = filename.split('.').pop()?.toLowerCase();
+  switch (ext) {
+    case 'js':
+      return <span className="material-symbols-outlined text-[18px] text-[#f0db4f] shrink-0">javascript</span>;
+    case 'py':
+      return <span className="material-symbols-outlined text-[18px] text-[#3572A5] shrink-0">code</span>;
+    case 'go':
+      return <span className="material-symbols-outlined text-[18px] text-[#00add8] shrink-0">code</span>;
+    default:
+      return <span className="material-symbols-outlined text-[18px] text-outline shrink-0">description</span>;
+  }
+};
+
 const InlineInput: React.FC<{
   type: 'file' | 'directory';
   depth: number;
@@ -24,6 +38,7 @@ const InlineInput: React.FC<{
   const [value, setValue] = useState(initialValue);
   const [isInvalid, setIsInvalid] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const setValidationError = useFileStore((state) => state.setValidationError);
   // Guard against double-submission (Enter fires keydown, which can also trigger blur)
   const submittedRef = useRef(false);
 
@@ -39,16 +54,30 @@ const InlineInput: React.FC<{
         }
       }
     }
-  }, [initialValue, type]);
+    setValidationError(null);
+    return () => {
+      setValidationError(null);
+    };
+  }, [initialValue, type, setValidationError]);
 
   const handleSubmit = () => {
     if (submittedRef.current) return;
     const clean = value.trim();
     if (!clean || /[\/]/.test(clean)) {
       setIsInvalid(true);
+      setValidationError("Name cannot be empty or contain slashes");
       return;
     }
+    if (type === 'file') {
+      const hasValidExt = /\.(js|py|go)$/.test(clean);
+      if (!hasValidExt) {
+        setIsInvalid(true);
+        setValidationError("File type is required (must end with .js, .py, or .go)");
+        return;
+      }
+    }
     submittedRef.current = true;
+    setValidationError(null);
     onSave(clean);
   };
 
@@ -58,31 +87,50 @@ const InlineInput: React.FC<{
       handleSubmit();
     } else if (e.key === 'Escape') {
       submittedRef.current = true; // prevent blur from re-triggering
+      setValidationError(null);
       onCancel();
     }
   };
 
+  const shakeStyle = `
+    @keyframes shake-input {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-4px); }
+      40%, 80% { transform: translateX(4px); }
+    }
+    .shake-input {
+      animation: shake-input 0.25s ease-in-out;
+    }
+  `;
+
   return (
-    <div
-      className="flex items-center gap-xs py-[2px] px-sm w-full"
-      style={{ paddingLeft: `${(depth + 1) * 12}px` }}
-    >
-      <span className="material-symbols-outlined text-[18px] opacity-80 shrink-0">
-        {type === 'directory' ? 'folder' : 'description'}
-      </span>
-      <input
-        ref={inputRef}
-        value={value}
-        onChange={(e) => {
-          setValue(e.target.value);
-          setIsInvalid(false);
-        }}
-        onKeyDown={handleKeyDown}
-        onBlur={onCancel}
-        className={`bg-surface border text-[13px] px-[4px] py-[2px] rounded outline-none w-full max-w-[180px] ${
-          isInvalid ? 'border-error shadow-[0_0_4px_rgba(186,26,26,0.3)]' : 'border-outline/35 focus:border-primary/50'
-        }`}
-      />
+    <div className="flex flex-col w-full">
+      <style>{shakeStyle}</style>
+      <div
+        className="flex items-center gap-xs py-[2px] px-sm w-full"
+        style={{ paddingLeft: `${(depth + 1) * 12}px` }}
+      >
+        <span className="material-symbols-outlined text-[18px] opacity-80 shrink-0">
+          {type === 'directory' ? 'folder' : 'description'}
+        </span>
+        <input
+          ref={inputRef}
+          value={value}
+          onChange={(e) => {
+            setValue(e.target.value);
+            setIsInvalid(false);
+            setValidationError(null);
+          }}
+          onKeyDown={handleKeyDown}
+          onBlur={() => {
+            setValidationError(null);
+            onCancel();
+          }}
+          className={`bg-surface border text-[13px] px-[4px] py-[2px] rounded outline-none w-full max-w-[180px] ${
+            isInvalid ? 'border-error shadow-[0_0_4px_rgba(186,26,26,0.3)] shake-input' : 'border-outline/35 focus:border-primary/50'
+          }`}
+        />
+      </div>
     </div>
   );
 };
@@ -235,9 +283,13 @@ export const FileTreeNode: React.FC<FileTreeNodeProps> = ({
         }`}
         style={{ paddingLeft: `${(depth + 1) * 12}px` }}
       >
-        <span className="material-symbols-outlined text-[18px] opacity-80 shrink-0">
-          {isDirectory ? (isExpanded ? 'folder_open' : 'folder') : 'description'}
-        </span>
+        {isDirectory ? (
+          <span className="material-symbols-outlined text-[18px] opacity-80 shrink-0">
+            {isExpanded ? 'folder_open' : 'folder'}
+          </span>
+        ) : (
+          getFileIcon(node.name)
+        )}
         <span className="truncate text-[13px]">{node.name}</span>
       </button>
 

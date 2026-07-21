@@ -26,7 +26,7 @@ export const EditorRoom = () => {
   
   const { activeRoom, isLoading, error, fetchRoomDetails, clearActiveRoom } = useRoomStore();
 
-  const { files, activeFileId, fetchFileTree, clearFileStore, updateFileContent } = useFileStore();
+  const { files, activeFileId, fetchFileTree, clearFileStore, updateFileContent, validationError } = useFileStore();
   const activeFile = files.find((f) => f.id === activeFileId) || null;
 
   const [editor, setEditor] = useState<any>(null);
@@ -258,6 +258,13 @@ export const EditorRoom = () => {
                 </span>
               )}
             </button>
+
+            {isSidebarExpanded && validationError && (
+              <div className="mx-xs mt-xs p-sm bg-error/10 text-error border border-error/20 rounded-lg flex items-start gap-xs text-[11px] font-medium leading-normal animate-fade-in shadow-[0_2px_8px_rgba(186,26,26,0.15)]">
+                <span className="material-symbols-outlined text-[14px] text-error shrink-0 mt-[2px]" style={{ fontVariationSettings: "'FILL' 1" }}>warning</span>
+                <span>{validationError}</span>
+              </div>
+            )}
 
             {/* Explorer Content */}
             {isSidebarExpanded && isExplorerExpanded && (
