@@ -8,6 +8,9 @@ import { useAuthStore } from '../../store/authStore';
 import { useYjsSync } from '../../hooks/useYjsSync';
 import { roomService } from '../../services/roomService';
 import BeaverideLogo from '../../assets/logos/beaveride-logo.png';
+import { FileExplorer } from '../../components/editor/FileExplorer';
+import { EditorTabs } from '../../components/editor/EditorTabs';
+import { useFileStore } from '../../store/fileStore';
 
 type ActivityEventType = 'joined' | 'left' | 'global_run' | 'code_edit';
 
@@ -17,35 +20,15 @@ interface ActivityEntry {
   timestamp: string;
 }
 
-const getDefaultFileInfo = (language: string) => {
-  const lang = language.toLowerCase();
-  if (lang === 'python') {
-    return {
-      filename: 'main.py',
-      code: `# Python 3 execution environment\ndef greet(name):\n    return f"Hello, {name}!"\n\nprint(greet("Beaver"))\n`,
-    };
-  }
-  if (lang === 'go') {
-    return {
-      filename: 'main.go',
-      code: `package main\n\nimport "fmt"\n\nfunc main() {\n    fmt.Println("Hello, Go!")\n}\n`,
-    };
-  }
-  // Default to javascript
-  return {
-    filename: 'main.js',
-    code: `// JavaScript (Node.js) execution environment\nconst name = "Beaver";\nconsole.log(\`Hello, \${name}!\`);\n`,
-  };
-};
-
 export const EditorRoom = () => {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
   const { activeRoom, isLoading, error, fetchRoomDetails, clearActiveRoom } = useRoomStore();
 
+  const { files, activeFileId, fetchFileTree, clearFileStore, updateFileContent } = useFileStore();
+  const activeFile = files.find((f) => f.id === activeFileId) || null;
+
   const [editor, setEditor] = useState<any>(null);
-  const [activeFile, setActiveFile] = useState('main.js');
-  const [files, setFiles] = useState<Record<string, string>>({});
   const [globalOutput, setGlobalOutput] = useState('');
   const [globalRunStatus, setGlobalRunStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
   const [localOutput, setLocalOutput] = useState('');
@@ -56,11 +39,13 @@ export const EditorRoom = () => {
   useEffect(() => {
     if (!roomId) return;
     fetchRoomDetails(roomId);
+    fetchFileTree(roomId);
 
     return () => {
       clearActiveRoom();
+      clearFileStore();
     };
-  }, [roomId, fetchRoomDetails, clearActiveRoom]);
+  }, [roomId, fetchRoomDetails, clearActiveRoom, fetchFileTree, clearFileStore]);
 
   const token = useAuthStore((state) => state.token);
 
@@ -93,15 +78,15 @@ export const EditorRoom = () => {
       setGlobalOutput(`\r\n\x1b[31m[${message}]\x1b[0m\r\n`);
     };
 
-    socket.on('run:global:start', onStart);
-    socket.on('run:global:output', onOutput);
-    socket.on('run:global:end', onEnd);
-    socket.on('run:global:locked', onLocked);
-
     const onActivityUpdate = (entries: ActivityEntry[]) => {
       setActivities(entries);
     };
     socket.on('activity:update', onActivityUpdate);
+
+    socket.on('run:global:start', onStart);
+    socket.on('run:global:output', onOutput);
+    socket.on('run:global:end', onEnd);
+    socket.on('run:global:locked', onLocked);
 
     return () => {
       socket.off('run:global:start', onStart);
@@ -112,21 +97,10 @@ export const EditorRoom = () => {
     };
   }, [socket]);
 
-  // Set up initial file and code snippet once the room is loaded
-  useEffect(() => {
-    if (activeRoom) {
-      const fileInfo = getDefaultFileInfo(activeRoom.language);
-      setActiveFile(fileInfo.filename);
-      setFiles({
-        [fileInfo.filename]: fileInfo.code,
-      });
-    }
-  }, [activeRoom]);
-
   const handleGlobalRun = () => {
     if (!socket || !activeRoom || globalRunStatus === 'running') return;
     setActiveTab('global');
-    const code = editor ? editor.getValue() : '';
+    const code = activeFile?.content || '';
     socket.emit('run:global', { code, language: activeRoom.language });
   };
 
@@ -136,7 +110,7 @@ export const EditorRoom = () => {
     setLocalRunStatus('running');
     setLocalOutput('\r\n\x1b[33m[Local Run started...]\x1b[0m\r\n');
     try {
-      const code = editor ? editor.getValue() : '';
+      const code = activeFile?.content || '';
       const result = await roomService.runCode(roomId, code);
       setLocalOutput(result);
       setLocalRunStatus('success');
@@ -146,10 +120,6 @@ export const EditorRoom = () => {
     }
   };
 
-  const handleFileClick = (filename: string) => {
-    setActiveFile(filename);
-  };
-
   const getLanguageType = (filename: string) => {
     if (filename.endsWith('.js')) return 'javascript';
     if (filename.endsWith('.go')) return 'go';
@@ -157,25 +127,6 @@ export const EditorRoom = () => {
     if (filename.endsWith('.css')) return 'css';
     if (filename.endsWith('.json')) return 'json';
     return 'markdown';
-  };
-
-  const getFileIcon = (filename: string) => {
-    if (filename.endsWith('.js')) {
-      return <span className="material-symbols-outlined text-[16px] text-[#f0db4f]">javascript</span>;
-    }
-    if (filename.endsWith('.go')) {
-      return <span className="material-symbols-outlined text-[16px] text-[#00add8]">code</span>;
-    }
-    if (filename.endsWith('.py')) {
-      return <span className="material-symbols-outlined text-[16px] text-[#3572A5]">code</span>;
-    }
-    if (filename.endsWith('.css')) {
-      return <span className="material-symbols-outlined text-[16px] text-secondary">css</span>;
-    }
-    if (filename.endsWith('.json')) {
-      return <span className="material-symbols-outlined text-[16px] text-[#cb3837]">settings</span>;
-    }
-    return <span className="material-symbols-outlined text-[16px] text-outline">description</span>;
   };
 
   const formatLanguageName = (lang: string) => {
@@ -277,8 +228,8 @@ export const EditorRoom = () => {
 
         {/* Main Navigation */}
         <nav className="flex-1 overflow-y-auto flex flex-col gap-sm w-full">
-          <div className="group">
-            <div className={`flex items-center gap-sm px-sm py-sm rounded-lg bg-primary-container text-on-primary-container font-bold ${isSidebarExpanded ? '' : 'justify-center'}`} title="Explorer">
+          <div className="group flex-1 min-h-0 flex flex-col">
+            <div className={`flex items-center gap-sm px-sm py-sm rounded-lg bg-primary-container text-on-primary-container font-bold shrink-0 ${isSidebarExpanded ? '' : 'justify-center'}`} title="Explorer">
               <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>folder</span>
               {isSidebarExpanded && <span className="font-label-md text-label-md">Explorer</span>}
               {isSidebarExpanded && <span className="material-symbols-outlined text-[16px] ml-auto rotate-90">chevron_right</span>}
@@ -286,21 +237,8 @@ export const EditorRoom = () => {
             
             {/* Explorer Content */}
             {isSidebarExpanded && (
-              <div className="pl-md pr-sm py-xs flex flex-col gap-xs mt-xs">
-                <div className="flex items-center gap-xs px-sm py-xs rounded hover:bg-surface-container-high cursor-pointer text-on-surface font-label-md text-label-md">
-                  <span className="material-symbols-outlined text-[16px] text-tertiary">folder</span> src
-                </div>
-                <div className="pl-md flex flex-col gap-xs">
-                  {Object.keys(files).map((filename) => (
-                    <div 
-                      key={filename}
-                      onClick={() => handleFileClick(filename)}
-                      className={`flex items-center gap-xs px-sm py-xs rounded hover:bg-surface-container-high cursor-pointer text-on-surface font-label-md text-label-md ${activeFile === filename ? 'bg-surface-container-high' : ''}`}
-                    >
-                      {getFileIcon(filename)} {filename}
-                    </div>
-                  ))}
-                </div>
+              <div className="flex-1 min-h-0 overflow-y-auto mt-xs">
+                <FileExplorer roomId={roomId || ''} />
               </div>
             )}
           </div>
@@ -420,24 +358,27 @@ export const EditorRoom = () => {
           {/* Editor & Panels Area */}
           <div className="flex-1 flex flex-col min-h-0 relative">
             {/* Editor Header / Tabs */}
-            <div className="h-[40px] flex bg-surface-container-lowest border-b border-outline-variant/20 shrink-0 select-none">
-              {Object.keys(files).map((filename) => (
-                <div 
-                  key={filename}
-                  onClick={() => handleFileClick(filename)}
-                  className={`flex items-center gap-sm px-md border-r border-outline-variant/20 font-label-md text-label-md cursor-pointer transition-colors ${activeFile === filename ? 'bg-[#ffffff] border-b-2 border-b-primary text-on-surface' : 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-low'}`}
-                >
-                  {getFileIcon(filename)} {filename}
-                </div>
-              ))}
-            </div>
+            <EditorTabs />
 
             {/* Monaco-inspired Editor Container */}
             <div className="flex-1 relative min-h-0">
-              <MonacoEditor 
-                language={getLanguageType(activeFile)} 
-                onMount={(editorInstance) => setEditor(editorInstance)}
-              />
+              {activeFile ? (
+                <MonacoEditor 
+                  language={getLanguageType(activeFile.name)} 
+                  value={activeFile.content || ''}
+                  onChange={(val) => {
+                    if (val !== undefined) {
+                      updateFileContent(activeFile.id, val);
+                    }
+                  }}
+                  onMount={(editorInstance) => setEditor(editorInstance)}
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-on-surface-variant/60 gap-sm select-none">
+                  <span className="material-symbols-outlined text-4xl">code_blocks</span>
+                  <span className="text-sm">Open a file from the explorer to start editing</span>
+                </div>
+              )}
 
               {/* Presence Panel (Right side floating) */}
               <div className="absolute top-md right-md flex flex-col gap-sm z-30 w-64 select-none pointer-events-auto">

@@ -46,6 +46,14 @@ export const useFileStore = create<FileState>((set, get) => ({
     try {
       const files = await fileService.getFileTree(roomId);
       set({ files });
+      
+      // Auto-open the first file if none is active
+      if (files.length > 0 && !get().activeFileId) {
+        const firstFile = files.find((f) => f.type === 'file');
+        if (firstFile) {
+          get().openFile(firstFile);
+        }
+      }
     } catch (err) {
       console.error('Failed to fetch file tree:', err);
     }
