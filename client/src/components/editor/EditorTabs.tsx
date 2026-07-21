@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useFileStore } from '../../store/fileStore';
-import type { FileTab } from '../../types';
 
 export const EditorTabs: React.FC = () => {
   const { openTabs, activeFileId, setActiveFile, closeTab, reorderTabs } = useFileStore();
