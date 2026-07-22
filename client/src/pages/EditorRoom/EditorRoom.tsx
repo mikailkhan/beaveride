@@ -597,21 +597,6 @@ export const EditorRoom = () => {
             </div>
 
             <button 
-              onClick={() => {
-                navigator.clipboard.writeText(window.location.href);
-                alert("Room link copied to clipboard!");
-              }}
-              className="px-md py-sm rounded-lg border border-outline-variant text-on-surface font-label-md text-label-md hover:bg-surface-container-high transition-colors flex items-center gap-xs cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[18px]">person_add</span> Invite
-            </button>
-            <button 
-              onClick={() => alert("Workspace share settings opened.")}
-              className="px-md py-sm rounded-lg border border-outline-variant text-on-surface font-label-md text-label-md hover:bg-surface-container-high transition-colors flex items-center gap-xs cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[18px]">share</span> Share
-            </button>
-            <button 
               onClick={() => setShowChat((prev) => !prev)}
               className={`px-md py-sm rounded-lg border font-label-md text-label-md transition-colors flex items-center gap-xs cursor-pointer ${
                 showChat 
