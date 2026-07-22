@@ -439,9 +439,9 @@ export const EditorRoom = () => {
         <div className="px-sm w-full">
           <div className={`flex items-center mb-lg mt-sm ${isSidebarExpanded ? 'justify-between' : 'justify-center'}`}>
             {isSidebarExpanded && (
-              <div className="flex items-center w-[140px] h-[54px] bg-[#f5f5f7] rounded-lg overflow-hidden border border-[#e8e8ed]">
-                <Link to="/dashboard" className="px-2">
-                  <img src={BeaverideLogo} alt="BeaverIDE Logo" className="h-8 w-auto object-contain" />
+              <div className="flex items-center">
+                <Link to="/dashboard" className="px-2 text-on-surface font-label-md text-label-md">
+                  <span className="material-symbols-outlined text-[18px]">arrow_back</span>
                 </Link>
               </div>
             )}
@@ -569,7 +569,7 @@ export const EditorRoom = () => {
             </span>
             <span className="px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container text-[12px] font-bold ml-sm flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse"></span>
-              {formatLanguageName(activeRoom.language)} • {myRole.toUpperCase()}
+              {myRole.toUpperCase()}
             </span>
 
             {isViewer && (
@@ -577,11 +577,6 @@ export const EditorRoom = () => {
                 <span className="material-symbols-outlined text-[13px]">preview</span> Read Only Mode
               </span>
             )}
-
-            <span className="text-xs text-green-600/70 flex items-center gap-xs ml-sm" title="Real-time collaboration active">
-              <span className="material-symbols-outlined text-[14px]">bolt</span>
-              Live Syncing
-            </span>
           </div>
 
           {/* Actions */}
