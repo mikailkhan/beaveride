@@ -17,6 +17,8 @@ export interface Collaborator {
   lastName: string;
   color: string;
   activeFileId: string | null;
+  role?: 'owner' | 'editor' | 'viewer';
+  canRun?: boolean;
 }
 
 const getRandomColor = (): string => {
@@ -192,6 +194,8 @@ export function useYjsSync({ roomId, token }: UseYjsSyncProps): {
               lastName: state.user?.lastName || '',
               color: state.user?.color || '#f66317',
               activeFileId: state.activeFileId || null,
+              role: state.role || state.user?.role || 'editor',
+              canRun: state.canRun !== undefined ? state.canRun : (state.user?.canRun !== undefined ? state.user?.canRun : true),
             });
           }
         }

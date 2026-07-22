@@ -78,79 +78,99 @@ export const Settings = () => {
   };
 
   return (
-    <main className="flex-1 h-full overflow-y-auto bg-surface-container-lowest p-margin md:p-2xl">
+    <main className="flex-1 h-full overflow-y-auto bg-[#f5f5f7] p-8 md:p-12 font-sans text-[#1d1d1f]">
       {/* Header */}
-      <header className="mb-xl">
-        <h1 className="font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">Account Settings</h1>
-        <p className="font-body-md text-body-md text-on-surface-variant mt-sm">
-          Manage your account profile information and security settings.
-        </p>
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 gap-6 border-b border-[#e8e8ed] pb-6">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight text-[#1d1d1f]">Account Settings</h1>
+          <p className="text-[14px] text-[#86868b] mt-1.5">
+            Manage your personal details, email credentials, and security preferences.
+          </p>
+        </div>
+
+        {/* Account Badge */}
+        {user && (
+          <div className="flex items-center gap-3 px-4 py-2 bg-white rounded-full border border-[#e8e8ed] shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+            <div className="w-6 h-6 rounded-full bg-primary-container text-on-primary-container font-bold text-xs flex items-center justify-center">
+              {user.username.charAt(0).toUpperCase()}
+            </div>
+            <span className="text-xs font-semibold text-[#1d1d1f]">@{user.username}</span>
+          </div>
+        )}
       </header>
 
-      <div className="flex flex-col gap-xl max-w-4xl">
+      <div className="flex flex-col gap-8 max-w-4xl">
         {/* Profile Card */}
-        <section className="glass-panel p-lg md:p-xl rounded-xl border border-surface-variant bg-surface-container-lowest flex flex-col gap-md">
-          <div className="flex items-center gap-sm border-b border-surface-variant/40 pb-sm">
-            <span className="material-symbols-outlined text-primary text-xl">manage_accounts</span>
+        <section className="bg-white p-6 md:p-8 rounded-2xl border border-[#e8e8ed] flex flex-col gap-6 shadow-[0_2px_12px_rgba(0,0,0,0.02)]">
+          <div className="flex items-center gap-3 border-b border-[#f5f5f7] pb-4">
+            <div className="w-9 h-9 rounded-xl bg-[#f5f5f7] flex items-center justify-center text-primary shrink-0">
+              <span className="material-symbols-outlined text-sm">manage_accounts</span>
+            </div>
             <div>
-              <h2 className="font-headline-sm text-base font-bold text-on-surface">Profile Details</h2>
-              <p className="font-body-md text-xs text-on-surface-variant mt-[2px]">Update workspace contact credentials.</p>
+              <h2 className="text-base font-semibold text-[#1d1d1f]">Profile Details</h2>
+              <p className="text-xs text-[#86868b] mt-0.5">Update workspace contact credentials and personal information.</p>
             </div>
           </div>
 
-          <form onSubmit={handleUpdateProfile} className="flex flex-col gap-md">
+          <form onSubmit={handleUpdateProfile} className="flex flex-col gap-5">
             {profileMsg && (
               <div
-                className={`p-sm rounded-lg font-body-md text-sm border ${
+                className={`p-3.5 rounded-xl text-xs font-medium flex items-center gap-2 border ${
                   profileMsg.type === 'success'
-                    ? 'bg-success-container text-on-success-container border-success/20'
-                    : 'bg-error-container text-on-error-container border-error/20'
+                    ? 'bg-green-50 text-green-700 border-green-200/60'
+                    : 'bg-red-50 text-red-700 border-red-200/60'
                 }`}
               >
+                <span className="material-symbols-outlined text-[16px]">
+                  {profileMsg.type === 'success' ? 'check_circle' : 'error'}
+                </span>
                 {profileMsg.text}
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-md">
-              <div className="flex flex-col gap-xs">
-                <label className="font-label-md text-xs text-on-surface font-semibold">First Name</label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-[#1d1d1f]">First Name</label>
                 <input
                   type="text"
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
                   disabled={isUpdatingProfile}
-                  className="bg-surface-container-lowest border border-surface-variant rounded-lg p-sm font-body-md text-sm text-on-surface focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
+                  placeholder="First Name"
+                  className="w-full bg-[#f5f5f7] border border-[#e8e8ed] rounded-xl px-4 py-2.5 text-sm text-[#1d1d1f] placeholder:text-[#86868b] focus:outline-none focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/10 transition-all"
                 />
               </div>
 
-              <div className="flex flex-col gap-xs">
-                <label className="font-label-md text-xs text-on-surface font-semibold">Last Name</label>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-[#1d1d1f]">Last Name</label>
                 <input
                   type="text"
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
                   disabled={isUpdatingProfile}
-                  className="bg-surface-container-lowest border border-surface-variant rounded-lg p-sm font-body-md text-sm text-on-surface focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
+                  placeholder="Last Name"
+                  className="w-full bg-[#f5f5f7] border border-[#e8e8ed] rounded-xl px-4 py-2.5 text-sm text-[#1d1d1f] placeholder:text-[#86868b] focus:outline-none focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/10 transition-all"
                 />
               </div>
             </div>
 
-            <div className="flex flex-col gap-xs">
-              <label className="font-label-md text-xs text-on-surface font-semibold">Email Address</label>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-[#1d1d1f]">Email Address</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={isUpdatingProfile}
-                className="bg-surface-container-lowest border border-surface-variant rounded-lg p-sm font-body-md text-sm text-on-surface focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
+                placeholder="name@example.com"
+                className="w-full bg-[#f5f5f7] border border-[#e8e8ed] rounded-xl px-4 py-2.5 text-sm text-[#1d1d1f] placeholder:text-[#86868b] focus:outline-none focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/10 transition-all"
               />
             </div>
 
-            <div className="flex justify-end mt-sm">
+            <div className="flex justify-end pt-2">
               <button
                 type="submit"
                 disabled={isUpdatingProfile}
-                className="px-md py-sm bg-primary-container text-on-primary-container hover:bg-primary hover:text-on-primary rounded-lg font-label-md text-sm transition-colors cursor-pointer disabled:opacity-50"
+                className="px-5 py-2.5 bg-primary-container text-on-primary-container hover:bg-primary hover:text-on-primary rounded-full text-xs font-semibold transition-all duration-200 cursor-pointer disabled:opacity-50 shadow-[0_1px_2px_rgba(0,0,0,0.02)]"
               >
                 {isUpdatingProfile ? 'Saving Changes...' : 'Save Profile'}
               </button>
@@ -159,71 +179,76 @@ export const Settings = () => {
         </section>
 
         {/* Security Card */}
-        <section className="glass-panel p-lg md:p-xl rounded-xl border border-surface-variant bg-surface-container-lowest flex flex-col gap-md">
-          <div className="flex items-center gap-sm border-b border-surface-variant/40 pb-sm">
-            <span className="material-symbols-outlined text-primary text-xl">lock_open</span>
+        <section className="bg-white p-6 md:p-8 rounded-2xl border border-[#e8e8ed] flex flex-col gap-6 shadow-[0_2px_12px_rgba(0,0,0,0.02)]">
+          <div className="flex items-center gap-3 border-b border-[#f5f5f7] pb-4">
+            <div className="w-9 h-9 rounded-xl bg-[#f5f5f7] flex items-center justify-center text-primary shrink-0">
+              <span className="material-symbols-outlined text-sm">lock_open</span>
+            </div>
             <div>
-              <h2 className="font-headline-sm text-base font-bold text-on-surface">Password &amp; Security</h2>
-              <p className="font-body-md text-xs text-on-surface-variant mt-[2px]">Change account credentials password.</p>
+              <h2 className="text-base font-semibold text-[#1d1d1f]">Password &amp; Security</h2>
+              <p className="text-xs text-[#86868b] mt-0.5">Update your password to keep your account secure.</p>
             </div>
           </div>
 
-          <form onSubmit={handleUpdatePassword} className="flex flex-col gap-md">
+          <form onSubmit={handleUpdatePassword} className="flex flex-col gap-5">
             {passwordMsg && (
               <div
-                className={`p-sm rounded-lg font-body-md text-sm border ${
+                className={`p-3.5 rounded-xl text-xs font-medium flex items-center gap-2 border ${
                   passwordMsg.type === 'success'
-                    ? 'bg-success-container text-on-success-container border-success/20'
-                    : 'bg-error-container text-on-error-container border-error/20'
+                    ? 'bg-green-50 text-green-700 border-green-200/60'
+                    : 'bg-red-50 text-red-700 border-red-200/60'
                 }`}
               >
+                <span className="material-symbols-outlined text-[16px]">
+                  {passwordMsg.type === 'success' ? 'check_circle' : 'error'}
+                </span>
                 {passwordMsg.text}
               </div>
             )}
 
-            <div className="flex flex-col gap-xs">
-              <label className="font-label-md text-xs text-on-surface font-semibold">Current Password</label>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-[#1d1d1f]">Current Password</label>
               <input
                 type="password"
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 disabled={isUpdatingPassword}
                 placeholder="••••••••"
-                className="bg-surface-container-lowest border border-surface-variant rounded-lg p-sm font-body-md text-sm text-on-surface focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
+                className="w-full bg-[#f5f5f7] border border-[#e8e8ed] rounded-xl px-4 py-2.5 text-sm text-[#1d1d1f] placeholder:text-[#86868b] focus:outline-none focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/10 transition-all"
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-md">
-              <div className="flex flex-col gap-xs">
-                <label className="font-label-md text-xs text-on-surface font-semibold">New Password</label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-[#1d1d1f]">New Password</label>
                 <input
                   type="password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   disabled={isUpdatingPassword}
                   placeholder="At least 8 characters"
-                  className="bg-surface-container-lowest border border-surface-variant rounded-lg p-sm font-body-md text-sm text-on-surface focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
+                  className="w-full bg-[#f5f5f7] border border-[#e8e8ed] rounded-xl px-4 py-2.5 text-sm text-[#1d1d1f] placeholder:text-[#86868b] focus:outline-none focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/10 transition-all"
                 />
               </div>
 
-              <div className="flex flex-col gap-xs">
-                <label className="font-label-md text-xs text-on-surface font-semibold">Confirm New Password</label>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-[#1d1d1f]">Confirm New Password</label>
                 <input
                   type="password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   disabled={isUpdatingPassword}
                   placeholder="Repeat new password"
-                  className="bg-surface-container-lowest border border-surface-variant rounded-lg p-sm font-body-md text-sm text-on-surface focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
+                  className="w-full bg-[#f5f5f7] border border-[#e8e8ed] rounded-xl px-4 py-2.5 text-sm text-[#1d1d1f] placeholder:text-[#86868b] focus:outline-none focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/10 transition-all"
                 />
               </div>
             </div>
 
-            <div className="flex justify-end mt-sm">
+            <div className="flex justify-end pt-2">
               <button
                 type="submit"
                 disabled={isUpdatingPassword}
-                className="px-md py-sm bg-primary-container text-on-primary-container hover:bg-primary hover:text-on-primary rounded-lg font-label-md text-sm transition-colors cursor-pointer disabled:opacity-50"
+                className="px-5 py-2.5 bg-primary-container text-on-primary-container hover:bg-primary hover:text-on-primary rounded-full text-xs font-semibold transition-all duration-200 cursor-pointer disabled:opacity-50 shadow-[0_1px_2px_rgba(0,0,0,0.02)]"
               >
                 {isUpdatingPassword ? 'Updating Password...' : 'Change Password'}
               </button>

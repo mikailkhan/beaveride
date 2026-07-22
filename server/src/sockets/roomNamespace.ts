@@ -8,11 +8,14 @@ import { ExecutorService } from '../services/executorService.js';
 import { FileService } from '../services/fileService.js';
 import { addActivity, getActivities } from './activityStore.js';
 
+import { RoomService } from '../services/roomService.js';
+
 const userRepository = new UserRepository();
 const authService = new AuthService();
 const chatRepository = new ChatRepository();
 const executorService = new ExecutorService();
 const fileService = new FileService();
+const roomService = new RoomService();
 const globalRunLock = new Map<number, boolean>();
 const codeEditDebounce = new Map<string, number>(); // key: `${roomId}:${userId}`
 const CODE_EDIT_DEBOUNCE_MS = 10_000;
@@ -228,6 +231,69 @@ export function registerRoomNamespace(io: SocketServer): void {
         } catch (err) {
           console.error(`Failed to delete file node over socket in room ${roomId}:`, err);
           socket.emit('error', err instanceof Error ? err.message : 'Failed to delete file');
+        }
+      });
+
+      // Handle room member role updates by owner
+      socket.on('room:member:update_role', async (data: { targetUserId: number; role: 'owner' | 'editor' | 'viewer'; targetUsername?: string }) => {
+        try {
+          await roomService.updateMemberRole(userId, roomId, data.targetUserId, data.role);
+          const targetName = data.targetUsername || `User ${data.targetUserId}`;
+          const roleTitle = data.role.charAt(0).toUpperCase() + data.role.slice(1);
+          addActivity(roomId, {
+            username,
+            event: 'role_changed',
+            timestamp: new Date().toISOString(),
+            targetUsername: targetName,
+            detail: `changed ${targetName}'s role to ${roleTitle}`,
+          });
+          roomNsp.to(roomChannel).emit('room:member:updated', { targetUserId: data.targetUserId, role: data.role });
+          roomNsp.to(roomChannel).emit('activity:update', getActivities(roomId));
+        } catch (err) {
+          console.error(`Failed to update member role over socket in room ${roomId}:`, err);
+          socket.emit('error', err instanceof Error ? err.message : 'Failed to update member role');
+        }
+      });
+
+      // Handle room member canRun toggle by owner
+      socket.on('room:member:toggle_can_run', async (data: { targetUserId: number; canRun: boolean; targetUsername?: string }) => {
+        try {
+          await roomService.toggleMemberCanRun(userId, roomId, data.targetUserId, data.canRun);
+          const targetName = data.targetUsername || `User ${data.targetUserId}`;
+          const actionText = data.canRun ? 'enabled' : 'disabled';
+          addActivity(roomId, {
+            username,
+            event: 'run_toggled',
+            timestamp: new Date().toISOString(),
+            targetUsername: targetName,
+            detail: `${actionText} Global Run for ${targetName}`,
+          });
+          roomNsp.to(roomChannel).emit('room:member:updated', { targetUserId: data.targetUserId, canRun: data.canRun });
+          roomNsp.to(roomChannel).emit('activity:update', getActivities(roomId));
+        } catch (err) {
+          console.error(`Failed to toggle member canRun over socket in room ${roomId}:`, err);
+          socket.emit('error', err instanceof Error ? err.message : 'Failed to toggle execution rights');
+        }
+      });
+
+      // Handle kicking member by owner
+      socket.on('room:member:kick', async (data: { targetUserId: number; targetUsername?: string }) => {
+        try {
+          await roomService.kickMember(userId, roomId, data.targetUserId);
+          const targetName = data.targetUsername || `User ${data.targetUserId}`;
+          addActivity(roomId, {
+            username,
+            event: 'kicked',
+            timestamp: new Date().toISOString(),
+            targetUsername: targetName,
+            detail: `kicked ${targetName} from room`,
+          });
+          // Notify room and activity feed
+          roomNsp.to(roomChannel).emit('room:member:kicked', { targetUserId: data.targetUserId });
+          roomNsp.to(roomChannel).emit('activity:update', getActivities(roomId));
+        } catch (err) {
+          console.error(`Failed to kick member over socket in room ${roomId}:`, err);
+          socket.emit('error', err instanceof Error ? err.message : 'Failed to kick member');
         }
       });
 

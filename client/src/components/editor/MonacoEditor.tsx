@@ -4,11 +4,12 @@ import type { OnMount } from '@monaco-editor/react';
 interface MonacoEditorProps {
   language: string;
   value?: string;
+  options?: Record<string, any>;
   onChange?: (value: string | undefined) => void;
   onMount?: OnMount;
 }
 
-export const MonacoEditor = ({ language, value, onChange, onMount }: MonacoEditorProps) => {
+export const MonacoEditor = ({ language, value, options, onChange, onMount }: MonacoEditorProps) => {
   return (
     <div className="flex-1 w-full h-full relative">
       <Editor
@@ -30,6 +31,7 @@ export const MonacoEditor = ({ language, value, onChange, onMount }: MonacoEdito
           cursorBlinking: 'smooth',
           cursorSmoothCaretAnimation: 'on',
           formatOnPaste: true,
+          ...options,
         }}
         loading={<div className="p-4 text-on-surface-variant">Loading editor...</div>}
       />

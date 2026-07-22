@@ -1,9 +1,18 @@
-export type ActivityEventType = 'joined' | 'left' | 'global_run' | 'code_edit';
+export type ActivityEventType = 
+  | 'joined' 
+  | 'left' 
+  | 'global_run' 
+  | 'code_edit' 
+  | 'role_changed' 
+  | 'run_toggled' 
+  | 'kicked';
 
 export interface ActivityEntry {
   username: string;
   event: ActivityEventType;
   timestamp: string; // ISO 8601
+  targetUsername?: string;
+  detail?: string;
 }
 
 const store = new Map<number, ActivityEntry[]>();

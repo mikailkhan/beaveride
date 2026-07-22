@@ -12,14 +12,22 @@ import BeaverideLogo from '../../assets/logos/beaveride-logo.png';
 import { FileExplorer } from '../../components/editor/FileExplorer';
 import { EditorTabs } from '../../components/editor/EditorTabs';
 import { useFileStore } from '../../store/fileStore';
-import { fileService } from '../../services/fileService';
 
-type ActivityEventType = 'joined' | 'left' | 'global_run' | 'code_edit';
+type ActivityEventType = 
+  | 'joined' 
+  | 'left' 
+  | 'global_run' 
+  | 'code_edit' 
+  | 'role_changed' 
+  | 'run_toggled' 
+  | 'kicked';
 
 interface ActivityEntry {
   username: string;
   event: ActivityEventType;
   timestamp: string;
+  targetUsername?: string;
+  detail?: string;
 }
 
 export const EditorRoom = () => {
@@ -48,6 +56,13 @@ export const EditorRoom = () => {
   const [activities, setActivities] = useState<ActivityEntry[]>([]);
   const [activeTab, setActiveTab] = useState<'global' | 'local'>('global');
 
+  // Role and Permission states
+  const [myRole, setMyRole] = useState<'owner' | 'editor' | 'viewer'>('editor');
+  const [myCanRun, setMyCanRun] = useState<boolean>(true);
+  const [openRoleMenuUserId, setOpenRoleMenuUserId] = useState<number | null>(null);
+
+  const authUser = useAuthStore((state) => state.user);
+
   useEffect(() => {
     if (!roomId) return;
     fetchRoomDetails(roomId);
@@ -58,6 +73,14 @@ export const EditorRoom = () => {
       clearFileStore();
     };
   }, [roomId, fetchRoomDetails, clearActiveRoom, fetchFileTree, clearFileStore]);
+
+  // Sync activeRoom roles/permissions to local state when activeRoom is loaded
+  useEffect(() => {
+    if (activeRoom) {
+      setMyRole(activeRoom.role);
+      setMyCanRun(activeRoom.canRun);
+    }
+  }, [activeRoom]);
 
   const token = useAuthStore((state) => state.token);
 
@@ -103,17 +126,23 @@ export const EditorRoom = () => {
   // Dynamically bind Monaco editor to active file's Y.Text inside Yjs doc
   useFileBinding({ doc, awareness, editor, activeFileId, isSynced, files });
 
-  // Handle local activeFileId updates in Yjs awareness
+  // Handle local activeFileId, role, and canRun updates in Yjs awareness
   useEffect(() => {
-    if (awareness && activeFileId) {
-      awareness.setLocalStateField('activeFileId', activeFileId);
+    if (awareness) {
+      if (activeFileId) {
+        awareness.setLocalStateField('activeFileId', activeFileId);
+      }
+      awareness.setLocalStateField('role', myRole);
+      awareness.setLocalStateField('canRun', myCanRun);
     }
-  }, [awareness, activeFileId]);
+  }, [awareness, activeFileId, myRole, myCanRun]);
 
-  // Sync socket state in fileStore and listen to broadcast mutations
+  // Sync socket state in fileStore and listen to broadcast mutations & member management events
   useEffect(() => {
     if (!socket) return;
     setSocket(socket);
+
+    const currentUserId = authUser?.id;
 
     const onFiletreeMutate = (data: { type: string; fileId?: string; newName?: string; node?: any }) => {
       console.log('Received filetree mutation event:', data);
@@ -126,13 +155,32 @@ export const EditorRoom = () => {
       }
     };
 
+    const onMemberUpdated = (data: { targetUserId: number; role?: 'owner' | 'editor' | 'viewer'; canRun?: boolean }) => {
+      console.log('Received member updated event:', data);
+      if (currentUserId && String(data.targetUserId) === String(currentUserId)) {
+        if (data.role) setMyRole(data.role);
+        if (data.canRun !== undefined) setMyCanRun(data.canRun);
+      }
+    };
+
+    const onMemberKicked = (data: { targetUserId: number }) => {
+      if (currentUserId && String(data.targetUserId) === String(currentUserId)) {
+        alert("You have been removed from this room by the owner.");
+        window.location.href = '/dashboard';
+      }
+    };
+
     socket.on('filetree:mutate', onFiletreeMutate);
+    socket.on('room:member:updated', onMemberUpdated);
+    socket.on('room:member:kicked', onMemberKicked);
 
     return () => {
       socket.off('filetree:mutate', onFiletreeMutate);
+      socket.off('room:member:updated', onMemberUpdated);
+      socket.off('room:member:kicked', onMemberKicked);
       setSocket(null);
     };
-  }, [socket, setSocket, addNodeFromSocket, renameNodeFromSocket, deleteNodeFromSocket]);
+  }, [socket, setSocket, addNodeFromSocket, renameNodeFromSocket, deleteNodeFromSocket, authUser]);
 
   // Register socket listeners for global run lifecycle
   useEffect(() => {
@@ -189,7 +237,7 @@ export const EditorRoom = () => {
   };
 
   const handleGlobalRun = () => {
-    if (!socket || !activeRoom || globalRunStatus === 'running') return;
+    if (!socket || !activeRoom || globalRunStatus === 'running' || !myCanRun) return;
     setActiveTab('global');
     const code = editor ? editor.getValue() : (activeFile?.content || '');
     const executionLang = activeFile ? getExecutionLanguage(activeFile.name) : activeRoom.language;
@@ -263,12 +311,60 @@ export const EditorRoom = () => {
           label: `${entry.username} edited code`,
           colorClass: 'text-tertiary',
         };
+      case 'role_changed':
+        return {
+          icon: 'badge',
+          label: `${entry.username} ${entry.detail || 'updated role'}`,
+          colorClass: 'text-primary',
+        };
+      case 'run_toggled':
+        return {
+          icon: 'bolt',
+          label: `${entry.username} ${entry.detail || 'updated run permissions'}`,
+          colorClass: 'text-tertiary',
+        };
+      case 'kicked':
+        return {
+          icon: 'person_remove',
+          label: `${entry.username} ${entry.detail || 'kicked user'}`,
+          colorClass: 'text-error',
+        };
       default:
         return {
           icon: 'info',
           label: `${entry.username} performed action`,
           colorClass: 'text-outline',
         };
+    }
+  };
+
+  const handleRoleSelect = (targetUserId: number, targetUsername: string, newRole: 'owner' | 'editor' | 'viewer') => {
+    if (!socket) return;
+    socket.emit('room:member:update_role', {
+      targetUserId,
+      role: newRole,
+      targetUsername,
+    });
+    setOpenRoleMenuUserId(null);
+  };
+
+  const handleToggleCanRun = (targetUserId: number, targetUsername: string, currentCanRun?: boolean) => {
+    if (!socket) return;
+    const nextCanRun = !(currentCanRun !== false);
+    socket.emit('room:member:toggle_can_run', {
+      targetUserId,
+      canRun: nextCanRun,
+      targetUsername,
+    });
+  };
+
+  const handleKickUser = (targetUserId: number, targetUsername: string) => {
+    if (!socket) return;
+    if (window.confirm(`Are you sure you want to kick ${targetUsername} from this room?`)) {
+      socket.emit('room:member:kick', {
+        targetUserId,
+        targetUsername,
+      });
     }
   };
 
@@ -291,6 +387,8 @@ export const EditorRoom = () => {
       </div>
     );
   }
+
+  const isViewer = myRole === 'viewer';
 
   return (
     <div className="h-screen bg-background text-on-surface font-body-md overflow-hidden flex font-[Inter] w-full">
@@ -393,16 +491,20 @@ export const EditorRoom = () => {
         <header className="h-[60px] flex items-center justify-between px-md border-b border-outline-variant/20 bg-surface/80 backdrop-blur-xl z-20 shrink-0 select-none">
           {/* Breadcrumb */}
           <div className="flex items-center gap-sm font-label-md text-label-md">
-            <span className="text-on-surface-variant">beaver-corp</span>
-            <span className="text-outline-variant">/</span>
             <span className="text-on-surface font-bold flex items-center gap-xs">
               <span className="material-symbols-outlined text-[18px] text-tertiary">cloud</span>
               {activeRoom.title}
             </span>
             <span className="px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container text-[12px] font-bold ml-sm flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse"></span>
-              {formatLanguageName(activeRoom.language)} • {activeRoom.role}
+              {formatLanguageName(activeRoom.language)} • {myRole.toUpperCase()}
             </span>
+
+            {isViewer && (
+              <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 border border-amber-500/20 text-[11px] font-semibold flex items-center gap-1">
+                <span className="material-symbols-outlined text-[13px]">preview</span> Read Only Mode
+              </span>
+            )}
 
             <span className="text-xs text-green-600/70 flex items-center gap-xs ml-sm" title="Real-time collaboration active">
               <span className="material-symbols-outlined text-[14px]">bolt</span>
@@ -465,8 +567,9 @@ export const EditorRoom = () => {
             </button>
             <button 
               onClick={handleGlobalRun} 
-              disabled={globalRunStatus === 'running' || !activeRoom.canRun}
+              disabled={globalRunStatus === 'running' || !activeRoom.canRun || !myCanRun}
               className="px-md py-sm rounded-lg bg-primary-container text-white font-label-md text-label-md hover:bg-primary transition-colors flex items-center gap-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] cursor-pointer disabled:opacity-60"
+              title={!myCanRun ? "Global Run disabled by owner" : "Execute code globally"}
             >
               <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>play_arrow</span> Global Run
             </button>
@@ -492,6 +595,7 @@ export const EditorRoom = () => {
               {activeFile ? (
                 <MonacoEditor 
                   language={getLanguageType(activeFile.name)} 
+                  options={{ readOnly: isViewer }}
                   onMount={(editorInstance) => setEditor(editorInstance)}
                 />
               ) : (
@@ -502,7 +606,7 @@ export const EditorRoom = () => {
               )}
 
               {/* Presence Panel (Right side floating) */}
-              <div className="absolute top-md right-md flex flex-col gap-sm z-30 w-64 select-none pointer-events-auto">
+              <div className="absolute top-md right-md flex flex-col gap-sm z-30 w-72 select-none pointer-events-auto">
                 <div className="glass-panel rounded-xl p-sm bg-white/80 backdrop-blur-md border border-outline-variant/30 shadow-md">
                   <div 
                     onClick={() => setIsPresenceExpanded(!isPresenceExpanded)}
@@ -518,28 +622,110 @@ export const EditorRoom = () => {
                   </div>
 
                   {isPresenceExpanded && (
-                    <div className="flex flex-col gap-1 mt-xs max-h-48 overflow-y-auto">
-                      {collaborators.map((member) => (
-                        <div 
-                          key={member.clientId} 
-                          className="flex items-center gap-sm p-xs rounded-lg hover:bg-surface-container-low transition-colors"
-                        >
+                    <div className="flex flex-col gap-1.5 mt-xs max-h-60 overflow-y-auto pr-0.5">
+                      {collaborators.map((member) => {
+                        const isMemberOwner = member.role === 'owner';
+                        const isMemberViewer = member.role === 'viewer';
+                        const isMe = authUser?.id !== undefined && String(authUser.id) === String(member.userId);
+                        const isMenuOpen = openRoleMenuUserId === member.userId;
+
+                        return (
                           <div 
-                            style={{ borderColor: member.color }}
-                            className="w-6 h-6 rounded-full border-2 bg-surface-container-high flex items-center justify-center text-[10px] font-bold"
+                            key={member.clientId} 
+                            className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-surface-container-low transition-colors relative"
                           >
-                            {member.username.charAt(0).toUpperCase()}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="font-label-md text-[12px] font-bold text-on-surface truncate">
-                              {member.firstName} {member.lastName}
+                            {/* Avatar */}
+                            <div 
+                              style={{ borderColor: member.color }}
+                              className="w-6 h-6 rounded-full border-2 bg-surface-container-high flex items-center justify-center text-[10px] font-bold shrink-0"
+                            >
+                              {member.username.charAt(0).toUpperCase()}
                             </div>
-                            <div className="text-[10px] text-on-surface-variant truncate">
-                              @{member.username} • {getFileName(member.activeFileId)}
+
+                            {/* User details */}
+                            <div className="flex-1 min-w-0">
+                              <div className="font-label-md text-[12px] font-bold text-on-surface truncate flex items-center gap-1">
+                                <span>{member.firstName} {member.lastName}</span>
+                                {isMe && <span className="text-[10px] text-outline font-normal">(You)</span>}
+                              </div>
+                              <div className="text-[10px] text-on-surface-variant truncate">
+                                @{member.username} • {getFileName(member.activeFileId)}
+                              </div>
+                            </div>
+
+                            {/* Role Icon & Selector */}
+                            <div className="relative shrink-0 flex items-center gap-1">
+                              {/* Role Icon Button */}
+                              {myRole === 'owner' && !isMe && !isMemberOwner ? (
+                                <button
+                                  onClick={() => setOpenRoleMenuUserId(isMenuOpen ? null : member.userId)}
+                                  className="p-1 rounded hover:bg-surface-container-high transition-colors flex items-center gap-0.5 cursor-pointer"
+                                  title={`Current role: ${member.role || 'editor'}. Click to change.`}
+                                >
+                                  <span className={`material-symbols-outlined text-[16px] ${isMemberViewer ? 'text-outline' : 'text-primary'}`}>
+                                    {isMemberViewer ? 'preview' : 'edit_note'}
+                                  </span>
+                                  <span className="material-symbols-outlined text-[12px] text-outline">arrow_drop_down</span>
+                                </button>
+                              ) : (
+                                <span className="p-1 flex items-center" title={`Role: ${member.role || 'editor'}`}>
+                                  <span className={`material-symbols-outlined text-[16px] ${isMemberOwner ? 'text-amber-500' : isMemberViewer ? 'text-outline' : 'text-primary'}`}>
+                                    {isMemberOwner ? 'workspace_premium' : isMemberViewer ? 'preview' : 'edit_note'}
+                                  </span>
+                                </span>
+                              )}
+
+                              {/* Role Select Dropdown Menu */}
+                              {isMenuOpen && (
+                                <div className="absolute right-0 top-full mt-1 bg-white border border-outline-variant/30 rounded-lg shadow-lg p-1 z-50 flex flex-col gap-0.5 min-w-[100px]">
+                                  <button
+                                    onClick={() => handleRoleSelect(member.userId, member.username, 'editor')}
+                                    className={`flex items-center gap-1.5 px-2 py-1 text-[11px] rounded hover:bg-surface-container-low transition-colors w-full text-left font-medium ${
+                                      member.role !== 'viewer' ? 'text-primary font-bold' : 'text-on-surface'
+                                    }`}
+                                  >
+                                    <span className="material-symbols-outlined text-[14px]">edit_note</span>
+                                    Editor
+                                  </button>
+                                  <button
+                                    onClick={() => handleRoleSelect(member.userId, member.username, 'viewer')}
+                                    className={`flex items-center gap-1.5 px-2 py-1 text-[11px] rounded hover:bg-surface-container-low transition-colors w-full text-left font-medium ${
+                                      member.role === 'viewer' ? 'text-primary font-bold' : 'text-on-surface'
+                                    }`}
+                                  >
+                                    <span className="material-symbols-outlined text-[14px]">preview</span>
+                                    Viewer
+                                  </button>
+                                </div>
+                              )}
+
+                              {/* Owner controls: Global Run Toggle & Kick */}
+                              {myRole === 'owner' && !isMe && !isMemberOwner && (
+                                <>
+                                  <button
+                                    onClick={() => handleToggleCanRun(member.userId, member.username, member.canRun)}
+                                    className={`p-1 rounded hover:bg-surface-container-high transition-colors cursor-pointer ${
+                                      member.canRun !== false ? 'text-primary' : 'text-outline-variant'
+                                    }`}
+                                    title={member.canRun !== false ? "Disable Global Run for this user" : "Enable Global Run for this user"}
+                                  >
+                                    <span className="material-symbols-outlined text-[16px]">
+                                      {member.canRun !== false ? 'play_circle' : 'play_disabled'}
+                                    </span>
+                                  </button>
+                                  <button
+                                    onClick={() => handleKickUser(member.userId, member.username)}
+                                    className="p-1 rounded hover:bg-error-container/20 text-error transition-colors cursor-pointer"
+                                    title="Kick User from Room"
+                                  >
+                                    <span className="material-symbols-outlined text-[16px]">person_remove</span>
+                                  </button>
+                                </>
+                              )}
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -601,4 +787,3 @@ export const EditorRoom = () => {
     </div>
   );
 };
-

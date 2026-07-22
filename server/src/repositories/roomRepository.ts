@@ -151,6 +151,26 @@ export class RoomRepository {
       .where(eq(userRooms.roomId, roomId));
   }
 
+  async updateMemberRole(roomId: number, userId: number, role: 'owner' | 'editor' | 'viewer'): Promise<void> {
+    await db
+      .update(userRooms)
+      .set({ role, updatedAt: new Date() })
+      .where(and(eq(userRooms.roomId, roomId), eq(userRooms.userId, userId)));
+  }
+
+  async updateMemberCanRun(roomId: number, userId: number, canRun: boolean): Promise<void> {
+    await db
+      .update(userRooms)
+      .set({ canRun, updatedAt: new Date() })
+      .where(and(eq(userRooms.roomId, roomId), eq(userRooms.userId, userId)));
+  }
+
+  async removeMember(roomId: number, userId: number): Promise<void> {
+    await db
+      .delete(userRooms)
+      .where(and(eq(userRooms.roomId, roomId), eq(userRooms.userId, userId)));
+  }
+
   async findLanguageByName(name: string) {
     return db.query.programmingLanguages.findFirst({
       where: eq(programmingLanguages.language, name),

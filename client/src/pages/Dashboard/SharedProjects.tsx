@@ -13,10 +13,19 @@ export const SharedProjects = () => {
 
   const formatLanguageName = (lang: string) => {
     switch (lang.toLowerCase()) {
-      case 'javascript': return 'JavaScript (Node.js)';
-      case 'python': return 'Python 3';
-      case 'go': return 'Go (Golang)';
+      case 'javascript': return 'JavaScript';
+      case 'python': return 'Python';
+      case 'go': return 'Go';
       default: return lang.charAt(0).toUpperCase() + lang.slice(1);
+    }
+  };
+
+  const getLanguageColor = (lang: string) => {
+    switch (lang.toLowerCase()) {
+      case 'javascript': return 'text-[#f0db4f]';
+      case 'python': return 'text-[#3572A5]';
+      case 'go': return 'text-[#00add8]';
+      default: return 'text-[#86868b]';
     }
   };
 
@@ -37,76 +46,76 @@ export const SharedProjects = () => {
   const displayName = user ? `${user.firstName}` : 'Developer';
 
   return (
-    <main className="flex-1 h-full overflow-y-auto bg-surface-container-lowest p-margin md:p-2xl">
+    <main className="flex-1 h-full overflow-y-auto bg-[#f5f5f7] p-8 md:p-12 font-sans text-[#1d1d1f]">
       {/* Header */}
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-end mb-xl gap-md">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 gap-6 border-b border-[#e8e8ed] pb-6">
         <div>
-          <h1 className="font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">Shared Projects</h1>
-          <p className="font-body-md text-body-md text-on-surface-variant mt-sm">
+          <h1 className="text-3xl font-semibold tracking-tight text-[#1d1d1f]">Shared Projects</h1>
+          <p className="text-[14px] text-[#86868b] mt-1.5">
             Hello, {displayName}. Here are the collaborative workspaces shared with you.
           </p>
         </div>
       </header>
 
       {error && (
-        <div className="mb-lg p-md bg-error-container text-on-error-container rounded-lg font-body-md text-sm border border-error/20">
+        <div className="mb-6 p-4 bg-error-container text-on-error-container rounded-lg text-xs border border-error/20 flex items-center gap-2">
+          <span className="material-symbols-outlined text-[16px]">error_outline</span>
           {error}
         </div>
       )}
 
       <div className="w-full">
         {isLoading ? (
-          <div className="text-center py-20 text-on-surface-variant font-body-md">Loading shared projects...</div>
+          <div className="text-center py-20 text-[#86868b] text-sm font-medium animate-pulse">Loading shared projects...</div>
         ) : sharedRooms.length === 0 ? (
-          <div className="glass-panel p-2xl rounded-xl shadow-sm border border-dashed border-outline-variant flex flex-col items-center justify-center text-center gap-sm min-h-[220px]">
-            <div className="w-12 h-12 rounded-full bg-secondary-fixed flex items-center justify-center text-secondary">
-              <span className="material-symbols-outlined text-2xl">groups</span>
+          <div className="bg-white p-12 rounded-2xl border border-[#e8e8ed] flex flex-col items-center justify-center text-center gap-4 min-h-[220px]">
+            <div className="w-12 h-12 rounded-full bg-[#f5f5f7] flex items-center justify-center text-primary">
+              <span className="material-symbols-outlined text-xl">groups</span>
             </div>
             <div>
-              <h3 className="font-label-md text-label-md font-bold text-on-surface mt-sm">No shared projects</h3>
-              <p className="font-body-md text-sm text-on-surface-variant mt-xs">Use the Join Project button to connect to a workspace room.</p>
+              <h3 className="text-sm font-semibold text-[#1d1d1f]">No shared projects</h3>
+              <p className="text-xs text-[#86868b] mt-1">Use the Join Project button to connect to a shared room.</p>
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-md">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {sharedRooms.map((room) => (
               <Link
                 key={room.id}
                 to={`/room/${room.id}`}
-                className="glass-panel p-lg rounded-xl shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group border border-surface-variant flex flex-col justify-between min-h-[180px] bg-surface-container-lowest block"
+                className="bg-white p-6 rounded-2xl border border-[#e8e8ed] flex flex-col justify-between min-h-[170px] relative overflow-hidden group hover:border-primary/30 hover:shadow-[0_8px_30px_rgba(165,60,0,0.04)] transition-all duration-300 block"
               >
-                <div className="absolute top-0 left-0 w-1 h-full bg-secondary"></div>
-                
                 {/* Card Top */}
                 <div>
-                  <div className="flex justify-between items-start mb-md">
-                    <div className="flex items-center gap-sm min-w-0">
-                      <div className="w-8 h-8 rounded bg-secondary-fixed flex items-center justify-center text-secondary shrink-0">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="w-9 h-9 rounded-xl bg-[#f5f5f7] flex items-center justify-center text-on-surface-variant group-hover:bg-primary-container group-hover:text-on-primary-container transition-colors duration-300 shrink-0">
                         <span className="material-symbols-outlined text-sm">terminal</span>
                       </div>
                       <div className="min-w-0">
-                        <h3 className="font-label-md text-label-md font-bold text-on-surface group-hover:text-primary transition-colors truncate">
+                        <h3 className="text-sm font-semibold text-[#1d1d1f] group-hover:text-primary transition-colors truncate">
                           {room.title}
                         </h3>
-                        <p className="font-code-md text-xs text-on-surface-variant mt-xs">
+                        <p className="text-[11px] font-mono text-[#86868b] mt-0.5 uppercase tracking-wider flex items-center gap-1.5">
+                          <span className={`w-1.5 h-1.5 rounded-full ${getLanguageColor(room.language)} bg-current`}></span>
                           {formatLanguageName(room.language)}
                         </p>
                       </div>
                     </div>
 
-                    <span className="text-[11px] px-sm py-[2px] bg-secondary-container text-on-secondary-container rounded font-semibold shrink-0 uppercase tracking-wider">
+                    <span className="text-[10px] font-semibold px-2.5 py-1 bg-secondary-container text-on-secondary-container rounded-full shrink-0 uppercase tracking-wider">
                       {room.role}
                     </span>
                   </div>
                 </div>
 
                 {/* Card Bottom */}
-                <div className="flex justify-between items-end mt-lg border-t border-surface-variant/30 pt-sm">
-                  <span className="flex items-center gap-xs font-label-md text-[11px] text-secondary px-sm py-[2px] bg-secondary-container rounded-full shrink-0">
+                <div className="flex justify-between items-end mt-4 border-t border-[#f5f5f7] pt-3.5">
+                  <span className="flex items-center gap-1.5 text-[11px] font-semibold text-secondary bg-secondary-container px-2.5 py-0.5 rounded-full shrink-0">
                     <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse"></span>
                     Active
                   </span>
-                  <span className="font-label-md text-xs text-on-surface-variant">
+                  <span className="text-[11px] text-[#86868b]">
                     Updated {getRelativeTimeString(room.updatedAt)}
                   </span>
                 </div>

@@ -149,4 +149,37 @@ export class RoomService {
     if (!status) throw new HttpError(500, 'Status "trash" not found');
     await this.roomRepository.trashAllOwnerRooms(userId, status.id);
   }
+
+  async updateMemberRole(ownerUserId: number, roomId: number, targetUserId: number, role: 'owner' | 'editor' | 'viewer') {
+    await this.requireOwner(ownerUserId, roomId);
+    if (ownerUserId === targetUserId) {
+      throw new HttpError(400, 'Owner cannot change their own role');
+    }
+    const targetMembership = await this.roomRepository.findMembership(roomId, targetUserId);
+    if (!targetMembership) {
+      throw new HttpError(404, 'Member not found in this room');
+    }
+    await this.roomRepository.updateMemberRole(roomId, targetUserId, role);
+  }
+
+  async toggleMemberCanRun(ownerUserId: number, roomId: number, targetUserId: number, canRun: boolean) {
+    await this.requireOwner(ownerUserId, roomId);
+    const targetMembership = await this.roomRepository.findMembership(roomId, targetUserId);
+    if (!targetMembership) {
+      throw new HttpError(404, 'Member not found in this room');
+    }
+    await this.roomRepository.updateMemberCanRun(roomId, targetUserId, canRun);
+  }
+
+  async kickMember(ownerUserId: number, roomId: number, targetUserId: number) {
+    await this.requireOwner(ownerUserId, roomId);
+    if (ownerUserId === targetUserId) {
+      throw new HttpError(400, 'Owner cannot kick themselves from room');
+    }
+    const targetMembership = await this.roomRepository.findMembership(roomId, targetUserId);
+    if (!targetMembership) {
+      throw new HttpError(404, 'Member not found in this room');
+    }
+    await this.roomRepository.removeMember(roomId, targetUserId);
+  }
 }
