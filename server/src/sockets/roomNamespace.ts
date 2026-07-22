@@ -81,8 +81,8 @@ export function registerRoomNamespace(io: SocketServer): void {
       roomNsp.to(roomChannel).emit('activity:update', getActivities(roomId));
       socket.emit('activity:update', getActivities(roomId));
 
-      // Load and emit chat history
-      const history = await chatRepository.getRecentMessages(roomId, 50);
+      // Load and emit all chat history from database
+      const history = await chatRepository.getAllMessages(roomId);
       socket.emit('chat:history', history);
 
       // Handle initial document sync request
@@ -294,6 +294,16 @@ export function registerRoomNamespace(io: SocketServer): void {
         } catch (err) {
           console.error(`Failed to kick member over socket in room ${roomId}:`, err);
           socket.emit('error', err instanceof Error ? err.message : 'Failed to kick member');
+        }
+      });
+
+      // Fetch and emit full database chat history on demand
+      socket.on('chat:get_history', async () => {
+        try {
+          const history = await chatRepository.getAllMessages(roomId);
+          socket.emit('chat:history', history);
+        } catch (err) {
+          console.error(`Failed to fetch chat history in room ${roomId}:`, err);
         }
       });
 

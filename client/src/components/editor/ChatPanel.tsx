@@ -29,19 +29,25 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ socket, onClose }) => {
   useEffect(() => {
     if (!socket) return;
 
+    // Request full chat history from database
+    socket.emit('chat:get_history');
+
     // Listen for past history
-    socket.on('chat:history', (history: ChatMessage[]) => {
+    const onChatHistory = (history: ChatMessage[]) => {
       setMessages(history);
-    });
+    };
 
     // Listen for new messages
-    socket.on('chat:message', (msg: ChatMessage) => {
+    const onChatMessage = (msg: ChatMessage) => {
       setMessages((prev) => [...prev, msg]);
-    });
+    };
+
+    socket.on('chat:history', onChatHistory);
+    socket.on('chat:message', onChatMessage);
 
     return () => {
-      socket.off('chat:history');
-      socket.off('chat:message');
+      socket.off('chat:history', onChatHistory);
+      socket.off('chat:message', onChatMessage);
     };
   }, [socket]);
 
@@ -102,7 +108,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ socket, onClose }) => {
           </div>
         ) : (
           messages.map((msg) => {
-            const isMe = msg.userId === currentUser?.id;
+            const isMe = currentUser?.id !== undefined && String(msg.userId) === String(currentUser.id);
             return (
               <div
                 key={msg.id}
