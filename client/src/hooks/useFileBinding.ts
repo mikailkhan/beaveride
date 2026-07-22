@@ -13,6 +13,38 @@ interface UseFileBindingProps {
   files?: ProjectFile[];
 }
 
+/**
+ * Creates a Proxy over Yjs Awareness that filters out selection/cursor data
+ * for remote clients who are not currently viewing the active file.
+ */
+function createFilteredAwareness(awareness: Awareness, activeFileId: string): Awareness {
+  return new Proxy(awareness, {
+    get(target, prop, receiver) {
+      if (prop === 'getStates') {
+        return () => {
+          const rawStates = target.getStates();
+          const filtered = new Map();
+          rawStates.forEach((state, clientId) => {
+            // If it's a remote client, check if their activeFileId matches our activeFileId
+            if (clientId !== target.clientID) {
+              const remoteFileId = state.activeFileId;
+              if (remoteFileId && remoteFileId !== activeFileId) {
+                // Strip selection so cursor decoration is not rendered on a different file
+                filtered.set(clientId, { ...state, selection: null });
+                return;
+              }
+            }
+            filtered.set(clientId, state);
+          });
+          return filtered;
+        };
+      }
+      const val = Reflect.get(target, prop, receiver);
+      return typeof val === 'function' ? val.bind(target) : val;
+    },
+  });
+}
+
 export function useFileBinding({ doc, awareness, editor, activeFileId, isSynced, files = [] }: UseFileBindingProps) {
   const bindingRef = useRef<MonacoBinding | null>(null);
 
@@ -56,11 +88,12 @@ export function useFileBinding({ doc, awareness, editor, activeFileId, isSynced,
       }
 
       console.log(`Creating MonacoBinding for key "${key}"`);
+      const filteredAwareness = createFilteredAwareness(awareness, activeFileId);
       const binding = new MonacoBinding(
         yText,
         model,
         new Set([editor]),
-        awareness
+        filteredAwareness
       );
       bindingRef.current = binding;
       return true;

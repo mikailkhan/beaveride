@@ -140,12 +140,13 @@ export function useYjsSync({ roomId, token }: UseYjsSyncProps): {
               background-color: ${color} !important;
               opacity: 0.25;
             }
-            /* Cursor line and blinking animation */
+            /* Cursor line and blinking animation with smooth glide */
             .yRemoteSelectionHead-${clientId} {
               position: absolute;
               box-sizing: border-box;
               border-left: 2px solid ${color} !important;
               height: 100%;
+              transition: all 0.08s cubic-bezier(0.16, 1, 0.3, 1);
               animation: yRemoteSelectionHead-blink 1s step-end infinite;
             }
             /* Username label tag showing permanently */
