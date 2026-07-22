@@ -120,8 +120,8 @@ class RoomService {
     await api.patch('/api/rooms/trash-all');
   }
 
-  async runCode(roomId: string, code: string, language?: string): Promise<string> {
-    const response = await api.post<{ output: string }>(`/api/rooms/${roomId}/run`, { code, language });
+  async runCode(roomId: string, code: string, language?: string, entryFileId?: string): Promise<string> {
+    const response = await api.post<{ output: string }>(`/api/rooms/${roomId}/run`, { code, language, entryFileId });
     return response.output;
   }
 }

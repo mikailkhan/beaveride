@@ -67,6 +67,13 @@ export class FileRepository {
       .where(eq(projectFiles.id, id));
   }
 
+  async moveFile(id: number, newParentId: number | null): Promise<void> {
+    await db
+      .update(projectFiles)
+      .set({ parentId: newParentId, updatedAt: new Date() })
+      .where(eq(projectFiles.id, id));
+  }
+
   async deleteFile(id: number): Promise<void> {
     await db.delete(projectFiles).where(eq(projectFiles.id, id));
   }

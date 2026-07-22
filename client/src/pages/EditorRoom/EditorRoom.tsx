@@ -165,12 +165,16 @@ export const EditorRoom = () => {
 
     const currentUserId = authUser?.id;
 
-    const onFiletreeMutate = (data: { type: string; fileId?: string; newName?: string; node?: any }) => {
+    const { addNodeFromSocket, renameNodeFromSocket, moveNodeFromSocket, deleteNodeFromSocket } = useFileStore.getState();
+
+    const onFiletreeMutate = (data: { type: string; fileId?: string; newName?: string; targetParentId?: string | null; node?: any }) => {
       console.log('Received filetree mutation event:', data);
       if (data.type === 'create' && data.node) {
         addNodeFromSocket(data.node);
       } else if (data.type === 'rename' && data.fileId && data.newName) {
         renameNodeFromSocket(data.fileId, data.newName);
+      } else if (data.type === 'move' && data.fileId) {
+        moveNodeFromSocket(data.fileId, data.targetParentId ?? null);
       } else if (data.type === 'delete' && data.fileId) {
         deleteNodeFromSocket(data.fileId);
       }
@@ -243,10 +247,23 @@ export const EditorRoom = () => {
     };
   }, [socket]);
 
+  const isRunnableFile = (file?: FileNode | null): boolean => {
+    if (!file || file.type !== 'file') return false;
+    const ext = file.name.split('.').pop()?.toLowerCase() || '';
+    return ['js', 'mjs', 'cjs', 'jsx', 'ts', 'tsx', 'py', 'go'].includes(ext);
+  };
+
+  const isRunnable = isRunnableFile(activeFile);
+
   const getExecutionLanguage = (filename: string): string => {
     const ext = filename.split('.').pop()?.toLowerCase();
     switch (ext) {
       case 'js':
+      case 'mjs':
+      case 'cjs':
+      case 'jsx':
+      case 'ts':
+      case 'tsx':
         return 'javascript';
       case 'py':
         return 'python';
@@ -258,22 +275,21 @@ export const EditorRoom = () => {
   };
 
   const handleGlobalRun = () => {
-    if (!socket || !activeRoom || globalRunStatus === 'running' || !myCanRun) return;
+    if (!socket || !activeRoom || globalRunStatus === 'running' || !myCanRun || !isRunnable) return;
     setActiveTab('global');
-    const code = editor ? editor.getValue() : (activeFile?.content || '');
     const executionLang = activeFile ? getExecutionLanguage(activeFile.name) : activeRoom.language;
-    socket.emit('run:global', { code, language: executionLang });
+    socket.emit('run:global', { entryFileId: activeFileId || undefined, language: executionLang });
   };
 
   const handleLocalRun = async () => {
-    if (!activeRoom || !roomId || localRunStatus === 'running') return;
+    if (!activeRoom || !roomId || localRunStatus === 'running' || !isRunnable) return;
     setActiveTab('local');
     setLocalRunStatus('running');
     setLocalOutput('\r\n\x1b[33m[Local Run started...]\x1b[0m\r\n');
     try {
       const code = editor ? editor.getValue() : (activeFile?.content || '');
       const executionLang = activeFile ? getExecutionLanguage(activeFile.name) : activeRoom.language;
-      const result = await roomService.runCode(roomId, code, executionLang);
+      const result = await roomService.runCode(roomId, code, executionLang, activeFileId || undefined);
       setLocalOutput(result);
       setLocalRunStatus('success');
     } catch (err) {
@@ -606,21 +622,47 @@ export const EditorRoom = () => {
             >
               <span className="material-symbols-outlined text-[18px]">chat</span> Chat
             </button>
-            <button 
-              onClick={handleGlobalRun} 
-              disabled={globalRunStatus === 'running' || !activeRoom.canRun || !myCanRun}
-              className="px-md py-sm rounded-lg bg-primary-container text-white font-label-md text-label-md hover:bg-primary transition-colors flex items-center gap-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] cursor-pointer disabled:opacity-60"
-              title={!myCanRun ? "Global Run disabled by owner" : "Execute code globally"}
-            >
-              <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>play_arrow</span> Global Run
-            </button>
-            <button 
-              onClick={handleLocalRun} 
-              disabled={localRunStatus === 'running' || !activeRoom.canRun}
-              className="px-md py-sm rounded-lg bg-secondary-container text-on-secondary-container font-label-md text-label-md hover:bg-secondary hover:text-on-secondary transition-colors flex items-center gap-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] cursor-pointer disabled:opacity-60"
-            >
-              <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>play_circle</span> Local Run
-            </button>
+            {/* Global Run Button */}
+            <div className="relative group inline-flex items-center">
+              <button 
+                onClick={handleGlobalRun} 
+                disabled={globalRunStatus === 'running' || !activeRoom.canRun || !myCanRun || !isRunnable}
+                className="px-md py-sm rounded-lg bg-primary-container text-white font-label-md text-label-md hover:bg-primary transition-colors flex items-center gap-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none"
+                title={!myCanRun ? "Global Run disabled by owner" : !isRunnable ? "Execution is only supported for JS, Python, and Go files" : "Execute code globally"}
+              >
+                <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>play_arrow</span> Global Run
+              </button>
+              {(!isRunnable || !myCanRun) && (
+                <div className="absolute top-full mt-2 right-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap bg-surface-container-highest/95 backdrop-blur-md text-on-surface text-[11px] font-medium px-sm py-xs rounded-md shadow-lg border border-outline-variant/30 flex items-center gap-xs">
+                  <span className="material-symbols-outlined text-[14px] text-amber-500">info</span>
+                  {!myCanRun
+                    ? "Global Run disabled by owner"
+                    : !activeFile
+                    ? "No file selected"
+                    : `Execution unsupported for .${activeFile.name.split('.').pop() || 'file'} files`}
+                </div>
+              )}
+            </div>
+
+            {/* Local Run Button */}
+            <div className="relative group inline-flex items-center">
+              <button 
+                onClick={handleLocalRun} 
+                disabled={localRunStatus === 'running' || !activeRoom.canRun || !isRunnable}
+                className="px-md py-sm rounded-lg bg-secondary-container text-on-secondary-container font-label-md text-label-md hover:bg-secondary hover:text-on-secondary transition-colors flex items-center gap-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none"
+                title={!isRunnable ? "Execution is only supported for JS, Python, and Go files" : "Execute code locally"}
+              >
+                <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>play_circle</span> Local Run
+              </button>
+              {!isRunnable && (
+                <div className="absolute top-full mt-2 right-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap bg-surface-container-highest/95 backdrop-blur-md text-on-surface text-[11px] font-medium px-sm py-xs rounded-md shadow-lg border border-outline-variant/30 flex items-center gap-xs">
+                  <span className="material-symbols-outlined text-[14px] text-amber-500">info</span>
+                  {!activeFile
+                    ? "No file selected"
+                    : `Execution unsupported for .${activeFile.name.split('.').pop() || 'file'} files`}
+                </div>
+              )}
+            </div>
           </div>
         </header>
 

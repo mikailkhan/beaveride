@@ -69,6 +69,12 @@ export class FileService {
     await api.patch(`/api/rooms/${roomId}/files/${fileId}/rename`, { name });
   }
 
+  async moveNode(roomId: string, fileId: string, targetParentId: string | null): Promise<void> {
+    await api.patch(`/api/rooms/${roomId}/files/${fileId}/move`, {
+      targetParentId: targetParentId ? Number(targetParentId) : null,
+    });
+  }
+
   async deleteNode(roomId: string, fileId: string): Promise<void> {
     await api.delete(`/api/rooms/${roomId}/files/${fileId}`);
   }

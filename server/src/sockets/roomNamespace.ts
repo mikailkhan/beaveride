@@ -181,6 +181,28 @@ export function registerRoomNamespace(io: SocketServer): void {
         }
       });
 
+      // Handle file tree move event
+      socket.on('filetree:move', async (data: {
+        fileId: string;
+        targetParentId: string | null;
+      }) => {
+        try {
+          const fileIdNum = parseInt(data.fileId, 10);
+          const targetParentIdNum = data.targetParentId !== null ? parseInt(data.targetParentId, 10) : null;
+          if (isNaN(fileIdNum)) throw new Error('Invalid fileId');
+          await fileService.moveFile(userId, roomId, fileIdNum, targetParentIdNum);
+
+          // Broadcast moved event to all peers
+          roomNsp.to(roomChannel).emit('filetree:moved', {
+            fileId: data.fileId,
+            targetParentId: data.targetParentId,
+          });
+        } catch (err) {
+          console.error(`Failed to move file node over socket in room ${roomId}:`, err);
+          socket.emit('error', err instanceof Error ? err.message : 'Failed to move file');
+        }
+      });
+
       // Handle file tree delete event
       socket.on('filetree:delete', async (data: {
         fileId: string;
@@ -321,7 +343,7 @@ export function registerRoomNamespace(io: SocketServer): void {
       });
 
       // Handle global code run requests with mutex locking
-      socket.on('run:global', async (data: { code: string; language: string }) => {
+      socket.on('run:global', async (data: { entryFileId?: string; language: string; code?: string }) => {
         if (globalRunLock.get(roomId)) {
           socket.emit('run:global:locked', { message: 'A global execution is already in progress.' });
           return;
@@ -333,7 +355,54 @@ export function registerRoomNamespace(io: SocketServer): void {
         roomNsp.to(roomChannel).emit('run:global:start', { initiatedBy: username });
 
         try {
-          const resultOutput = await executorService.executeCode(data.language, data.code);
+          const allFiles = await fileService.getFileTree(userId, roomId);
+          const yDoc = await getOrCreateDoc(roomId);
+          const yFilesMap = yDoc.getMap('files');
+
+          const nodeMap = new Map(allFiles.map(f => [String(f.id), f]));
+
+          const getFullPath = (nodeId: string): string => {
+            const node = nodeMap.get(nodeId);
+            if (!node) return '';
+            if (node.parentId === null) return node.name;
+            const parentPath = getFullPath(String(node.parentId));
+            return parentPath ? `${parentPath}/${node.name}` : node.name;
+          };
+
+          const projectPayload: { path: string; content: string }[] = [];
+          let entryFilePath = '';
+
+          for (const file of allFiles) {
+            if (file.type === 'file') {
+              const fullPath = getFullPath(String(file.id));
+              let fileContent = file.content || '';
+
+              const yTextKey = `file:${file.id}`;
+              const yText = yFilesMap.get(yTextKey) as Y.Text | undefined;
+              if (yText) {
+                fileContent = yText.toString();
+              }
+
+              projectPayload.push({ path: fullPath, content: fileContent });
+
+              if (data.entryFileId && String(file.id) === String(data.entryFileId)) {
+                entryFilePath = fullPath;
+              }
+            }
+          }
+
+          if (!entryFilePath) {
+            const defaultEntry = projectPayload.find(f =>
+              f.path === 'index.js' || f.path === 'main.py' || f.path === 'main.go' || f.path.startsWith('src/index.')
+            );
+            entryFilePath = defaultEntry ? defaultEntry.path : (projectPayload[0]?.path || 'code.js');
+          }
+
+          const resultOutput = await executorService.executeProject(
+            data.language,
+            projectPayload,
+            entryFilePath
+          );
           roomNsp.to(roomChannel).emit('run:global:output', { chunk: resultOutput });
           roomNsp.to(roomChannel).emit('run:global:end', { success: true });
         } catch (err) {
