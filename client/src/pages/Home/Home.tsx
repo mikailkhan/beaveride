@@ -39,27 +39,6 @@ const steps = [
     image: step4,
     themeColor: "primary",
   },
-  {
-    number: "05",
-    title: "Run in the Cloud",
-    description: "Execute your code instantly without configuring local environments. Click Run, and BeaverIDE handles the heavy lifting so you can stay focused on solving problems.",
-    image: step5,
-    themeColor: "secondary",
-  },
-  {
-    number: "06",
-    title: "Watch Live Output",
-    description: "See your application's results appear instantly in the shared terminal. Everyone stays on the same page with synchronized logs, output, and debugging information.",
-    image: step6,
-    themeColor: "tertiary",
-  },
-  {
-    number: "07",
-    title: "Ship Faster Together",
-    description: "From the first idea to the final build, BeaverIDE keeps your team moving as one. Spend less time managing tools and more time creating software that matters.",
-    image: step7,
-    themeColor: "primary",
-  },
 ];
 
 export const Home = () => {
