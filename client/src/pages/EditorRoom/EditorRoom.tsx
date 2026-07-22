@@ -65,6 +65,10 @@ export const EditorRoom = () => {
   // Auth state
   const authUser = useAuthStore((state) => state.user);
 
+  // Panel visibility states for Users Online and Activity Feed
+  const [showUsersPanel, setShowUsersPanel] = useState(false);
+  const [showActivityPanel, setShowActivityPanel] = useState(false);
+
   // Search Modal state
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
@@ -480,6 +484,42 @@ export const EditorRoom = () => {
             <span className="material-symbols-outlined text-[20px]">search</span>
             {isSidebarExpanded && <span className="font-label-md text-label-md">Search</span>}
           </button>
+
+          {/* Button 1: Users Online Panel Toggle */}
+          <button 
+            onClick={() => {
+              setShowUsersPanel((prev) => {
+                const next = !prev;
+                if (next && !isPresenceExpanded) setIsPresenceExpanded(true);
+                return next;
+              });
+            }}
+            className={`flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface-variant hover:bg-primary-container/10 hover:text-primary transition-all w-full text-left cursor-pointer ${isSidebarExpanded ? '' : 'justify-center'}`} 
+            title={showUsersPanel ? "Hide Users Online" : "Show Users Online"}
+          >
+            <span className={`material-symbols-outlined text-[20px] transition-colors ${showUsersPanel ? 'text-primary' : 'text-on-surface-variant'}`}>
+              group
+            </span>
+            {isSidebarExpanded && <span className="font-label-md text-label-md">Users</span>}
+          </button>
+
+          {/* Button 2: Activity Feed Panel Toggle */}
+          <button 
+            onClick={() => {
+              setShowActivityPanel((prev) => {
+                const next = !prev;
+                if (next && !isActivityExpanded) setIsActivityExpanded(true);
+                return next;
+              });
+            }}
+            className={`flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface-variant hover:bg-primary-container/10 hover:text-primary transition-all w-full text-left cursor-pointer ${isSidebarExpanded ? '' : 'justify-center'}`} 
+            title={showActivityPanel ? "Hide Activity Feed" : "Show Activity Feed"}
+          >
+            <span className={`material-symbols-outlined text-[20px] transition-colors ${showActivityPanel ? 'text-primary' : 'text-on-surface-variant'}`}>
+              history
+            </span>
+            {isSidebarExpanded && <span className="font-label-md text-label-md">Activity</span>}
+          </button>
         </nav>
 
         {/* Footer Navigation */}
@@ -623,7 +663,9 @@ export const EditorRoom = () => {
 
               {/* Presence Panel (Right side floating) */}
               <div className="absolute top-md right-md flex flex-col gap-sm z-30 w-72 select-none pointer-events-auto">
-                <div className="glass-panel rounded-xl p-sm bg-white/80 backdrop-blur-md border border-outline-variant/30 shadow-md">
+                {/* Users Online Panel */}
+                {showUsersPanel && (
+                  <div className="glass-panel rounded-xl p-sm bg-white/80 backdrop-blur-md border border-outline-variant/30 shadow-md transition-all duration-300 ease-in-out transform animate-fade-in">
                   <div 
                     onClick={() => setIsPresenceExpanded(!isPresenceExpanded)}
                     className="flex items-center justify-between cursor-pointer font-label-md text-label-md font-bold text-on-surface px-xs py-xs select-none hover:bg-surface-container-low rounded-lg transition-colors"
@@ -745,43 +787,46 @@ export const EditorRoom = () => {
                     </div>
                   )}
                 </div>
+                )}
 
                 {/* Activity Feed Panel */}
-                <div className="glass-panel rounded-xl p-sm bg-white/80 backdrop-blur-md border border-outline-variant/30 shadow-md">
-                  <div 
-                    onClick={() => setIsActivityExpanded(!isActivityExpanded)}
-                    className="flex items-center justify-between cursor-pointer font-label-md text-label-md font-bold text-on-surface px-xs py-xs select-none hover:bg-surface-container-low rounded-lg transition-colors"
-                  >
-                    <span>Activity Feed</span>
-                    <span 
-                      className="material-symbols-outlined text-[18px] transition-transform duration-200" 
-                      style={{ transform: isActivityExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                {showActivityPanel && (
+                  <div className="glass-panel rounded-xl p-sm bg-white/80 backdrop-blur-md border border-outline-variant/30 shadow-md transition-all duration-300 ease-in-out transform animate-fade-in">
+                    <div 
+                      onClick={() => setIsActivityExpanded(!isActivityExpanded)}
+                      className="flex items-center justify-between cursor-pointer font-label-md text-label-md font-bold text-on-surface px-xs py-xs select-none hover:bg-surface-container-low rounded-lg transition-colors"
                     >
-                      keyboard_arrow_down
-                    </span>
-                  </div>
-                  {isActivityExpanded && (
-                    <div className="flex flex-col gap-1 mt-xs max-h-48 overflow-y-auto">
-                      {activities.slice(0, 20).map((entry, index) => {
-                        const details = formatActivity(entry);
-                        return (
-                          <div key={index} className="flex items-center gap-xs p-xs rounded-lg text-[11px] text-on-surface-variant">
-                            <span className={`material-symbols-outlined text-[14px] ${details.colorClass}`}>
-                              {details.icon}
-                            </span>
-                            <span className="flex-1 truncate" title={details.label}>{details.label}</span>
-                            <span className="text-[10px] text-outline shrink-0">
-                              {new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                          </div>
-                        );
-                      })}
-                      {activities.length === 0 && (
-                        <div className="text-[11px] text-outline px-xs py-xs">No activity yet.</div>
-                      )}
+                      <span>Activity Feed</span>
+                      <span 
+                        className="material-symbols-outlined text-[18px] transition-transform duration-200" 
+                        style={{ transform: isActivityExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                      >
+                        keyboard_arrow_down
+                      </span>
                     </div>
-                  )}
-                </div>
+                    {isActivityExpanded && (
+                      <div className="flex flex-col gap-1 mt-xs max-h-48 overflow-y-auto">
+                        {activities.slice(0, 20).map((entry, index) => {
+                          const details = formatActivity(entry);
+                          return (
+                            <div key={index} className="flex items-center gap-xs p-xs rounded-lg text-[11px] text-on-surface-variant">
+                              <span className={`material-symbols-outlined text-[14px] ${details.colorClass}`}>
+                                {details.icon}
+                              </span>
+                              <span className="flex-1 truncate" title={details.label}>{details.label}</span>
+                              <span className="text-[10px] text-outline shrink-0">
+                                {new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                          );
+                        })}
+                        {activities.length === 0 && (
+                          <div className="text-[11px] text-outline px-xs py-xs">No activity yet.</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
