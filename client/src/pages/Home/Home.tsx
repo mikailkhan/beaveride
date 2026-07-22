@@ -32,13 +32,6 @@ const steps = [
     image: step3,
     themeColor: "tertiary",
   },
-  {
-    number: "04",
-    title: "Code Together Live",
-    description: "See every edit appear instantly as your teammates type. Collaborate naturally, brainstorm ideas, and solve problems together without refreshing or merging changes.",
-    image: step4,
-    themeColor: "primary",
-  },
 ];
 
 export const Home = () => {
