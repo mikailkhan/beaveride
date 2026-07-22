@@ -1,11 +1,18 @@
 import Docker from 'dockerode';
+import tar from 'tar-stream';
 
 const docker = new Docker();
+
+export interface ProjectFilePayload {
+  path: string;
+  content: string;
+}
 
 interface LanguageConfig {
   image: string;
   filename: string;
   runCmd: string;
+  runProjectCmd: (entryFilePath: string) => string;
   env?: string[];
   memoryLimit?: number;
 }
@@ -15,22 +22,40 @@ const CONFIGS: Record<string, LanguageConfig> = {
     image: 'node:18-alpine',
     filename: 'code.js',
     runCmd: 'node /tmp/code.js',
+    runProjectCmd: (entryFilePath: string) => `node "${entryFilePath}"`,
     memoryLimit: 128 * 1024 * 1024, // 128MB
   },
   python: {
     image: 'python:3.10-alpine',
     filename: 'code.py',
     runCmd: 'python /tmp/code.py',
+    runProjectCmd: (entryFilePath: string) => `python "${entryFilePath}"`,
     memoryLimit: 128 * 1024 * 1024, // 128MB
   },
   go: {
     image: 'golang:1.20-alpine',
     filename: 'code.go',
     runCmd: 'go run /tmp/code.go',
+    runProjectCmd: (entryFilePath: string) => `go run "${entryFilePath}"`,
     env: ['GOCACHE=/tmp/go-cache', 'GOPATH=/tmp/go'],
-    memoryLimit: 256 * 1024 * 1024, // 256MB (Go compiler is heavier)
+    memoryLimit: 256 * 1024 * 1024, // 256MB
   },
 };
+
+async function createTarBuffer(files: ProjectFilePayload[]): Promise<Buffer> {
+  const pack = tar.pack();
+  for (const file of files) {
+    pack.entry({ name: `workspace/${file.path}` }, file.content);
+  }
+  pack.finalize();
+
+  const chunks: Buffer[] = [];
+  return new Promise((resolve, reject) => {
+    pack.on('data', (chunk: Buffer) => chunks.push(Buffer.from(chunk)));
+    pack.on('end', () => resolve(Buffer.concat(chunks)));
+    pack.on('error', reject);
+  });
+}
 
 export class ExecutorService {
   private async ensureImage(image: string): Promise<void> {
@@ -56,7 +81,19 @@ export class ExecutorService {
       return `Unsupported execution language: ${language}`;
     }
 
-    const codeToRun = code;
+    return this.executeProject(language, [{ path: config.filename, content: code }], config.filename);
+  }
+
+  async executeProject(
+    language: string,
+    files: ProjectFilePayload[],
+    entryFilePath: string
+  ): Promise<string> {
+    const lang = language.toLowerCase();
+    const config = CONFIGS[lang];
+    if (!config) {
+      return `Unsupported execution language: ${language}`;
+    }
 
     try {
       await this.ensureImage(config.image);
@@ -64,27 +101,33 @@ export class ExecutorService {
       return `Docker Image Pull Error: ${(err as Error).message}`;
     }
 
-    // Convert code to a base64 string to securely inject during execution
-    const base64Code = Buffer.from(codeToRun).toString('base64');
-    const decodeAndRunCmd = `echo "${base64Code}" | base64 -d > /tmp/${config.filename} && ${config.runCmd}`;
+    let tarBuffer: Buffer;
+    try {
+      tarBuffer = await createTarBuffer(files);
+    } catch (err) {
+      return `Tar Compression Error: ${(err as Error).message}`;
+    }
+
+    const base64Tar = tarBuffer.toString('base64');
+    const unpackAndRunCmd = `echo "${base64Tar}" | base64 -d | tar -xf - -C /tmp && cd /tmp/workspace && ${config.runProjectCmd(entryFilePath)}`;
 
     let container: Docker.Container;
     try {
       container = (await docker.createContainer({
         Image: config.image,
-        Cmd: ['sh', '-c', decodeAndRunCmd],
+        Cmd: ['sh', '-c', unpackAndRunCmd],
         Env: config.env || [],
         AttachStdout: true,
         AttachStderr: true,
         HostConfig: {
           NetworkMode: 'none',
-          Memory: config.memoryLimit || (128 * 1024 * 1024), // Dynamic or default 128MB limit
-          NanoCpus: 1000000000,     // 1.0 CPU limit (prevents slow virtualized compiles)
+          Memory: config.memoryLimit || 128 * 1024 * 1024,
+          NanoCpus: 1000000000,
           ReadonlyRootfs: true,
           Tmpfs: {
-            '/tmp': 'rw,exec,nosuid,size=65536k' // Writable execution directory
-          }
-        }
+            '/tmp': 'rw,exec,nosuid,size=65536k',
+          },
+        },
       })) as Docker.Container;
     } catch (err) {
       return `Container Creation Error: ${(err as Error).message}`;
@@ -109,19 +152,23 @@ export class ExecutorService {
         const stream = await container.attach({
           stream: true,
           stdout: true,
-          stderr: true
+          stderr: true,
         });
 
         // Demux standard output and error streams
-        container.modem.demuxStream(stream, {
-          write: (chunk: Buffer) => {
-            output += chunk.toString('utf8');
+        container.modem.demuxStream(
+          stream,
+          {
+            write: (chunk: Buffer) => {
+              output += chunk.toString('utf8');
+            },
+          },
+          {
+            write: (chunk: Buffer) => {
+              output += chunk.toString('utf8');
+            },
           }
-        }, {
-          write: (chunk: Buffer) => {
-            output += chunk.toString('utf8');
-          }
-        });
+        );
 
         await container.start();
 

@@ -1,7 +1,10 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
+import * as Y from 'yjs';
 import { RoomService } from '../services/roomService.js';
 import { ExecutorService } from '../services/executorService.js';
+import { FileService } from '../services/fileService.js';
+import { getOrCreateDoc } from '../sockets/docStore.js';
 import { HttpError } from '../middleware/errorMiddleware.js';
 
 const createRoomSchema = z.object({
@@ -19,7 +22,8 @@ const roomParamsSchema = z.object({
 export class RoomController {
   constructor(
     private readonly roomService = new RoomService(),
-    private readonly executorService = new ExecutorService()
+    private readonly executorService = new ExecutorService(),
+    private readonly fileService = new FileService()
   ) {}
 
   createRoom = async (req: Request, res: Response): Promise<void> => {
@@ -98,9 +102,10 @@ export class RoomController {
   runCode = async (req: Request, res: Response): Promise<void> => {
     if (!req.user) throw new HttpError(401, 'Unauthorized');
     const { id: roomId } = roomParamsSchema.parse(req.params);
-    const { code, language } = z.object({
-      code: z.string(),
-      language: z.string().optional()
+    const { code, language, entryFileId } = z.object({
+      code: z.string().optional(),
+      language: z.string().optional(),
+      entryFileId: z.string().optional(),
     }).parse(req.body);
     const roomDetails = await this.roomService.getRoomDetails(req.user.sub, roomId);
     if (!roomDetails.canRun) {
@@ -110,7 +115,57 @@ export class RoomController {
       ? language.toLowerCase()
       : roomDetails.language;
 
-    const output = await this.executorService.executeCode(executionLang, code);
+    const allFiles = await this.fileService.getFileTree(req.user.sub, roomId);
+    const yDoc = await getOrCreateDoc(roomId);
+    const yFilesMap = yDoc.getMap('files');
+
+    const nodeMap = new Map(allFiles.map(f => [String(f.id), f]));
+
+    const getFullPath = (nodeId: string): string => {
+      const node = nodeMap.get(nodeId);
+      if (!node) return '';
+      if (node.parentId === null) return node.name;
+      const parentPath = getFullPath(String(node.parentId));
+      return parentPath ? `${parentPath}/${node.name}` : node.name;
+    };
+
+    const projectPayload: { path: string; content: string }[] = [];
+    let entryFilePath = '';
+
+    for (const file of allFiles) {
+      if (file.type === 'file') {
+        const fullPath = getFullPath(String(file.id));
+        let fileContent = file.content || '';
+
+        const yTextKey = `file:${file.id}`;
+        const yText = yFilesMap.get(yTextKey) as Y.Text | undefined;
+        if (yText) {
+          fileContent = yText.toString();
+        }
+
+        projectPayload.push({ path: fullPath, content: fileContent });
+
+        if (entryFileId && String(file.id) === String(entryFileId)) {
+          entryFilePath = fullPath;
+        }
+      }
+    }
+
+    if (!entryFilePath) {
+      const defaultEntry = projectPayload.find(f =>
+        f.path === 'index.js' || f.path === 'main.py' || f.path === 'main.go' || f.path.startsWith('src/index.')
+      );
+      entryFilePath = defaultEntry ? defaultEntry.path : (projectPayload[0]?.path || 'code.js');
+    }
+
+    // If project payload is completely empty (e.g. no files in tree yet), fallback to single code string
+    if (projectPayload.length === 0 && code) {
+      const output = await this.executorService.executeCode(executionLang, code);
+      res.status(200).json({ output });
+      return;
+    }
+
+    const output = await this.executorService.executeProject(executionLang, projectPayload, entryFilePath);
     res.status(200).json({ output });
   };
 }

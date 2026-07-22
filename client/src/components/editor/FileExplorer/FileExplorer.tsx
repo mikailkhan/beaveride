@@ -40,14 +40,6 @@ const InlineInput: React.FC<{
       setValidationError("Name cannot be empty or contain slashes");
       return;
     }
-    if (type === 'file') {
-      const hasValidExt = /\.(js|py|go)$/.test(clean);
-      if (!hasValidExt) {
-        setIsInvalid(true);
-        setValidationError("File type is required (must end with .js, .py, or .go)");
-        return;
-      }
-    }
     submittedRef.current = true;
     setValidationError(null);
     onSave(clean);

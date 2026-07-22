@@ -243,10 +243,23 @@ export const EditorRoom = () => {
     };
   }, [socket]);
 
+  const isRunnableFile = (file?: FileNode | null): boolean => {
+    if (!file || file.type !== 'file') return false;
+    const ext = file.name.split('.').pop()?.toLowerCase() || '';
+    return ['js', 'mjs', 'cjs', 'jsx', 'ts', 'tsx', 'py', 'go'].includes(ext);
+  };
+
+  const isRunnable = isRunnableFile(activeFile);
+
   const getExecutionLanguage = (filename: string): string => {
     const ext = filename.split('.').pop()?.toLowerCase();
     switch (ext) {
       case 'js':
+      case 'mjs':
+      case 'cjs':
+      case 'jsx':
+      case 'ts':
+      case 'tsx':
         return 'javascript';
       case 'py':
         return 'python';
@@ -258,22 +271,21 @@ export const EditorRoom = () => {
   };
 
   const handleGlobalRun = () => {
-    if (!socket || !activeRoom || globalRunStatus === 'running' || !myCanRun) return;
+    if (!socket || !activeRoom || globalRunStatus === 'running' || !myCanRun || !isRunnable) return;
     setActiveTab('global');
-    const code = editor ? editor.getValue() : (activeFile?.content || '');
     const executionLang = activeFile ? getExecutionLanguage(activeFile.name) : activeRoom.language;
-    socket.emit('run:global', { code, language: executionLang });
+    socket.emit('run:global', { entryFileId: activeFileId || undefined, language: executionLang });
   };
 
   const handleLocalRun = async () => {
-    if (!activeRoom || !roomId || localRunStatus === 'running') return;
+    if (!activeRoom || !roomId || localRunStatus === 'running' || !isRunnable) return;
     setActiveTab('local');
     setLocalRunStatus('running');
     setLocalOutput('\r\n\x1b[33m[Local Run started...]\x1b[0m\r\n');
     try {
       const code = editor ? editor.getValue() : (activeFile?.content || '');
       const executionLang = activeFile ? getExecutionLanguage(activeFile.name) : activeRoom.language;
-      const result = await roomService.runCode(roomId, code, executionLang);
+      const result = await roomService.runCode(roomId, code, executionLang, activeFileId || undefined);
       setLocalOutput(result);
       setLocalRunStatus('success');
     } catch (err) {
@@ -623,16 +635,17 @@ export const EditorRoom = () => {
             </button>
             <button 
               onClick={handleGlobalRun} 
-              disabled={globalRunStatus === 'running' || !activeRoom.canRun || !myCanRun}
-              className="px-md py-sm rounded-lg bg-primary-container text-white font-label-md text-label-md hover:bg-primary transition-colors flex items-center gap-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] cursor-pointer disabled:opacity-60"
-              title={!myCanRun ? "Global Run disabled by owner" : "Execute code globally"}
+              disabled={globalRunStatus === 'running' || !activeRoom.canRun || !myCanRun || !isRunnable}
+              className="px-md py-sm rounded-lg bg-primary-container text-white font-label-md text-label-md hover:bg-primary transition-colors flex items-center gap-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              title={!myCanRun ? "Global Run disabled by owner" : !isRunnable ? "Execution is only supported for JS, Python, and Go files" : "Execute code globally"}
             >
               <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>play_arrow</span> Global Run
             </button>
             <button 
               onClick={handleLocalRun} 
-              disabled={localRunStatus === 'running' || !activeRoom.canRun}
-              className="px-md py-sm rounded-lg bg-secondary-container text-on-secondary-container font-label-md text-label-md hover:bg-secondary hover:text-on-secondary transition-colors flex items-center gap-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] cursor-pointer disabled:opacity-60"
+              disabled={localRunStatus === 'running' || !activeRoom.canRun || !isRunnable}
+              className="px-md py-sm rounded-lg bg-secondary-container text-on-secondary-container font-label-md text-label-md hover:bg-secondary hover:text-on-secondary transition-colors flex items-center gap-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              title={!isRunnable ? "Execution is only supported for JS, Python, and Go files" : "Execute code locally"}
             >
               <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>play_circle</span> Local Run
             </button>
