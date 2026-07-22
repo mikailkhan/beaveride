@@ -101,7 +101,7 @@ export const EditorRoom = () => {
   const { collaborators, socket, doc, awareness, isSynced } = useYjsSync({ roomId: roomId || '', token: token || '' });
 
   // Dynamically bind Monaco editor to active file's Y.Text inside Yjs doc
-  useFileBinding({ doc, awareness, editor, activeFileId, isSynced });
+  useFileBinding({ doc, awareness, editor, activeFileId, isSynced, files });
 
   // Handle local activeFileId updates in Yjs awareness
   useEffect(() => {
@@ -374,11 +374,6 @@ export const EditorRoom = () => {
             <span className="material-symbols-outlined text-[20px]">folder_open</span>
             {isSidebarExpanded && <span className="font-label-md text-label-md">Dashboard</span>}
           </Link>
-          <a className={`flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface-variant hover:bg-primary-container/10 hover:text-primary transition-all relative ${isSidebarExpanded ? '' : 'justify-center'}`} href="#notifications" title="Notifications">
-            <span className="material-symbols-outlined text-[20px]">notifications</span>
-            {isSidebarExpanded && <span className="font-label-md text-label-md">Notifications</span>}
-            <span className={`absolute bg-primary rounded-full border border-surface-container-low ${isSidebarExpanded ? 'top-2 left-6 w-2 h-2' : 'top-1 right-2 w-1.5 h-1.5'}`}></span>
-          </a>
         </div>
 
         {/* Resize Handle */}
