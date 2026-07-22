@@ -11,23 +11,21 @@ interface FileExplorerProps {
 const InlineInput: React.FC<{
   type: 'file' | 'directory';
   onSave: (val: string) => void;
+  onSavePath?: (path: string) => void;
   onCancel: () => void;
-}> = ({ type, onSave, onCancel }) => {
+}> = ({ type, onSave, onSavePath, onCancel }) => {
   const [value, setValue] = useState('');
   const [isInvalid, setIsInvalid] = useState(false);
   const inputRef = React.useRef<HTMLInputElement>(null);
   const setValidationError = useFileStore((state) => state.setValidationError);
-  // Guard against double-submission (Enter fires keydown, which can also trigger blur)
   const submittedRef = React.useRef(false);
 
   useEffect(() => {
     if (inputRef.current) {
       inputRef.current.focus();
     }
-    // Clear validation error when component mounts
     setValidationError(null);
     return () => {
-      // Clear validation error when component unmounts
       setValidationError(null);
     };
   }, [setValidationError]);
@@ -35,14 +33,20 @@ const InlineInput: React.FC<{
   const handleSubmit = () => {
     if (submittedRef.current) return;
     const clean = value.trim();
-    if (!clean || /[\/]/.test(clean)) {
+    if (!clean) {
       setIsInvalid(true);
-      setValidationError("Name cannot be empty or contain slashes");
+      setValidationError("Name cannot be empty");
       return;
     }
+
     submittedRef.current = true;
     setValidationError(null);
-    onSave(clean);
+
+    if (onSavePath && clean.includes('/')) {
+      onSavePath(clean);
+    } else {
+      onSave(clean);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -50,7 +54,7 @@ const InlineInput: React.FC<{
       e.preventDefault();
       handleSubmit();
     } else if (e.key === 'Escape') {
-      submittedRef.current = true; // prevent blur from re-triggering
+      submittedRef.current = true;
       setValidationError(null);
       onCancel();
     }
@@ -72,7 +76,7 @@ const InlineInput: React.FC<{
       <style>{shakeStyle}</style>
       <div className="flex items-center gap-xs py-[2px] px-sm w-full pl-3">
         <span className="material-symbols-outlined text-[18px] opacity-80 shrink-0">
-          {type === 'directory' ? 'folder' : 'description'}
+          {type === 'directory' || value.endsWith('/') ? 'folder' : 'description'}
         </span>
         <input
           ref={inputRef}
@@ -97,9 +101,10 @@ const InlineInput: React.FC<{
 };
 
 export const FileExplorer: React.FC<FileExplorerProps> = ({ roomId }) => {
-  const { files, fetchFileTree, createNode, openFile } = useFileStore();
+  const { files, fetchFileTree, createNode, createPathNodes, moveNode, openFile } = useFileStore();
   const [creatingNode, setCreatingNode] = useState<{ parentId: string | null; type: 'file' | 'directory' } | null>(null);
   const [renamingNodeId, setRenamingNodeId] = useState<string | null>(null);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
@@ -108,9 +113,30 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ roomId }) => {
     }
   }, [roomId, fetchFileTree]);
 
-  // Build the parent -> children map
+  // Global keydown listener for "n" / "N" shortcut to create a new file
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      const activeElement = document.activeElement;
+      const isInput =
+        activeElement &&
+        (activeElement.tagName === 'INPUT' ||
+          activeElement.tagName === 'TEXTAREA' ||
+          activeElement.classList.contains('monaco-mouse-cursor-text') ||
+          activeElement.closest('.monaco-editor'));
+
+      if (!isInput && (e.key === 'n' || e.key === 'N')) {
+        e.preventDefault();
+        setCreatingNode({ parentId: selectedNodeId || null, type: 'file' });
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [selectedNodeId]);
+
+  // Build parent -> children map
   const childrenMap = new Map<string | null, ProjectFile[]>();
-  
+
   files.forEach((f) => {
     const parentId = f.parentId;
     if (!childrenMap.has(parentId)) {
@@ -143,6 +169,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ roomId }) => {
       const created = await createNode(roomId, {
         name,
         type,
+        parentId: creatingNode.parentId || undefined,
         content: '',
       });
       if (type === 'file') {
@@ -155,9 +182,37 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ roomId }) => {
     }
   };
 
+  const handleCreateRootPath = async (rawPath: string) => {
+    try {
+      await createPathNodes(roomId, rawPath, creatingNode?.parentId || null);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setCreatingNode(null);
+    }
+  };
+
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     setContextMenu({ x: e.clientX, y: e.clientY });
+  };
+
+  // Root drop zone handlers for moving nested items back to root level
+  const handleRootDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleRootDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    const sourceId = e.dataTransfer.getData('text/beaveride-node');
+    if (sourceId) {
+      try {
+        await moveNode(roomId, sourceId, null);
+      } catch (err) {
+        console.error('Failed to move file to root:', err);
+      }
+    }
   };
 
   const emptyAreaMenuItems = [
@@ -176,6 +231,8 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ roomId }) => {
   return (
     <div
       onContextMenu={handleContextMenu}
+      onDragOver={handleRootDragOver}
+      onDrop={handleRootDrop}
       className="w-full flex flex-col h-full overflow-hidden select-none"
     >
       {/* Explorer Toolbar Header */}
@@ -183,14 +240,14 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ roomId }) => {
         <span className="text-[11px] font-bold tracking-wider text-on-surface-variant/60 uppercase">Files</span>
         <div className="flex items-center gap-xs">
           <button
-            onClick={() => setCreatingNode({ parentId: null, type: 'file' })}
+            onClick={() => setCreatingNode({ parentId: selectedNodeId || null, type: 'file' })}
             className="p-[3px] rounded hover:bg-surface-container-high text-on-surface-variant/80 hover:text-on-surface transition-colors cursor-pointer"
-            title="New File..."
+            title="New File (N)"
           >
             <span className="material-symbols-outlined text-[16px]">note_add</span>
           </button>
           <button
-            onClick={() => setCreatingNode({ parentId: null, type: 'directory' })}
+            onClick={() => setCreatingNode({ parentId: selectedNodeId || null, type: 'directory' })}
             className="p-[3px] rounded hover:bg-surface-container-high text-on-surface-variant/80 hover:text-on-surface transition-colors cursor-pointer"
             title="New Folder..."
           >
@@ -205,6 +262,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ roomId }) => {
           <InlineInput
             type={creatingNode.type}
             onSave={handleCreateRoot}
+            onSavePath={handleCreateRootPath}
             onCancel={() => setCreatingNode(null)}
           />
         )}
@@ -226,6 +284,8 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ roomId }) => {
                 setCreatingNode={setCreatingNode}
                 renamingNodeId={renamingNodeId}
                 setRenamingNodeId={setRenamingNodeId}
+                selectedNodeId={selectedNodeId}
+                setSelectedNodeId={setSelectedNodeId}
               />
             ))}
           </div>

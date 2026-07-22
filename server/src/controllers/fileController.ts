@@ -86,6 +86,16 @@ export class FileController {
     res.status(200).json({ message: 'File/directory renamed successfully' });
   };
 
+  moveNode = async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) throw new HttpError(401, 'Unauthorized');
+    const { roomId, fileId } = fileParamsSchema.parse(req.params);
+    const moveSchema = z.object({
+      targetParentId: z.number().nullable(),
+    });
+    const { targetParentId } = moveSchema.parse(req.body);
+    await this.fileService.moveFile(req.user.sub, roomId, fileId, targetParentId);
+    res.status(200).json({ message: 'File/directory moved successfully' });
+  };
   deleteNode = async (req: Request, res: Response): Promise<void> => {
     if (!req.user) throw new HttpError(401, 'Unauthorized');
     const { roomId, fileId } = fileParamsSchema.parse(req.params);

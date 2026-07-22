@@ -12,6 +12,8 @@ interface FileTreeNodeProps {
   setCreatingNode: (val: { parentId: string | null; type: 'file' | 'directory' } | null) => void;
   renamingNodeId: string | null;
   setRenamingNodeId: (val: string | null) => void;
+  selectedNodeId: string | null;
+  setSelectedNodeId: (val: string | null) => void;
 }
 
 const getFileIcon = (filename: string) => {
@@ -48,13 +50,13 @@ const InlineInput: React.FC<{
   depth: number;
   initialValue?: string;
   onSave: (val: string) => void;
+  onSavePath?: (path: string) => void;
   onCancel: () => void;
-}> = ({ type, depth, initialValue = '', onSave, onCancel }) => {
+}> = ({ type, depth, initialValue = '', onSave, onSavePath, onCancel }) => {
   const [value, setValue] = useState(initialValue);
   const [isInvalid, setIsInvalid] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const setValidationError = useFileStore((state) => state.setValidationError);
-  // Guard against double-submission (Enter fires keydown, which can also trigger blur)
   const submittedRef = useRef(false);
 
   useEffect(() => {
@@ -78,14 +80,20 @@ const InlineInput: React.FC<{
   const handleSubmit = () => {
     if (submittedRef.current) return;
     const clean = value.trim();
-    if (!clean || /[\/]/.test(clean)) {
+    if (!clean) {
       setIsInvalid(true);
-      setValidationError("Name cannot be empty or contain slashes");
+      setValidationError("Name cannot be empty");
       return;
     }
+
     submittedRef.current = true;
     setValidationError(null);
-    onSave(clean);
+
+    if (onSavePath && clean.includes('/')) {
+      onSavePath(clean);
+    } else {
+      onSave(clean);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -93,7 +101,7 @@ const InlineInput: React.FC<{
       e.preventDefault();
       handleSubmit();
     } else if (e.key === 'Escape') {
-      submittedRef.current = true; // prevent blur from re-triggering
+      submittedRef.current = true;
       setValidationError(null);
       onCancel();
     }
@@ -118,7 +126,7 @@ const InlineInput: React.FC<{
         style={{ paddingLeft: `${(depth + 1) * 12}px` }}
       >
         <span className="material-symbols-outlined text-[18px] opacity-80 shrink-0">
-          {type === 'directory' ? 'folder' : 'description'}
+          {type === 'directory' || value.endsWith('/') ? 'folder' : 'description'}
         </span>
         <input
           ref={inputRef}
@@ -151,22 +159,29 @@ export const FileTreeNode: React.FC<FileTreeNodeProps> = ({
   setCreatingNode,
   renamingNodeId,
   setRenamingNodeId,
+  selectedNodeId,
+  setSelectedNodeId,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
   const activeFileId = useFileStore((state) => state.activeFileId);
   const openFile = useFileStore((state) => state.openFile);
   const renameNode = useFileStore((state) => state.renameNode);
   const createNode = useFileStore((state) => state.createNode);
+  const createPathNodes = useFileStore((state) => state.createPathNodes);
+  const moveNode = useFileStore((state) => state.moveNode);
   const deleteNode = useFileStore((state) => state.deleteNode);
 
   const isDirectory = node.type === 'directory';
   const isActive = node.id === activeFileId;
+  const isSelected = node.id === selectedNodeId;
   const children = childrenMap.get(node.id) || [];
 
   const handleRowClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    setSelectedNodeId(node.id);
     if (isDirectory) {
       setIsExpanded(!isExpanded);
     } else {
@@ -174,9 +189,18 @@ export const FileTreeNode: React.FC<FileTreeNodeProps> = ({
     }
   };
 
+  const handleRowKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && renamingNodeId !== node.id) {
+      e.preventDefault();
+      e.stopPropagation();
+      setRenamingNodeId(node.id);
+    }
+  };
+
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    setSelectedNodeId(node.id);
     setContextMenu({ x: e.clientX, y: e.clientY });
   };
 
@@ -207,6 +231,54 @@ export const FileTreeNode: React.FC<FileTreeNodeProps> = ({
       console.error(err);
     } finally {
       setCreatingNode(null);
+    }
+  };
+
+  const handleCreateChildPath = async (rawPath: string) => {
+    try {
+      await createPathNodes(roomId, rawPath, node.id);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setCreatingNode(null);
+    }
+  };
+
+  // Drag & Drop event handlers
+  const handleDragStart = (e: React.DragEvent) => {
+    e.stopPropagation();
+    e.dataTransfer.setData('text/beaveride-node', node.id);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isDirectory) {
+      setIsDragOver(true);
+    }
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+
+    const sourceId = e.dataTransfer.getData('text/beaveride-node');
+    if (!sourceId || sourceId === node.id) return;
+
+    const targetParentId = isDirectory ? node.id : node.parentId;
+    try {
+      await moveNode(roomId, sourceId, targetParentId);
+    } catch (err) {
+      console.error('Failed to move file node:', err);
     }
   };
 
@@ -281,12 +353,26 @@ export const FileTreeNode: React.FC<FileTreeNodeProps> = ({
   }
 
   return (
-    <div className="w-full select-none relative">
+    <div
+      draggable={renamingNodeId !== node.id}
+      onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      className={`w-full select-none relative transition-colors duration-150 rounded ${
+        isDragOver ? 'bg-primary/20 ring-1 ring-primary/40' : ''
+      }`}
+    >
       <button
         onClick={handleRowClick}
+        onKeyDown={handleRowKeyDown}
         onContextMenu={handleContextMenu}
-        className={`w-full flex items-center gap-xs py-1 px-sm rounded hover:bg-surface-container-high/40 text-left text-sm cursor-pointer transition-colors duration-150 ${
-          isActive ? 'bg-surface-container-highest/80 text-primary font-medium border-l-2 border-primary rounded-l-none' : 'text-on-surface'
+        className={`w-full flex items-center gap-xs py-1 px-sm rounded hover:bg-surface-container-high/40 text-left text-sm cursor-pointer transition-colors duration-150 outline-none focus:ring-1 focus:ring-primary/40 ${
+          isActive
+            ? 'bg-surface-container-highest/80 text-primary font-medium border-l-2 border-primary rounded-l-none'
+            : isSelected
+            ? 'bg-surface-container-high/60 text-on-surface'
+            : 'text-on-surface'
         }`}
         style={{ paddingLeft: `${(depth + 1) * 12}px` }}
       >
@@ -306,6 +392,7 @@ export const FileTreeNode: React.FC<FileTreeNodeProps> = ({
           type={creatingNode.type}
           depth={depth + 1}
           onSave={handleCreateChild}
+          onSavePath={handleCreateChildPath}
           onCancel={() => setCreatingNode(null)}
         />
       )}
@@ -324,6 +411,8 @@ export const FileTreeNode: React.FC<FileTreeNodeProps> = ({
               setCreatingNode={setCreatingNode}
               renamingNodeId={renamingNodeId}
               setRenamingNodeId={setRenamingNodeId}
+              selectedNodeId={selectedNodeId}
+              setSelectedNodeId={setSelectedNodeId}
             />
           ))}
         </div>

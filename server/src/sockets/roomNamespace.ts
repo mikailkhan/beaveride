@@ -181,6 +181,28 @@ export function registerRoomNamespace(io: SocketServer): void {
         }
       });
 
+      // Handle file tree move event
+      socket.on('filetree:move', async (data: {
+        fileId: string;
+        targetParentId: string | null;
+      }) => {
+        try {
+          const fileIdNum = parseInt(data.fileId, 10);
+          const targetParentIdNum = data.targetParentId !== null ? parseInt(data.targetParentId, 10) : null;
+          if (isNaN(fileIdNum)) throw new Error('Invalid fileId');
+          await fileService.moveFile(userId, roomId, fileIdNum, targetParentIdNum);
+
+          // Broadcast moved event to all peers
+          roomNsp.to(roomChannel).emit('filetree:moved', {
+            fileId: data.fileId,
+            targetParentId: data.targetParentId,
+          });
+        } catch (err) {
+          console.error(`Failed to move file node over socket in room ${roomId}:`, err);
+          socket.emit('error', err instanceof Error ? err.message : 'Failed to move file');
+        }
+      });
+
       // Handle file tree delete event
       socket.on('filetree:delete', async (data: {
         fileId: string;

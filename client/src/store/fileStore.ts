@@ -23,8 +23,11 @@ interface FileState {
   reorderTabs: (fromIndex: number, toIndex: number) => void;
   updateFileContent: (fileId: string, content: string) => void;
   deleteNode: (roomId: string, fileId: string) => Promise<void>;
+  moveNode: (roomId: string, fileId: string, targetParentId: string | null) => Promise<void>;
+  createPathNodes: (roomId: string, rawPath: string, parentId?: string | null) => Promise<ProjectFile | null>;
   addNodeFromSocket: (node: ProjectFile) => void;
   renameNodeFromSocket: (fileId: string, newName: string) => void;
+  moveNodeFromSocket: (fileId: string, targetParentId: string | null) => void;
   deleteNodeFromSocket: (fileId: string) => void;
   clearFileStore: () => void;
 }
@@ -200,6 +203,77 @@ export const useFileStore = create<FileState>((set, get) => ({
     });
   },
 
+  moveNode: async (roomId, fileId, targetParentId) => {
+    const { files } = get();
+    if (targetParentId === fileId) return;
+
+    if (targetParentId !== null) {
+      const nodeMap = new Map(files.map((f) => [f.id, f]));
+      let current: string | null = targetParentId;
+      while (current !== null) {
+        if (current === fileId) return; // Prevent moving into own subdirectory
+        const currNode = nodeMap.get(current);
+        current = currNode ? currNode.parentId : null;
+      }
+    }
+
+    await fileService.moveNode(roomId, fileId, targetParentId);
+    set((state) => {
+      const updatedFiles = state.files.map((f) =>
+        f.id === fileId ? { ...f, parentId: targetParentId } : f
+      );
+      const socket = state.socket;
+      if (socket) {
+        socket.emit('filetree:mutate', { type: 'move', fileId, targetParentId });
+      }
+      return { files: updatedFiles };
+    });
+  },
+
+  createPathNodes: async (roomId, rawPath, initialParentId = null) => {
+    const isDir = rawPath.endsWith('/');
+    const parts = rawPath.split('/').filter(Boolean);
+    if (parts.length === 0) return null;
+
+    let currentParentId: string | null = initialParentId || null;
+    let lastCreatedFile: ProjectFile | null = null;
+
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      const isLastPart = i === parts.length - 1;
+      const nodeType = (!isLastPart || isDir) ? 'directory' : 'file';
+
+      const currentFiles = get().files;
+      const existing = currentFiles.find(
+        (f) => f.name === part && f.parentId === currentParentId
+      );
+
+      if (existing) {
+        currentParentId = existing.id;
+        if (existing.type === 'file') {
+          lastCreatedFile = existing;
+        }
+      } else {
+        const created = await get().createNode(roomId, {
+          name: part,
+          type: nodeType,
+          parentId: currentParentId || undefined,
+          content: '',
+        });
+        currentParentId = created.id;
+
+        if (nodeType === 'file') {
+          lastCreatedFile = created;
+        }
+      }
+    }
+
+    if (lastCreatedFile) {
+      get().openFile(lastCreatedFile);
+    }
+    return lastCreatedFile;
+  },
+
   addNodeFromSocket: (node) => {
     set((state) => {
       // Prevent duplicates
@@ -221,6 +295,14 @@ export const useFileStore = create<FileState>((set, get) => ({
         openTabs: updatedTabs,
       };
     });
+  },
+
+  moveNodeFromSocket: (fileId, targetParentId) => {
+    set((state) => ({
+      files: state.files.map((f) =>
+        f.id === fileId ? { ...f, parentId: targetParentId } : f
+      ),
+    }));
   },
 
   deleteNodeFromSocket: (fileId) => {

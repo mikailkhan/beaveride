@@ -112,6 +112,44 @@ export class FileService {
     await this.fileRepository.renameFile(fileId, newName.trim());
   }
 
+  async moveFile(userId: number, roomId: number, fileId: number, newParentId: number | null) {
+    await this.requireWriteAccess(userId, roomId);
+
+    const file = await this.fileRepository.getFileById(fileId);
+    if (!file || file.roomId !== roomId) {
+      throw new HttpError(404, 'File/directory not found');
+    }
+
+    if (newParentId !== null) {
+      if (newParentId === fileId) {
+        throw new HttpError(400, 'Cannot move a directory into itself');
+      }
+      const parent = await this.fileRepository.getFileById(newParentId);
+      if (!parent || parent.roomId !== roomId) {
+        throw new HttpError(400, 'Target parent directory does not exist in this room');
+      }
+      if (parent.type !== 'directory') {
+        throw new HttpError(400, 'Target parent must be a directory');
+      }
+
+      // If moving a directory, check that newParentId is not a descendant of fileId
+      if (file.type === 'directory') {
+        const allFiles = await this.fileRepository.getFileTree(roomId);
+        const nodeMap = new Map(allFiles.map((f) => [f.id, f]));
+        let current: number | null = newParentId;
+        while (current !== null) {
+          if (current === fileId) {
+            throw new HttpError(400, 'Cannot move a directory into one of its subdirectories');
+          }
+          const currNode = nodeMap.get(current);
+          current = currNode ? currNode.parentId : null;
+        }
+      }
+    }
+
+    await this.fileRepository.moveFile(fileId, newParentId);
+  }
+
   async deleteFile(userId: number, roomId: number, fileId: number) {
     await this.requireWriteAccess(userId, roomId);
     const file = await this.fileRepository.getFileById(fileId);
