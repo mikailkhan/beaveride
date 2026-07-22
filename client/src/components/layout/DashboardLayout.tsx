@@ -19,7 +19,7 @@ export const DashboardLayout = () => {
   const [joinRoomId, setJoinRoomId] = useState('');
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
 
   const handleOpenCreateModal = () => {
     setCreateTitle('');

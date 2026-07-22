@@ -12,6 +12,7 @@ import BeaverideLogo from '../../assets/logos/beaveride-logo.png';
 import { FileExplorer } from '../../components/editor/FileExplorer';
 import { EditorTabs } from '../../components/editor/EditorTabs';
 import { useFileStore } from '../../store/fileStore';
+import { GlobalSearchModal } from '../../components/editor/GlobalSearchModal';
 
 type ActivityEventType = 
   | 'joined' 
@@ -61,7 +62,23 @@ export const EditorRoom = () => {
   const [myCanRun, setMyCanRun] = useState<boolean>(true);
   const [openRoleMenuUserId, setOpenRoleMenuUserId] = useState<number | null>(null);
 
+  // Auth state
   const authUser = useAuthStore((state) => state.user);
+
+  // Search Modal state
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+  // Global keyboard shortcut (Cmd+K / Ctrl+K) for Search Modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsSearchOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   useEffect(() => {
     if (!roomId) return;
@@ -85,13 +102,13 @@ export const EditorRoom = () => {
   const token = useAuthStore((state) => state.token);
 
   const [showChat, setShowChat] = useState(false);
-  const [isPresenceExpanded, setIsPresenceExpanded] = useState(true);
-  const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
+  const [isPresenceExpanded, setIsPresenceExpanded] = useState(false);
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
   const [isExplorerExpanded, setIsExplorerExpanded] = useState(true);
-  const [isActivityExpanded, setIsActivityExpanded] = useState(true);
+  const [isActivityExpanded, setIsActivityExpanded] = useState(false);
 
   // Sidebar resizing state & handlers
-  const [sidebarWidth, setSidebarWidth] = useState(280);
+  const [sidebarWidth, setSidebarWidth] = useState(200);
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
 
   useEffect(() => {
@@ -455,15 +472,14 @@ export const EditorRoom = () => {
             )}
           </div>
 
-          <a className={`flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface-variant hover:bg-primary-container/10 hover:text-primary transition-all ${isSidebarExpanded ? '' : 'justify-center'}`} href="#search" title="Search">
+          <button 
+            onClick={() => setIsSearchOpen(true)}
+            className={`flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface-variant hover:bg-primary-container/10 hover:text-primary transition-all w-full text-left cursor-pointer ${isSidebarExpanded ? '' : 'justify-center'}`} 
+            title="Search (Cmd+K)"
+          >
             <span className="material-symbols-outlined text-[20px]">search</span>
             {isSidebarExpanded && <span className="font-label-md text-label-md">Search</span>}
-          </a>
-        
-          <a className={`flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface-variant hover:bg-primary-container/10 hover:text-primary transition-all ${isSidebarExpanded ? '' : 'justify-center'}`} href="#settings" title="Settings">
-            <span className="material-symbols-outlined text-[20px]">settings</span>
-            {isSidebarExpanded && <span className="font-label-md text-label-md">Settings</span>}
-          </a>
+          </button>
         </nav>
 
         {/* Footer Navigation */}
@@ -784,6 +800,14 @@ export const EditorRoom = () => {
           )}
         </div>
       </main>
+
+      {/* Global Search Modal */}
+      <GlobalSearchModal
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+        doc={doc}
+        editor={editor}
+      />
     </div>
   );
 };
