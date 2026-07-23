@@ -83,6 +83,10 @@ export function useYjsSync({ roomId, token }: UseYjsSyncProps): {
       socket.emit('sync:init');
     });
 
+    socket.on('room:joined', () => {
+      socket.emit('sync:init');
+    });
+
     socket.on('connect_error', (err) => {
       console.error('Socket connection error:', err.message);
       setError(err.message);

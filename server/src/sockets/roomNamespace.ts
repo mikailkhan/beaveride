@@ -69,30 +69,24 @@ export function registerRoomNamespace(io: SocketServer): void {
     socket.join(roomChannel);
     console.log(`Socket ${socket.id} joined channel ${roomChannel}`);
 
-    try {
-      // Load or create Y.Doc state for this room
-      const doc = await getOrCreateDoc(roomId);
+    // Eagerly initiate async document loading and chat history fetching
+    const docPromise = getOrCreateDoc(roomId);
+    const historyPromise = chatRepository.getAllMessages(roomId);
 
-      // Emit confirmation
-      socket.emit('room:joined', { userId, username, roomId });
-
-      // Add joined activity log and broadcast updates
-      addActivity(roomId, { username, event: 'joined', timestamp: new Date().toISOString() });
-      roomNsp.to(roomChannel).emit('activity:update', getActivities(roomId));
-      socket.emit('activity:update', getActivities(roomId));
-
-      // Load and emit all chat history from database
-      const history = await chatRepository.getAllMessages(roomId);
-      socket.emit('chat:history', history);
-
-      // Handle initial document sync request
-      socket.on('sync:init', () => {
+    // Register all socket event listeners SYNCHRONOUSLY to prevent missed client events
+    socket.on('sync:init', async () => {
+      try {
+        const doc = await docPromise;
         const stateUpdate = Y.encodeStateAsUpdate(doc);
         socket.emit('sync:init', stateUpdate);
-      });
+      } catch (err) {
+        console.error(`Failed to handle sync:init for room ${roomId}:`, err);
+      }
+    });
 
-      // Handle document updates
-      socket.on('sync:update', (update: Uint8Array) => {
+    socket.on('sync:update', async (update: Uint8Array) => {
+      try {
+        await docPromise;
         updateDoc(roomId, update, userId);
         // Relay the update to all other users in the room
         socket.to(roomChannel).emit('sync:update', update);
@@ -106,12 +100,39 @@ export function registerRoomNamespace(io: SocketServer): void {
           addActivity(roomId, { username, event: 'code_edit', timestamp: new Date().toISOString() });
           roomNsp.to(roomChannel).emit('activity:update', getActivities(roomId));
         }
-      });
+      } catch (err) {
+        console.error(`Failed to process sync:update for room ${roomId}:`, err);
+      }
+    });
 
-      // Handle awareness updates (cursors, selections)
-      socket.on('sync:awareness', (update: Uint8Array) => {
-        socket.to(roomChannel).emit('sync:awareness', update);
-      });
+    socket.on('sync:awareness', (update: Uint8Array) => {
+      socket.to(roomChannel).emit('sync:awareness', update);
+    });
+
+    // Handle room initialization asynchronously
+    (async () => {
+      try {
+        const doc = await docPromise;
+
+        // Emit room joined confirmation and eager doc sync state
+        socket.emit('room:joined', { userId, username, roomId });
+
+        const stateUpdate = Y.encodeStateAsUpdate(doc);
+        socket.emit('sync:init', stateUpdate);
+
+        // Add joined activity log and broadcast updates
+        addActivity(roomId, { username, event: 'joined', timestamp: new Date().toISOString() });
+        roomNsp.to(roomChannel).emit('activity:update', getActivities(roomId));
+        socket.emit('activity:update', getActivities(roomId));
+
+        // Load and emit all chat history from database
+        const history = await historyPromise;
+        socket.emit('chat:history', history);
+      } catch (err) {
+        console.error(`Failed to initialize Yjs document for room ${roomId}:`, err);
+        socket.emit('error', 'Failed to load document workspace');
+      }
+    })();
 
       // Relay client-side filetree mutations to other clients in room
       socket.on('filetree:mutate', (data: any) => {
@@ -414,10 +435,6 @@ export function registerRoomNamespace(io: SocketServer): void {
           globalRunLock.delete(roomId);
         }
       });
-    } catch (err) {
-      console.error(`Failed to initialize Yjs document for room ${roomId}:`, err);
-      socket.emit('error', 'Failed to load document workspace');
-    }
 
     socket.on('disconnect', async () => {
       console.log(`Socket ${socket.id} disconnected from room namespace (user: ${username})`);
