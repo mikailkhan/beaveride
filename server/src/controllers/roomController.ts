@@ -6,6 +6,7 @@ import { ExecutorService } from '../services/executorService.js';
 import { FileService } from '../services/fileService.js';
 import { getOrCreateDoc } from '../sockets/docStore.js';
 import { HttpError } from '../middleware/errorMiddleware.js';
+import { buildProjectPayload } from '../utils/filePathUtils.js';
 
 const createRoomSchema = z.object({
   title: z
@@ -119,44 +120,7 @@ export class RoomController {
     const yDoc = await getOrCreateDoc(roomId);
     const yFilesMap = yDoc.getMap('files');
 
-    const nodeMap = new Map(allFiles.map(f => [String(f.id), f]));
-
-    const getFullPath = (nodeId: string): string => {
-      const node = nodeMap.get(nodeId);
-      if (!node) return '';
-      if (node.parentId === null) return node.name;
-      const parentPath = getFullPath(String(node.parentId));
-      return parentPath ? `${parentPath}/${node.name}` : node.name;
-    };
-
-    const projectPayload: { path: string; content: string }[] = [];
-    let entryFilePath = '';
-
-    for (const file of allFiles) {
-      if (file.type === 'file') {
-        const fullPath = getFullPath(String(file.id));
-        let fileContent = file.content || '';
-
-        const yTextKey = `file:${file.id}`;
-        const yText = yFilesMap.get(yTextKey) as Y.Text | undefined;
-        if (yText) {
-          fileContent = yText.toString();
-        }
-
-        projectPayload.push({ path: fullPath, content: fileContent });
-
-        if (entryFileId && String(file.id) === String(entryFileId)) {
-          entryFilePath = fullPath;
-        }
-      }
-    }
-
-    if (!entryFilePath) {
-      const defaultEntry = projectPayload.find(f =>
-        f.path === 'index.js' || f.path === 'main.py' || f.path === 'main.go' || f.path.startsWith('src/index.')
-      );
-      entryFilePath = defaultEntry ? defaultEntry.path : (projectPayload[0]?.path || 'code.js');
-    }
+    const { payload: projectPayload, entryFilePath } = buildProjectPayload(allFiles, yFilesMap, entryFileId ? String(entryFileId) : undefined);
 
     // If project payload is completely empty (e.g. no files in tree yet), fallback to single code string
     if (projectPayload.length === 0 && code) {
