@@ -16,10 +16,10 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
   registerRoomNamespace(io);
 
   io.on('connection', (socket) => {
-    console.log(`Socket connected: ${socket.id}`);
+    console.info(`Socket connected: ${socket.id}`);
 
     socket.on('disconnect', () => {
-      console.log(`Socket disconnected: ${socket.id}`);
+      console.info(`Socket disconnected: ${socket.id}`);
     });
   });
 

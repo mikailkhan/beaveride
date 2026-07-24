@@ -62,15 +62,17 @@ export class ExecutorService {
     try {
       await docker.getImage(image).inspect();
     } catch {
-      console.log(`Image ${image} not found locally, pulling...`);
-      const stream = await docker.pull(image);
+      console.info(`Image ${image} not found locally, pulling...`);
       await new Promise<void>((resolve, reject) => {
-        docker.modem.followProgress(stream, (err, res) => {
-          if (err) reject(err);
-          else resolve();
+        docker.pull(image, (err: Error | null, stream: NodeJS.ReadableStream) => {
+          if (err) return reject(err);
+          docker.modem.followProgress(stream, (pullErr: Error | null) => {
+            if (pullErr) reject(pullErr);
+            else resolve();
+          });
         });
       });
-      console.log(`Image ${image} pulled successfully`);
+      console.info(`Image ${image} pulled successfully`);
     }
   }
 

@@ -10,11 +10,11 @@ const server = createServer(app);
 createSocketServer(server);
 
 server.listen(env.PORT, () => {
-  console.log(`BeaverIDE API listening on port ${env.PORT}`);
+  console.info(`BeaverIDE API listening on port ${env.PORT}`);
 });
 
 const shutdown = async (signal: NodeJS.Signals) => {
-  console.log(`${signal} received, shutting down`);
+  console.info(`${signal} received, shutting down`);
   cleanupDocStore();
   try {
     await persistAllDirtyDocs();

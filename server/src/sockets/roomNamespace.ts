@@ -63,11 +63,11 @@ export function registerRoomNamespace(io: SocketServer): void {
 
   roomNsp.on('connection', async (socket) => {
     const { userId, username, roomId } = socket.data;
-    console.log(`Socket ${socket.id} connected to room namespace (user: ${username}, id: ${userId})`);
+    console.info(`Socket ${socket.id} connected to room namespace (user: ${username}, id: ${userId})`);
 
     const roomChannel = `room:${roomId}`;
     socket.join(roomChannel);
-    console.log(`Socket ${socket.id} joined channel ${roomChannel}`);
+    console.info(`Socket ${socket.id} joined channel ${roomChannel}`);
 
     // Eagerly initiate async document loading and chat history fetching
     const docPromise = getOrCreateDoc(roomId);
@@ -437,7 +437,7 @@ export function registerRoomNamespace(io: SocketServer): void {
       });
 
     socket.on('disconnect', async () => {
-      console.log(`Socket ${socket.id} disconnected from room namespace (user: ${username})`);
+      console.info(`Socket ${socket.id} disconnected from room namespace (user: ${username})`);
       try {
         await decrementConnections(roomId);
         addActivity(roomId, { username, event: 'left', timestamp: new Date().toISOString() });

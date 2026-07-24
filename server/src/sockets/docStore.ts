@@ -134,7 +134,7 @@ export async function persistDoc(roomId: number): Promise<void> {
     }
 
     cached.dirty = false;
-    console.log(`Persisted snapshot and file contents for room ${roomId}`);
+    console.info(`Persisted snapshot and file contents for room ${roomId}`);
   } catch (err) {
     console.error(`Failed to persist room ${roomId} to DB:`, err);
   }
@@ -145,7 +145,7 @@ export async function decrementConnections(roomId: number): Promise<void> {
   if (!cached) return;
 
   cached.connectionCount--;
-  console.log(`Room ${roomId} connection count decremented to ${cached.connectionCount}`);
+  console.info(`Room ${roomId} connection count decremented to ${cached.connectionCount}`);
 
   if (cached.connectionCount <= 0) {
     if (cached.dirty) {
@@ -153,7 +153,7 @@ export async function decrementConnections(roomId: number): Promise<void> {
     }
     cache.delete(roomId);
     clearActivities(roomId);
-    console.log(`Room ${roomId} connection count is 0. Saved and removed doc from cache. Activities cleared.`);
+    console.info(`Room ${roomId} connection count is 0. Saved and removed doc from cache. Activities cleared.`);
   }
 }
 
