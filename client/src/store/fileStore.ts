@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { ProjectFile, FileTab } from '../types';
 import { fileService } from '../services/fileService.js';
+import { getMonacoLanguage } from '../utils/fileUtils';
 
 interface FileState {
   files: ProjectFile[];
@@ -30,20 +31,6 @@ interface FileState {
   moveNodeFromSocket: (fileId: string, targetParentId: string | null) => void;
   deleteNodeFromSocket: (fileId: string) => void;
   clearFileStore: () => void;
-}
-
-function getMonacoLanguage(filename: string): string {
-  const ext = filename.split('.').pop()?.toLowerCase();
-  switch (ext) {
-    case 'js':
-      return 'javascript';
-    case 'py':
-      return 'python';
-    case 'go':
-      return 'go';
-    default:
-      return 'plaintext';
-  }
 }
 
 export const useFileStore = create<FileState>((set, get) => ({

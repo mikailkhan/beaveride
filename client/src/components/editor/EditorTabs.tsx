@@ -1,38 +1,10 @@
 import React, { useState } from 'react';
 import { useFileStore } from '../../store/fileStore';
+import { getFileIcon } from '../../utils/fileUtils';
 
 export const EditorTabs: React.FC = () => {
   const { openTabs, activeFileId, setActiveFile, closeTab, reorderTabs } = useFileStore();
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
-
-  const getFileIcon = (filename: string) => {
-    const ext = filename.split('.').pop()?.toLowerCase();
-    switch (ext) {
-      case 'js':
-      case 'cjs':
-      case 'mjs':
-        return <span className="material-symbols-outlined text-[16px] text-[#f0db4f] shrink-0">javascript</span>;
-      case 'ts':
-      case 'tsx':
-      case 'jsx':
-        return <span className="material-symbols-outlined text-[16px] text-[#3178c6] shrink-0">code</span>;
-      case 'py':
-        return <span className="material-symbols-outlined text-[16px] text-[#3572A5] shrink-0">code</span>;
-      case 'go':
-        return <span className="material-symbols-outlined text-[16px] text-[#00add8] shrink-0">code</span>;
-      case 'json':
-        return <span className="material-symbols-outlined text-[16px] text-[#cb8764] shrink-0">data_object</span>;
-      case 'css':
-      case 'scss':
-        return <span className="material-symbols-outlined text-[16px] text-[#264de4] shrink-0">css</span>;
-      case 'html':
-        return <span className="material-symbols-outlined text-[16px] text-[#e34c26] shrink-0">html</span>;
-      case 'md':
-        return <span className="material-symbols-outlined text-[16px] text-[#083344] shrink-0">markdown</span>;
-      default:
-        return <span className="material-symbols-outlined text-[16px] text-outline shrink-0">description</span>;
-    }
-  };
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedIndex(index);
