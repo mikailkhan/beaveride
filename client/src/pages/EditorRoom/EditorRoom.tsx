@@ -55,7 +55,6 @@ export const EditorRoom = () => {
   const [globalRunStatus, setGlobalRunStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
   const [localOutput, setLocalOutput] = useState('');
   const [localRunStatus, setLocalRunStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
-  const [activities, setActivities] = useState<ActivityEntry[]>([]);
   const [activeTab, setActiveTab] = useState<'global' | 'local'>('global');
 
   // Role and Permission states

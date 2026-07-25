@@ -5,14 +5,14 @@ import { HttpError } from '../middleware/errorMiddleware.js';
 import { requireUser } from '../middleware/authMiddleware.js';
 
 const registerSchema = z.object({
-  email: z.string().email('Invalid email address'),
+  email: z.string().email('Invalid email address').max(254, 'Email must be under 254 characters'),
   username: z
     .string()
     .min(3, 'Username must be at least 3 characters')
-    .max(80, 'Username must be under 80 characters')
+    .max(30, 'Username must be under 30 characters')
     .regex(/^[a-zA-Z0-9_-]+$/, 'Username may only contain letters, numbers, hyphens, and underscores'),
-  firstName: z.string().min(1, 'First name is required').max(120, 'First name must be under 120 characters'),
-  lastName: z.string().max(120, 'Last name must be under 120 characters').default(''),
+  firstName: z.string().min(1, 'First name is required').max(60, 'First name must be under 60 characters'),
+  lastName: z.string().max(60, 'Last name must be under 60 characters').default(''),
   password: z
     .string()
     .min(8, 'Password must be at least 8 characters')
@@ -20,18 +20,18 @@ const registerSchema = z.object({
 });
 
 const loginSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(1, 'Password is required'),
+  email: z.string().email('Invalid email address').max(254, 'Email must be under 254 characters'),
+  password: z.string().min(1, 'Password is required').max(128, 'Password must be under 128 characters'),
 });
 
 const updateProfileSchema = z.object({
-  firstName: z.string().min(1).max(120).optional(),
-  lastName: z.string().max(120).optional(),
-  email: z.string().email().optional(),
+  firstName: z.string().min(1).max(60, 'First name must be under 60 characters').optional(),
+  lastName: z.string().max(60, 'Last name must be under 60 characters').optional(),
+  email: z.string().email('Invalid email address').max(254, 'Email must be under 254 characters').optional(),
 });
 
 const changePasswordSchema = z.object({
-  currentPassword: z.string().min(1, 'Current password is required'),
+  currentPassword: z.string().min(1, 'Current password is required').max(128, 'Current password must be under 128 characters'),
   newPassword: z
     .string()
     .min(8, 'New password must be at least 8 characters')
