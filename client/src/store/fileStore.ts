@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { Socket } from 'socket.io-client';
 import type { ProjectFile, FileTab } from '../types';
 import { fileService } from '../services/fileService.js';
 import { getMonacoLanguage } from '../utils/fileUtils';
@@ -8,8 +9,8 @@ interface FileState {
   openTabs: FileTab[];
   activeFileId: string | null;
   validationError: string | null;
-  socket: any | null;
-  setSocket: (socket: any | null) => void;
+  socket: Socket | null;
+  setSocket: (socket: Socket | null) => void;
   setValidationError: (err: string | null) => void;
   setFiles: (files: ProjectFile[]) => void;
   fetchFileTree: (roomId: string) => Promise<void>;
