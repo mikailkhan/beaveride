@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { AuthService } from '../services/authService.js';
 import { HttpError } from '../middleware/errorMiddleware.js';
+import { requireUser } from '../middleware/authMiddleware.js';
 
 const registerSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -53,29 +54,26 @@ export class AuthController {
   };
 
   me = async (req: Request, res: Response): Promise<void> => {
-    if (!req.user) {
-      throw new HttpError(401, 'Unauthorized');
-    }
-
-    const result = await this.authService.getCurrentUser(req.user.sub);
+    const user = requireUser(req);
+    const result = await this.authService.getCurrentUser(user.sub);
     res.status(200).json({ data: result });
   };
 
   updateProfile = async (req: Request, res: Response): Promise<void> => {
-    if (!req.user) throw new HttpError(401, 'Unauthorized');
+    const user = requireUser(req);
     const parsed = updateProfileSchema.parse(req.body);
     // Build a clean dto without undefined entries (required by exactOptionalPropertyTypes)
     const dto = Object.fromEntries(
       Object.entries(parsed).filter(([, v]) => v !== undefined)
     ) as { firstName?: string; lastName?: string; email?: string };
-    const user = await this.authService.updateProfile(req.user.sub, dto);
-    res.status(200).json({ data: { user } });
+    const updatedUser = await this.authService.updateProfile(user.sub, dto);
+    res.status(200).json({ data: { user: updatedUser } });
   };
 
   changePassword = async (req: Request, res: Response): Promise<void> => {
-    if (!req.user) throw new HttpError(401, 'Unauthorized');
+    const user = requireUser(req);
     const dto = changePasswordSchema.parse(req.body);
-    await this.authService.changePassword(req.user.sub, dto);
+    await this.authService.changePassword(user.sub, dto);
     res.status(200).json({ message: 'Password changed successfully' });
   };
 }

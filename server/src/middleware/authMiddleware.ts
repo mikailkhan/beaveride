@@ -36,3 +36,12 @@ export const requireAuth = (req: Request, _res: Response, next: NextFunction): v
     next(new HttpError(401, error instanceof Error ? error.message : 'Invalid token'));
   }
 };
+
+/**
+ * Asserts that req.user is present and returns it with full type.
+ * Throws 401 if not present.
+ */
+export function requireUser(req: Request): JwtPayload {
+  if (!req.user) throw new HttpError(401, 'Unauthorized');
+  return req.user;
+}
