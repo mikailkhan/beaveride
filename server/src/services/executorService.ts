@@ -1,4 +1,5 @@
 import Docker from 'dockerode';
+import path from 'path';
 import tar from 'tar-stream';
 
 const docker = new Docker();
@@ -97,6 +98,21 @@ export class ExecutorService {
       return `Unsupported execution language: ${language}`;
     }
 
+    // Path traversal check for entry file
+    const normalizedEntry = path.normalize(entryFilePath);
+    if (normalizedEntry.startsWith('..') || path.isAbsolute(normalizedEntry)) {
+      return 'Execution Error: Invalid entry file path';
+    }
+
+    // Resource & file payload bounds checks
+    if (files.length > 100) {
+      return 'Execution Error: Project has too many files (max 100)';
+    }
+    const totalSize = files.reduce((sum, f) => sum + f.content.length, 0);
+    if (totalSize > 5 * 1024 * 1024) {
+      return 'Execution Error: Project files exceed 5MB total size limit';
+    }
+
     try {
       await this.ensureImage(config.image);
     } catch (err) {
@@ -126,6 +142,9 @@ export class ExecutorService {
           Memory: config.memoryLimit || 128 * 1024 * 1024,
           NanoCpus: 1000000000,
           ReadonlyRootfs: true,
+          PidsLimit: 64,
+          SecurityOpt: ['no-new-privileges:true'],
+          CapDrop: ['ALL'],
           Tmpfs: {
             '/tmp': 'rw,exec,nosuid,size=65536k',
           },
