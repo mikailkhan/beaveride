@@ -5,6 +5,8 @@ import { HttpError } from '../middleware/errorMiddleware.js';
 import { UserRepository } from '../repositories/userRepository.js';
 import type { User } from '../repositories/userRepository.js';
 
+// 12 rounds provides ~300ms hashing time on modern hardware — a good balance
+// between brute-force resistance and login latency. Do not lower below 10.
 const BCRYPT_ROUNDS = 12;
 
 export type SafeUser = Omit<User, 'passwordHash'>;
@@ -139,7 +141,7 @@ export class AuthService {
   }
 
   verifyToken(token: string): JwtPayload {
-    const payload = jwt.verify(token, env.JWT_SECRET);
+    const payload = jwt.verify(token, env.JWT_SECRET, { algorithms: ['HS256'] });
 
     if (typeof payload === 'string' || !('sub' in payload) || !('email' in payload)) {
       throw new HttpError(401, 'Invalid token payload');
@@ -151,7 +153,7 @@ export class AuthService {
   private signToken(user: SafeUser): string {
     // Cast through unknown: env.JWT_EXPIRES_IN is a plain `string` but @types/jsonwebtoken
     // uses a branded StringValue. The value is always a valid ms-compatible string (Zod default '7d').
-    const signOptions = { expiresIn: env.JWT_EXPIRES_IN } as jwt.SignOptions;
+    const signOptions = { expiresIn: env.JWT_EXPIRES_IN, algorithm: 'HS256' } as jwt.SignOptions;
     return jwt.sign({ sub: user.id, email: user.email }, env.JWT_SECRET, signOptions);
   }
 }
