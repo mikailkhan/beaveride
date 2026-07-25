@@ -7,6 +7,7 @@ import { useRoomStore } from '../../store/roomStore';
 import { useAuthStore } from '../../store/authStore';
 import { useYjsSync } from '../../hooks/useYjsSync';
 import { useFileBinding } from '../../hooks/useFileBinding';
+import { useRoomSocket } from '../../hooks/useRoomSocket';
 import { roomService } from '../../services/roomService';
 import BeaverideLogo from '../../assets/logos/beaveride-logo.png';
 import { FileExplorer } from '../../components/editor/FileExplorer';
@@ -158,94 +159,15 @@ export const EditorRoom = () => {
     }
   }, [awareness, activeFileId, myRole, myCanRun]);
 
-  // Sync socket state in fileStore and listen to broadcast mutations & member management events
-  useEffect(() => {
-    if (!socket) return;
-    setSocket(socket);
-
-    const currentUserId = authUser?.id;
-
-    const { addNodeFromSocket, renameNodeFromSocket, moveNodeFromSocket, deleteNodeFromSocket } = useFileStore.getState();
-
-    const onFiletreeMutate = (data: { type: string; fileId?: string; newName?: string; targetParentId?: string | null; node?: any }) => {
-      console.log('Received filetree mutation event:', data);
-      if (data.type === 'create' && data.node) {
-        addNodeFromSocket(data.node);
-      } else if (data.type === 'rename' && data.fileId && data.newName) {
-        renameNodeFromSocket(data.fileId, data.newName);
-      } else if (data.type === 'move' && data.fileId) {
-        moveNodeFromSocket(data.fileId, data.targetParentId ?? null);
-      } else if (data.type === 'delete' && data.fileId) {
-        deleteNodeFromSocket(data.fileId);
-      }
-    };
-
-    const onMemberUpdated = (data: { targetUserId: number; role?: 'owner' | 'editor' | 'viewer'; canRun?: boolean }) => {
-      console.log('Received member updated event:', data);
-      if (currentUserId && String(data.targetUserId) === String(currentUserId)) {
-        if (data.role) setMyRole(data.role);
-        if (data.canRun !== undefined) setMyCanRun(data.canRun);
-      }
-    };
-
-    const onMemberKicked = (data: { targetUserId: number }) => {
-      if (currentUserId && String(data.targetUserId) === String(currentUserId)) {
-        alert("You have been removed from this room by the owner.");
-        window.location.href = '/dashboard';
-      }
-    };
-
-    socket.on('filetree:mutate', onFiletreeMutate);
-    socket.on('room:member:updated', onMemberUpdated);
-    socket.on('room:member:kicked', onMemberKicked);
-
-    return () => {
-      socket.off('filetree:mutate', onFiletreeMutate);
-      socket.off('room:member:updated', onMemberUpdated);
-      socket.off('room:member:kicked', onMemberKicked);
-      setSocket(null);
-    };
-  }, [socket, setSocket, addNodeFromSocket, renameNodeFromSocket, deleteNodeFromSocket, authUser]);
-
-  // Register socket listeners for global run lifecycle
-  useEffect(() => {
-    if (!socket) return;
-
-    const onStart = ({ initiatedBy }: { initiatedBy: string }) => {
-      setGlobalRunStatus('running');
-      setGlobalOutput(`\r\n\x1b[33m[Global Run started by ${initiatedBy}...]\x1b[0m\r\n`);
-    };
-
-    const onOutput = ({ chunk }: { chunk: string }) => {
-      setGlobalOutput(chunk);
-    };
-
-    const onEnd = ({ success }: { success: boolean }) => {
-      setGlobalRunStatus(success ? 'success' : 'error');
-    };
-
-    const onLocked = ({ message }: { message: string }) => {
-      setGlobalOutput(`\r\n\x1b[31m[${message}]\x1b[0m\r\n`);
-    };
-
-    const onActivityUpdate = (entries: ActivityEntry[]) => {
-      setActivities(entries);
-    };
-    socket.on('activity:update', onActivityUpdate);
-
-    socket.on('run:global:start', onStart);
-    socket.on('run:global:output', onOutput);
-    socket.on('run:global:end', onEnd);
-    socket.on('run:global:locked', onLocked);
-
-    return () => {
-      socket.off('run:global:start', onStart);
-      socket.off('run:global:output', onOutput);
-      socket.off('run:global:end', onEnd);
-      socket.off('run:global:locked', onLocked);
-      socket.off('activity:update', onActivityUpdate);
-    };
-  }, [socket]);
+  // Use custom socket hook for room mutations, member status updates, activities, and global run state
+  const { activities } = useRoomSocket({
+    socket,
+    authUser,
+    setMyRole,
+    setMyCanRun,
+    setGlobalRunStatus,
+    setGlobalOutput,
+  });
 
   const isRunnableFile = (file?: FileNode | null): boolean => {
     if (!file || file.type !== 'file') return false;
