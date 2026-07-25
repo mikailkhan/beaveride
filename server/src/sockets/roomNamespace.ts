@@ -10,6 +10,7 @@ import { addActivity, getActivities } from './activityStore.js';
 import { buildProjectPayload } from '../utils/filePathUtils.js';
 
 import { RoomService } from '../services/roomService.js';
+import { RoomRepository } from '../repositories/roomRepository.js';
 
 const userRepository = new UserRepository();
 const authService = new AuthService();
@@ -17,6 +18,7 @@ const chatRepository = new ChatRepository();
 const executorService = new ExecutorService();
 const fileService = new FileService();
 const roomService = new RoomService();
+const roomRepository = new RoomRepository();
 const globalRunLock = new Map<number, boolean>();
 const codeEditDebounce = new Map<string, number>(); // key: `${roomId}:${userId}`
 const CODE_EDIT_DEBOUNCE_MS = 10_000;
@@ -135,9 +137,18 @@ export function registerRoomNamespace(io: SocketServer): void {
       }
     })();
 
-      // Relay client-side filetree mutations to other clients in room
-      socket.on('filetree:mutate', (data: any) => {
-        socket.to(roomChannel).emit('filetree:mutate', data);
+      // Relay client-side filetree mutations to other clients in room with field whitelist validation
+      socket.on('filetree:mutate', (data: unknown) => {
+        if (typeof data !== 'object' || data === null) return;
+        const d = data as Record<string, unknown>;
+        const sanitized = {
+          type: typeof d.type === 'string' ? d.type : undefined,
+          fileId: typeof d.fileId === 'string' ? d.fileId : undefined,
+          newName: typeof d.newName === 'string' ? d.newName : undefined,
+          targetParentId: d.targetParentId === null || typeof d.targetParentId === 'string' ? d.targetParentId : undefined,
+          node: typeof d.node === 'object' ? d.node : undefined,
+        };
+        socket.to(roomChannel).emit('filetree:mutate', sanitized);
       });
 
       // Handle file tree creation event
@@ -366,6 +377,14 @@ export function registerRoomNamespace(io: SocketServer): void {
 
       // Handle global code run requests with mutex locking
       socket.on('run:global', async (data: { entryFileId?: string; language: string; code?: string }) => {
+        // Re-validate canRun permission from DB — awareness state is client-controlled
+        const membership = await roomRepository.findMembership(roomId, userId);
+        if (!membership || !membership.canRun) {
+          socket.emit('run:global:output', { chunk: 'Error: You do not have execution privileges in this room.' });
+          socket.emit('run:global:end', { success: false });
+          return;
+        }
+
         if (globalRunLock.get(roomId)) {
           socket.emit('run:global:locked', { message: 'A global execution is already in progress.' });
           return;
