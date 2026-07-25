@@ -9,12 +9,11 @@ import { useYjsSync } from '../../hooks/useYjsSync';
 import { useFileBinding } from '../../hooks/useFileBinding';
 import { useRoomSocket } from '../../hooks/useRoomSocket';
 import { roomService } from '../../services/roomService';
-import BeaverideLogo from '../../assets/logos/beaveride-logo.png';
 import { FileExplorer } from '../../components/editor/FileExplorer';
 import { EditorTabs } from '../../components/editor/EditorTabs';
 import { useFileStore } from '../../store/fileStore';
 import { GlobalSearchModal } from '../../components/editor/GlobalSearchModal';
-import type { ActivityEntry, ActivityEventType } from '../../types';
+import type { ActivityEntry, ProjectFile } from '../../types';
 
 
 export const EditorRoom = () => {
@@ -28,10 +27,6 @@ export const EditorRoom = () => {
     fetchFileTree,
     clearFileStore,
     validationError,
-    setSocket,
-    addNodeFromSocket,
-    renameNodeFromSocket,
-    deleteNodeFromSocket
   } = useFileStore();
   const activeFile = files.find((f) => f.id === activeFileId) || null;
 
@@ -153,7 +148,7 @@ export const EditorRoom = () => {
     setGlobalOutput,
   });
 
-  const isRunnableFile = (file?: FileNode | null): boolean => {
+  const isRunnableFile = (file?: ProjectFile | null): boolean => {
     if (!file || file.type !== 'file') return false;
     const ext = file.name.split('.').pop()?.toLowerCase() || '';
     return ['js', 'mjs', 'cjs', 'jsx', 'ts', 'tsx', 'py', 'go'].includes(ext);
