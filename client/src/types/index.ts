@@ -56,3 +56,20 @@ export interface FileTab {
   name: string;         // filename for display
   language: string;     // Monaco language id (e.g., 'javascript', 'python', 'go')
 }
+
+export type ActivityEventType =
+  | 'joined'
+  | 'left'
+  | 'global_run'
+  | 'code_edit'
+  | 'role_changed'
+  | 'run_toggled'
+  | 'kicked';
+
+export interface ActivityEntry {
+  username: string;
+  event: ActivityEventType;
+  timestamp: string;
+  targetUsername?: string;
+  detail?: string;
+}

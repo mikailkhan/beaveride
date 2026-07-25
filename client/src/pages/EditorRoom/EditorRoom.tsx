@@ -14,23 +14,8 @@ import { FileExplorer } from '../../components/editor/FileExplorer';
 import { EditorTabs } from '../../components/editor/EditorTabs';
 import { useFileStore } from '../../store/fileStore';
 import { GlobalSearchModal } from '../../components/editor/GlobalSearchModal';
+import type { ActivityEntry, ActivityEventType } from '../../types';
 
-type ActivityEventType = 
-  | 'joined' 
-  | 'left' 
-  | 'global_run' 
-  | 'code_edit' 
-  | 'role_changed' 
-  | 'run_toggled' 
-  | 'kicked';
-
-interface ActivityEntry {
-  username: string;
-  event: ActivityEventType;
-  timestamp: string;
-  targetUsername?: string;
-  detail?: string;
-}
 
 export const EditorRoom = () => {
   const { roomId } = useParams<{ roomId: string }>();
