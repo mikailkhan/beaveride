@@ -7,6 +7,7 @@ import { authRoutes } from './routes/authRoutes.js';
 import { healthRoutes, rootHealthRoutes } from './routes/healthRoutes.js';
 import { roomRoutes } from './routes/roomRoutes.js';
 import { fileRoutes } from './routes/fileRoutes.js';
+import { apiRateLimiter } from './middleware/rateLimitMiddleware.js';
 
 export const createApp = () => {
   const app = express();
@@ -21,6 +22,7 @@ export const createApp = () => {
   app.use(express.json({ limit: '1mb' }));
 
   app.use(rootHealthRoutes);
+  app.use('/api', apiRateLimiter);
   app.use('/api', healthRoutes);
   app.use('/api/auth', authRoutes);
   app.use('/api/rooms', fileRoutes);
