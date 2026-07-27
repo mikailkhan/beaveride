@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import type { Socket } from 'socket.io-client';
 import type { ActivityEntry, User } from '../types';
 import { useFileStore } from '../store/fileStore';
+import { useLockStore } from '../store/lockStore';
+import type { FileLockInfo } from '../types';
 
 interface UseRoomSocketProps {
   socket: Socket | null;
@@ -120,6 +122,67 @@ export function useRoomSocket({
       socket.off('activity:update', onActivityUpdate);
     };
   }, [socket, setGlobalRunStatus, setGlobalOutput]);
+
+  // Register socket listeners for file lock events and heartbeat
+  useEffect(() => {
+    if (!socket) return;
+
+    const { setLockState, addLock, removeLock, setQueuePosition, removeFromQueue } =
+      useLockStore.getState();
+
+    const onLockState = (locks: FileLockInfo[]) => {
+      setLockState(locks);
+    };
+
+    const onLockAcquired = (lock: FileLockInfo) => {
+      addLock(lock);
+    };
+
+    const onLockReleased = (data: { fileId: number }) => {
+      removeLock(data.fileId);
+    };
+
+    const onLockQueued = (data: { fileId: number; position: number; heldBy: { userId: number; username: string } }) => {
+      setQueuePosition(data.fileId, data.position);
+    };
+
+    const onLockGranted = (data: { fileId: number; lock: FileLockInfo }) => {
+      removeFromQueue(data.fileId);
+      addLock(data.lock);
+    };
+
+    socket.on('lock:state', onLockState);
+    socket.on('lock:acquired', onLockAcquired);
+    socket.on('lock:released', onLockReleased);
+    socket.on('lock:queued', onLockQueued);
+    socket.on('lock:granted', onLockGranted);
+
+    return () => {
+      socket.off('lock:state', onLockState);
+      socket.off('lock:acquired', onLockAcquired);
+      socket.off('lock:released', onLockReleased);
+      socket.off('lock:queued', onLockQueued);
+      socket.off('lock:granted', onLockGranted);
+    };
+  }, [socket]);
+
+  // Send lock heartbeats every 10 seconds
+  useEffect(() => {
+    if (!socket || !authUser) return;
+
+    const intervalId = setInterval(() => {
+      const { fileLocks } = useLockStore.getState();
+      const currentUserId = Number(authUser.id);
+
+      for (const [fileId, lock] of fileLocks.entries()) {
+        if (lock.userId === currentUserId) {
+          socket.emit('lock:heartbeat', { fileId });
+        }
+      }
+    }, 10_000);
+
+    return () => clearInterval(intervalId);
+  }, [socket, authUser]);
 
   return { activities };
 }
