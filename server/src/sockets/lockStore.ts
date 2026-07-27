@@ -128,7 +128,7 @@ export function releaseAllLocksForSocket(socketId: string): ReleasedLock[] {
   for (const [key, lock] of locks.entries()) {
     if (lock.socketId === socketId) {
       const parts = key.split(':');
-      if (parts.length < 2) continue;
+      if (!parts[0] || !parts[1]) continue;
       const roomId = parseInt(parts[0], 10);
       const fileId = parseInt(parts[1], 10);
 
