@@ -582,6 +582,19 @@ export const EditorRoom = () => {
             {/* Editor Header / Tabs */}
             <EditorTabs />
 
+            {/* Queue position notification banner */}
+            {(() => {
+              if (!activeFile) return null;
+              const queuePos = useLockStore.getState().queuePositions.get(Number(activeFile.id));
+              if (!queuePos) return null;
+              return (
+                <div className="flex items-center gap-xs px-sm py-1.5 bg-amber-500/10 text-amber-600 text-xs font-label-md border-b border-amber-500/20 shrink-0">
+                  <span className="material-symbols-outlined text-[14px]">hourglass_top</span>
+                  You are #{queuePos} in queue for this file. You will automatically receive the lock when it becomes available.
+                </div>
+              );
+            })()}
+
             {/* Monaco-inspired Editor Container */}
             <div className="flex-1 relative min-h-0">
               {activeFile ? (() => {

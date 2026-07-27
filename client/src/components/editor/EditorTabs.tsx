@@ -1,10 +1,15 @@
 import React, { useState } from 'react';
 import { useFileStore } from '../../store/fileStore';
+import { useLockStore } from '../../store/lockStore';
+import { useAuthStore } from '../../store/authStore';
 import { getFileIcon } from '../../utils/fileUtils';
 
 export const EditorTabs: React.FC = () => {
   const { openTabs, activeFileId, setActiveFile, closeTab, reorderTabs } = useFileStore();
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+
+  const authUser = useAuthStore((state) => state.user);
+  const fileLocks = useLockStore((state) => state.fileLocks);
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedIndex(index);
@@ -35,6 +40,9 @@ export const EditorTabs: React.FC = () => {
         const isActive = tab.id === activeFileId;
         const isDragging = index === draggedIndex;
 
+        const lockInfo = fileLocks.get(Number(tab.id));
+        const isLockedByMe = lockInfo !== undefined && authUser !== null && lockInfo.userId === Number(authUser.id);
+
         return (
           <div
             key={tab.id}
@@ -51,6 +59,20 @@ export const EditorTabs: React.FC = () => {
           >
             {getFileIcon(tab.name)}
             <span className="truncate max-w-[120px] text-[13px]">{tab.name}</span>
+            {lockInfo && (
+              <span
+                className={`material-symbols-outlined text-[13px] ${
+                  isLockedByMe ? 'text-primary' : 'text-error'
+                }`}
+                title={
+                  isLockedByMe
+                    ? `Locked by you (${lockInfo.lockScope} scope)`
+                    : `Locked by ${lockInfo.username} (${lockInfo.lockScope} scope)`
+                }
+              >
+                lock
+              </span>
+            )}
             <button
               onClick={(e) => {
                 e.stopPropagation();
