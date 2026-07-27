@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { ProjectFile } from '../../../types';
 import { useFileStore } from '../../../store/fileStore';
+import { useLockStore } from '../../../store/lockStore';
+import { useAuthStore } from '../../../store/authStore';
 import { ContextMenu } from './ContextMenu';
 import { getFileIcon } from '../../../utils/fileUtils';
 
@@ -145,6 +147,13 @@ export const FileTreeNode: React.FC<FileTreeNodeProps> = ({
   const createPathNodes = useFileStore((state) => state.createPathNodes);
   const moveNode = useFileStore((state) => state.moveNode);
   const deleteNode = useFileStore((state) => state.deleteNode);
+  const socket = useFileStore((state) => state.socket);
+
+  const authUser = useAuthStore((state) => state.user);
+  const fileIdNum = Number(node.id);
+  const lockInfo = useLockStore((state) => state.fileLocks.get(fileIdNum));
+  const isLockedByMe = lockInfo !== undefined && authUser !== null && lockInfo.userId === Number(authUser.id);
+  const isLockedByOther = lockInfo !== undefined && authUser !== null && lockInfo.userId !== Number(authUser.id);
 
   const isDirectory = node.type === 'directory';
   const isActive = node.id === activeFileId;
@@ -300,16 +309,48 @@ export const FileTreeNode: React.FC<FileTreeNodeProps> = ({
         },
       ]
     : [
-        {
-          label: 'Rename',
-          icon: 'edit',
-          onClick: () => setRenamingNodeId(node.id),
-        },
-        {
-          label: 'Delete',
-          icon: 'delete',
-          onClick: handleDelete,
-        },
+        ...(isLockedByMe
+          ? [
+              {
+                label: 'Unlock File',
+                icon: 'lock_open',
+                onClick: () => {
+                  socket?.emit('lock:release', { fileId: fileIdNum });
+                },
+              },
+            ]
+          : !isLockedByOther
+          ? [
+              {
+                label: 'Lock File',
+                icon: 'lock',
+                onClick: () => {
+                  socket?.emit('lock:acquire', { fileId: fileIdNum, lockScope: 'file' });
+                },
+              },
+              {
+                label: 'Lock (Function Scope)',
+                icon: 'view_cozy',
+                onClick: () => {
+                  socket?.emit('lock:acquire', { fileId: fileIdNum, lockScope: 'function' });
+                },
+              },
+            ]
+          : []),
+        ...(!isLockedByOther
+          ? [
+              {
+                label: 'Rename',
+                icon: 'edit',
+                onClick: () => setRenamingNodeId(node.id),
+              },
+              {
+                label: 'Delete',
+                icon: 'delete',
+                onClick: handleDelete,
+              },
+            ]
+          : []),
       ];
 
   if (renamingNodeId === node.id) {
@@ -326,7 +367,7 @@ export const FileTreeNode: React.FC<FileTreeNodeProps> = ({
 
   return (
     <div
-      draggable={renamingNodeId !== node.id}
+      draggable={renamingNodeId !== node.id && !isLockedByOther}
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -356,6 +397,20 @@ export const FileTreeNode: React.FC<FileTreeNodeProps> = ({
           getFileIcon(node.name)
         )}
         <span className="truncate text-[13px]">{node.name}</span>
+        {lockInfo && (
+          <span
+            className={`material-symbols-outlined text-[14px] ml-auto mr-1 shrink-0 ${
+              isLockedByMe ? 'text-primary' : 'text-error'
+            }`}
+            title={
+              isLockedByMe
+                ? `Locked by you (${lockInfo.lockScope} scope)`
+                : `Locked by ${lockInfo.username} (${lockInfo.lockScope} scope)`
+            }
+          >
+            lock
+          </span>
+        )}
       </button>
 
       {/* Render child creation input if active for this directory */}
