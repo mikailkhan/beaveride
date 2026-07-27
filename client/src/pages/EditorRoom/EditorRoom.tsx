@@ -12,6 +12,7 @@ import { roomService } from '../../services/roomService';
 import { FileExplorer } from '../../components/editor/FileExplorer';
 import { EditorTabs } from '../../components/editor/EditorTabs';
 import { useFileStore } from '../../store/fileStore';
+import { useLockStore } from '../../store/lockStore';
 import { GlobalSearchModal } from '../../components/editor/GlobalSearchModal';
 import type { ActivityEntry, ProjectFile } from '../../types';
 
@@ -225,6 +226,18 @@ export const EditorRoom = () => {
 
   const formatActivity = (entry: ActivityEntry) => {
     switch (entry.event) {
+      case 'file_locked':
+        return {
+          icon: 'lock',
+          label: `${entry.username} ${entry.detail || 'locked a file'}`,
+          colorClass: 'text-tertiary',
+        };
+      case 'file_unlocked':
+        return {
+          icon: 'lock_open',
+          label: `${entry.username} ${entry.detail || 'unlocked a file'}`,
+          colorClass: 'text-primary',
+        };
       case 'joined':
         return {
           icon: 'login',
@@ -571,13 +584,17 @@ export const EditorRoom = () => {
 
             {/* Monaco-inspired Editor Container */}
             <div className="flex-1 relative min-h-0">
-              {activeFile ? (
-                <MonacoEditor 
-                  language={getLanguageType(activeFile.name)} 
-                  options={{ readOnly: isViewer }}
-                  onMount={(editorInstance) => setEditor(editorInstance)}
-                />
-              ) : (
+              {activeFile ? (() => {
+                const activeFileLock = useLockStore.getState().fileLocks.get(Number(activeFile.id));
+                const isActiveFileLocked = activeFileLock !== undefined && authUser !== null && activeFileLock.userId !== Number(authUser.id);
+                return (
+                  <MonacoEditor 
+                    language={getLanguageType(activeFile.name)} 
+                    readOnly={isViewer || isActiveFileLocked}
+                    onMount={(editorInstance) => setEditor(editorInstance)}
+                  />
+                );
+              })() : (
                 <div className="flex flex-col items-center justify-center h-full text-on-surface-variant/60 gap-sm select-none">
                   <span className="material-symbols-outlined text-4xl">code_blocks</span>
                   <span className="text-sm">Open a file from the explorer to start editing</span>
