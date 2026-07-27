@@ -64,7 +64,9 @@ export type ActivityEventType =
   | 'code_edit'
   | 'role_changed'
   | 'run_toggled'
-  | 'kicked';
+  | 'kicked'
+  | 'file_locked'
+  | 'file_unlocked';
 
 export interface ActivityEntry {
   username: string;
@@ -73,3 +75,16 @@ export interface ActivityEntry {
   targetUsername?: string;
   detail?: string;
 }
+
+export type LockScope = 'file' | 'function';
+
+export interface FileLockInfo {
+  fileId: number;
+  userId: number;
+  username: string;
+  socketId: string;
+  lockScope: LockScope;
+  acquiredAt: number;
+  lastHeartbeat: number;
+}
+
