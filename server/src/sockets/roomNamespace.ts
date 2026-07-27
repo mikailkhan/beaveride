@@ -11,6 +11,14 @@ import { buildProjectPayload } from '../utils/filePathUtils.js';
 
 import { RoomService } from '../services/roomService.js';
 import { RoomRepository } from '../repositories/roomRepository.js';
+import {
+  acquireLock,
+  releaseLock,
+  refreshHeartbeat,
+  releaseAllLocksForSocket,
+  getLocksForRoom,
+  getExpiredLocks,
+} from './lockStore.js';
 
 const userRepository = new UserRepository();
 const authService = new AuthService();
@@ -127,6 +135,10 @@ export function registerRoomNamespace(io: SocketServer): void {
         addActivity(roomId, { username, event: 'joined', timestamp: new Date().toISOString() });
         roomNsp.to(roomChannel).emit('activity:update', getActivities(roomId));
         socket.emit('activity:update', getActivities(roomId));
+
+        // Send current lock state for the room
+        const roomLocks = getLocksForRoom(roomId);
+        socket.emit('lock:state', roomLocks);
 
         // Load and emit all chat history from database
         const history = await historyPromise;
@@ -375,6 +387,71 @@ export function registerRoomNamespace(io: SocketServer): void {
         }
       });
 
+      // Lock handlers
+      socket.on('lock:acquire', (data: { fileId: number; lockScope?: 'file' | 'function' }) => {
+        const scope = data.lockScope === 'function' ? 'function' : 'file';
+        const result = acquireLock(roomId, data.fileId, userId, username, socket.id, scope);
+
+        if (result.status === 'acquired') {
+          roomNsp.to(roomChannel).emit('lock:acquired', result.lock);
+          addActivity(roomId, {
+            username,
+            event: 'file_locked',
+            timestamp: new Date().toISOString(),
+            detail: `locked file #${data.fileId}`,
+          });
+          roomNsp.to(roomChannel).emit('activity:update', getActivities(roomId));
+        } else if (result.status === 'queued') {
+          socket.emit('lock:queued', {
+            fileId: data.fileId,
+            position: result.position,
+            heldBy: result.heldBy,
+          });
+        } else if (result.status === 'already_held') {
+          socket.emit('lock:already_held', { fileId: data.fileId });
+        }
+      });
+
+      socket.on('lock:release', (data: { fileId: number }) => {
+        const result = releaseLock(roomId, data.fileId, userId);
+
+        if (result.status === 'released') {
+          roomNsp.to(roomChannel).emit('lock:released', { fileId: data.fileId, releasedBy: userId });
+
+          addActivity(roomId, {
+            username,
+            event: 'file_unlocked',
+            timestamp: new Date().toISOString(),
+            detail: `unlocked file #${data.fileId}`,
+          });
+          roomNsp.to(roomChannel).emit('activity:update', getActivities(roomId));
+
+          if (result.nextInQueue) {
+            const next = result.nextInQueue;
+            const grantResult = acquireLock(roomId, data.fileId, next.userId, next.username, next.socketId, 'file');
+            if (grantResult.status === 'acquired') {
+              roomNsp.to(next.socketId).emit('lock:granted', {
+                fileId: data.fileId,
+                lock: grantResult.lock,
+              });
+              roomNsp.to(roomChannel).emit('lock:acquired', grantResult.lock);
+
+              addActivity(roomId, {
+                username: next.username,
+                event: 'file_locked',
+                timestamp: new Date().toISOString(),
+                detail: `locked file #${data.fileId} (from queue)`,
+              });
+              roomNsp.to(roomChannel).emit('activity:update', getActivities(roomId));
+            }
+          }
+        }
+      });
+
+      socket.on('lock:heartbeat', (data: { fileId: number }) => {
+        refreshHeartbeat(roomId, data.fileId, userId);
+      });
+
       // Handle global code run requests with mutex locking
       socket.on('run:global', async (data: { entryFileId?: string; language: string; code?: string }) => {
         // Re-validate canRun permission from DB — awareness state is client-controlled
@@ -383,6 +460,22 @@ export function registerRoomNamespace(io: SocketServer): void {
           socket.emit('run:global:output', { chunk: 'Error: You do not have execution privileges in this room.' });
           socket.emit('run:global:end', { success: false });
           return;
+        }
+
+        // Block global run if the entry file is locked by another user
+        if (data.entryFileId) {
+          const entryFileIdNum = parseInt(data.entryFileId, 10);
+          if (!isNaN(entryFileIdNum)) {
+            const roomLocks = getLocksForRoom(roomId);
+            const entryLock = roomLocks.find((l) => l.fileId === entryFileIdNum);
+            if (entryLock && entryLock.userId !== userId) {
+              socket.emit('run:global:output', {
+                chunk: `Error: File is locked by ${entryLock.username}. Cannot run while file is locked by another user.`,
+              });
+              socket.emit('run:global:end', { success: false });
+              return;
+            }
+          }
         }
 
         if (globalRunLock.get(roomId)) {
@@ -422,6 +515,38 @@ export function registerRoomNamespace(io: SocketServer): void {
     socket.on('disconnect', async () => {
       console.info(`Socket ${socket.id} disconnected from room namespace (user: ${username})`);
       try {
+        // Auto-release any file locks held by this disconnecting socket
+        const releasedLocks = releaseAllLocksForSocket(socket.id);
+        for (const released of releasedLocks) {
+          const releasedRoomChannel = `room:${released.roomId}`;
+          roomNsp.to(releasedRoomChannel).emit('lock:released', {
+            fileId: released.fileId,
+            releasedBy: released.lock.userId,
+            reason: 'disconnect',
+          });
+
+          addActivity(released.roomId, {
+            username: released.lock.username,
+            event: 'file_unlocked',
+            timestamp: new Date().toISOString(),
+            detail: `unlocked file #${released.fileId} (disconnected)`,
+          });
+          roomNsp.to(releasedRoomChannel).emit('activity:update', getActivities(released.roomId));
+
+          // Auto-grant to next in queue
+          if (released.nextInQueue) {
+            const next = released.nextInQueue;
+            const grantResult = acquireLock(released.roomId, released.fileId, next.userId, next.username, next.socketId, 'file');
+            if (grantResult.status === 'acquired') {
+              roomNsp.to(next.socketId).emit('lock:granted', {
+                fileId: released.fileId,
+                lock: grantResult.lock,
+              });
+              roomNsp.to(releasedRoomChannel).emit('lock:acquired', grantResult.lock);
+            }
+          }
+        }
+
         await decrementConnections(roomId);
         addActivity(roomId, { username, event: 'left', timestamp: new Date().toISOString() });
         roomNsp.to(roomChannel).emit('activity:update', getActivities(roomId));
@@ -431,4 +556,46 @@ export function registerRoomNamespace(io: SocketServer): void {
       }
     });
   });
+
+  // Sweep for expired locks every 10 seconds
+  setInterval(() => {
+    const expired = getExpiredLocks();
+    for (const { key, lock } of expired) {
+      const parts = key.split(':');
+      if (!parts[0] || !parts[1]) continue;
+      const eRoomId = parseInt(parts[0], 10);
+      const eFileId = parseInt(parts[1], 10);
+
+      const result = releaseLock(eRoomId, eFileId, lock.userId);
+      if (result.status === 'released') {
+        const channel = `room:${eRoomId}`;
+        roomNsp.to(channel).emit('lock:released', {
+          fileId: eFileId,
+          releasedBy: lock.userId,
+          reason: 'timeout',
+        });
+
+        addActivity(eRoomId, {
+          username: lock.username,
+          event: 'file_unlocked',
+          timestamp: new Date().toISOString(),
+          detail: `unlocked file #${eFileId} (timed out)`,
+        });
+        roomNsp.to(channel).emit('activity:update', getActivities(eRoomId));
+
+        // Auto-grant next in queue
+        if (result.nextInQueue) {
+          const next = result.nextInQueue;
+          const grantResult = acquireLock(eRoomId, eFileId, next.userId, next.username, next.socketId, 'file');
+          if (grantResult.status === 'acquired') {
+            roomNsp.to(next.socketId).emit('lock:granted', {
+              fileId: eFileId,
+              lock: grantResult.lock,
+            });
+            roomNsp.to(channel).emit('lock:acquired', grantResult.lock);
+          }
+        }
+      }
+    }
+  }, 10_000);
 }
