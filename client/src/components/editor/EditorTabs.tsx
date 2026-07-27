@@ -41,7 +41,7 @@ export const EditorTabs: React.FC = () => {
         const isDragging = index === draggedIndex;
 
         const lockInfo = fileLocks.get(Number(tab.id));
-        const isLockedByMe = lockInfo !== undefined && authUser !== null && lockInfo.userId === Number(authUser.id);
+        const isLockedByMe = lockInfo !== undefined && authUser !== null && String(lockInfo.userId) === String(authUser.id);
 
         return (
           <div
@@ -62,7 +62,7 @@ export const EditorTabs: React.FC = () => {
             {lockInfo && (
               <span
                 className={`material-symbols-outlined text-[13px] ${
-                  isLockedByMe ? 'text-primary' : 'text-error'
+                  isLockedByMe ? 'text-blue-500' : 'text-error'
                 }`}
                 title={
                   isLockedByMe

@@ -599,7 +599,7 @@ export const EditorRoom = () => {
             <div className="flex-1 relative min-h-0">
               {activeFile ? (() => {
                 const activeFileLock = useLockStore.getState().fileLocks.get(Number(activeFile.id));
-                const isActiveFileLocked = activeFileLock !== undefined && authUser !== null && activeFileLock.userId !== Number(authUser.id);
+                const isActiveFileLocked = activeFileLock !== undefined && authUser !== null && String(activeFileLock.userId) !== String(authUser.id);
                 return (
                   <MonacoEditor 
                     language={getLanguageType(activeFile.name)} 

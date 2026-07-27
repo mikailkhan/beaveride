@@ -152,8 +152,8 @@ export const FileTreeNode: React.FC<FileTreeNodeProps> = ({
   const authUser = useAuthStore((state) => state.user);
   const fileIdNum = Number(node.id);
   const lockInfo = useLockStore((state) => state.fileLocks.get(fileIdNum));
-  const isLockedByMe = lockInfo !== undefined && authUser !== null && lockInfo.userId === Number(authUser.id);
-  const isLockedByOther = lockInfo !== undefined && authUser !== null && lockInfo.userId !== Number(authUser.id);
+  const isLockedByMe = lockInfo !== undefined && authUser !== null && String(lockInfo.userId) === String(authUser.id);
+  const isLockedByOther = lockInfo !== undefined && authUser !== null && String(lockInfo.userId) !== String(authUser.id);
 
   const isDirectory = node.type === 'directory';
   const isActive = node.id === activeFileId;
@@ -400,7 +400,7 @@ export const FileTreeNode: React.FC<FileTreeNodeProps> = ({
         {lockInfo && (
           <span
             className={`material-symbols-outlined text-[14px] ml-auto mr-1 shrink-0 ${
-              isLockedByMe ? 'text-primary' : 'text-error'
+              isLockedByMe ? 'text-blue-500' : 'text-error'
             }`}
             title={
               isLockedByMe
