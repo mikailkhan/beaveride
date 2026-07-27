@@ -2,8 +2,8 @@ import { create } from 'zustand';
 import type { FileLockInfo } from '../types';
 
 interface LockState {
-  /** Map of fileId → FileLockInfo for all locked files in the current room */
-  fileLocks: Map<number, FileLockInfo>;
+  /** Map of fileId → FileLockInfo[] for all locks in the current room */
+  fileLocks: Map<number, FileLockInfo[]>;
 
   /** Files the current user is queued for: fileId → queue position */
   queuePositions: Map<number, number>;
@@ -11,11 +11,11 @@ interface LockState {
   /** Set the full lock state (on initial connect) */
   setLockState: (locks: FileLockInfo[]) => void;
 
-  /** A file was locked (broadcast from server) */
+  /** A lock was acquired (broadcast from server) */
   addLock: (lock: FileLockInfo) => void;
 
-  /** A file was unlocked (broadcast from server) */
-  removeLock: (fileId: number) => void;
+  /** A lock was released (broadcast from server) */
+  removeLock: (fileId: number, lockId: string) => void;
 
   /** Update queue position for a file */
   setQueuePosition: (fileId: number, position: number) => void;
@@ -23,11 +23,11 @@ interface LockState {
   /** Remove from queue (lock was granted or cancelled) */
   removeFromQueue: (fileId: number) => void;
 
-  /** Check if a file is locked by another user */
-  isLockedByOther: (fileId: number, currentUserId: number) => boolean;
+  /** Check if a file is globally locked by another user (file scope) */
+  isFileLockedByOther: (fileId: number, currentUserId: number) => boolean;
 
-  /** Get lock info for a specific file */
-  getLock: (fileId: number) => FileLockInfo | undefined;
+  /** Get all locks for a specific file */
+  getLocks: (fileId: number) => FileLockInfo[];
 
   /** Clear all lock state (on room leave) */
   clearLockStore: () => void;
@@ -38,9 +38,11 @@ export const useLockStore = create<LockState>((set, get) => ({
   queuePositions: new Map(),
 
   setLockState: (locks) => {
-    const map = new Map<number, FileLockInfo>();
+    const map = new Map<number, FileLockInfo[]>();
     for (const lock of locks) {
-      map.set(lock.fileId, lock);
+      const existing = map.get(lock.fileId) || [];
+      existing.push(lock);
+      map.set(lock.fileId, existing);
     }
     set({ fileLocks: map });
   },
@@ -48,15 +50,29 @@ export const useLockStore = create<LockState>((set, get) => ({
   addLock: (lock) => {
     set((state) => {
       const updated = new Map(state.fileLocks);
-      updated.set(lock.fileId, lock);
+      const existing = updated.get(lock.fileId) || [];
+      // Replace if same lock id already exists, else append
+      const index = existing.findIndex(l => l.id === lock.id);
+      if (index >= 0) {
+        existing[index] = lock;
+      } else {
+        existing.push(lock);
+      }
+      updated.set(lock.fileId, [...existing]);
       return { fileLocks: updated };
     });
   },
 
-  removeLock: (fileId) => {
+  removeLock: (fileId, lockId) => {
     set((state) => {
       const updated = new Map(state.fileLocks);
-      updated.delete(fileId);
+      const existing = updated.get(fileId) || [];
+      const filtered = existing.filter(l => l.id !== lockId);
+      if (filtered.length === 0) {
+        updated.delete(fileId);
+      } else {
+        updated.set(fileId, filtered);
+      }
       return { fileLocks: updated };
     });
   },
@@ -77,13 +93,15 @@ export const useLockStore = create<LockState>((set, get) => ({
     });
   },
 
-  isLockedByOther: (fileId, currentUserId) => {
-    const lock = get().fileLocks.get(fileId);
-    return lock !== undefined && lock.userId !== currentUserId;
+  isFileLockedByOther: (fileId, currentUserId) => {
+    const locks = get().fileLocks.get(fileId);
+    if (!locks) return false;
+    // True if there is a 'file' scope lock owned by someone else
+    return locks.some(l => l.lockScope === 'file' && l.userId !== currentUserId);
   },
 
-  getLock: (fileId) => {
-    return get().fileLocks.get(fileId);
+  getLocks: (fileId) => {
+    return get().fileLocks.get(fileId) || [];
   },
 
   clearLockStore: () => {

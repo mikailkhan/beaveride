@@ -5,7 +5,7 @@ class MockRoomService {
     {
       id: 'r1',
       title: 'Interview Sandbox',
-      progLangId: 1, // Let's say 1 is JavaScript
+      language: 'javascript',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       status: 'active',
@@ -13,7 +13,7 @@ class MockRoomService {
     {
       id: 'r2',
       title: 'React Components Pair Programming',
-      progLangId: 1,
+      language: 'typescript',
       createdAt: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
       updatedAt: new Date(Date.now() - 3600000).toISOString(),
       status: 'active',
@@ -36,13 +36,13 @@ class MockRoomService {
     });
   }
 
-  async createRoom(title: string, progLangId: number): Promise<Room> {
+  async createRoom(title: string, language: string): Promise<Room> {
     return new Promise((resolve) => {
       setTimeout(() => {
         const newRoom: Room = {
           id: `r${Date.now()}`,
           title,
-          progLangId,
+          language,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           status: 'active',

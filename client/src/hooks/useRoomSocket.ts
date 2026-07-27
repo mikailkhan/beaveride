@@ -138,8 +138,8 @@ export function useRoomSocket({
       addLock(lock);
     };
 
-    const onLockReleased = (data: { fileId: number }) => {
-      removeLock(data.fileId);
+    const onLockReleased = (data: { fileId: number; lockId: string }) => {
+      removeLock(data.fileId, data.lockId);
     };
 
     const onLockQueued = (data: { fileId: number; position: number; heldBy: { userId: number; username: string } }) => {
@@ -174,8 +174,9 @@ export function useRoomSocket({
       const { fileLocks } = useLockStore.getState();
       const currentUserId = Number(authUser.id);
 
-      for (const [fileId, lock] of fileLocks.entries()) {
-        if (lock.userId === currentUserId) {
+      for (const [fileId, locks] of fileLocks.entries()) {
+        const hasMyLock = locks.some(l => l.userId === currentUserId);
+        if (hasMyLock) {
           socket.emit('lock:heartbeat', { fileId });
         }
       }

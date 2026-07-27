@@ -1,9 +1,12 @@
 export interface FileLock {
+  id: string;
   fileId: number;
   userId: number;
   username: string;
   socketId: string;
   lockScope: 'file' | 'function';
+  startLine?: number;
+  endLine?: number;
   acquiredAt: number;
   lastHeartbeat: number;
 }
@@ -13,17 +16,31 @@ export interface QueueEntry {
   username: string;
   socketId: string;
   requestedAt: number;
+  lockScope: 'file' | 'function';
+  startLine?: number;
+  endLine?: number;
 }
 
-const HEARTBEAT_TIMEOUT_MS = 30_000; // 30 seconds — if no heartbeat in this window, auto-release
+const HEARTBEAT_TIMEOUT_MS = 30_000; // 30 seconds
 
-const locks = new Map<string, FileLock>(); // key: `${roomId}:${fileId}`
-const queues = new Map<string, QueueEntry[]>(); // key: `${roomId}:${fileId}`
+// key: `${roomId}:${fileId}`
+const locks = new Map<string, FileLock[]>();
+const queues = new Map<string, QueueEntry[]>();
+
+function generateId(): string {
+  return Math.random().toString(36).substring(2, 9);
+}
 
 export type AcquireLockResult =
   | { status: 'acquired'; lock: FileLock }
   | { status: 'queued'; position: number; heldBy: { userId: number; username: string } }
-  | { status: 'already_held' }; // caller already holds this lock
+  | { status: 'already_held' };
+
+function checkOverlap(a: FileLock | QueueEntry, b: FileLock | QueueEntry): boolean {
+  if (a.lockScope === 'file' || b.lockScope === 'file') return true;
+  if (a.startLine === undefined || a.endLine === undefined || b.startLine === undefined || b.endLine === undefined) return true;
+  return a.startLine <= b.endLine && a.endLine >= b.startLine;
+}
 
 export function acquireLock(
   roomId: number,
@@ -31,116 +48,160 @@ export function acquireLock(
   userId: number,
   username: string,
   socketId: string,
-  lockScope: 'file' | 'function'
+  lockScope: 'file' | 'function',
+  startLine?: number,
+  endLine?: number
 ): AcquireLockResult {
   const key = `${roomId}:${fileId}`;
-  const existing = locks.get(key);
+  let fileLocks = locks.get(key) ?? [];
 
-  // If the same user already holds the lock, return early
-  if (existing && existing.userId === userId) {
+  // Check if same user already holds the exact exact lock scope (if file) or exact range (if function)
+  // Or simply, if they already hold a lock that covers this request.
+  const existingLock = fileLocks.find(l => 
+    l.userId === userId && 
+    (l.lockScope === 'file' || (lockScope === 'function' && l.startLine === startLine && l.endLine === endLine))
+  );
+
+  if (existingLock) {
     return { status: 'already_held' };
   }
 
-  // If no lock exists, grant it immediately
-  if (!existing) {
+  const requestedLock = { lockScope, startLine, endLine };
+
+  // Check for overlaps with other users
+  const overlappingLock = fileLocks.find(l => l.userId !== userId && checkOverlap(l, requestedLock as any));
+
+  if (!overlappingLock) {
     const lock: FileLock = {
+      id: generateId(),
       fileId,
       userId,
       username,
       socketId,
       lockScope,
+      startLine,
+      endLine,
       acquiredAt: Date.now(),
       lastHeartbeat: Date.now(),
     };
-    locks.set(key, lock);
+    locks.set(key, [...fileLocks, lock]);
     return { status: 'acquired', lock };
   }
 
-  // Lock exists and is held by someone else — add to queue
-  let queue = queues.get(key);
-  if (!queue) {
-    queue = [];
-    queues.set(key, queue);
-  }
-
-  // Don't add duplicate queue entries for the same user
-  const alreadyQueued = queue.some((q) => q.userId === userId);
+  // Overlap exists — add to queue
+  let queue = queues.get(key) ?? [];
+  
+  const alreadyQueued = queue.some((q) => 
+    q.userId === userId && q.lockScope === lockScope && q.startLine === startLine && q.endLine === endLine
+  );
+  
   if (!alreadyQueued) {
-    queue.push({ userId, username, socketId, requestedAt: Date.now() });
+    queue.push({ userId, username, socketId, requestedAt: Date.now(), lockScope, startLine, endLine });
+    queues.set(key, queue);
   }
 
   const position = queue.findIndex((q) => q.userId === userId) + 1;
   return {
     status: 'queued',
     position,
-    heldBy: { userId: existing.userId, username: existing.username },
+    heldBy: { userId: overlappingLock.userId, username: overlappingLock.username },
   };
 }
 
 export type ReleaseLockResult =
-  | { status: 'released'; nextInQueue: QueueEntry | null }
+  | { status: 'released'; lock: FileLock; nextInQueue: QueueEntry[] }
   | { status: 'not_held' };
 
 export function releaseLock(
   roomId: number,
   fileId: number,
-  userId: number
+  userId: number,
+  lockId: string
 ): ReleaseLockResult {
   const key = `${roomId}:${fileId}`;
-  const existing = locks.get(key);
+  let fileLocks = locks.get(key) ?? [];
 
-  if (!existing || existing.userId !== userId) {
+  const lockIndex = fileLocks.findIndex(l => l.id === lockId && l.userId === userId);
+  
+  if (lockIndex === -1) {
     return { status: 'not_held' };
   }
 
-  locks.delete(key);
-
-  // Check queue — promote next user
-  const queue = queues.get(key);
-  const next = queue?.shift() ?? null;
-
-  // Clean up empty queue
-  if (queue && queue.length === 0) {
-    queues.delete(key);
+  const releasedLock = fileLocks[lockIndex];
+  fileLocks.splice(lockIndex, 1);
+  
+  if (fileLocks.length === 0) {
+    locks.delete(key);
+  } else {
+    locks.set(key, fileLocks);
   }
 
-  return { status: 'released', nextInQueue: next };
+  // Check queue — we might be able to promote multiple users if they don't overlap with each other
+  // or with existing locks.
+  const queue = queues.get(key) ?? [];
+  const promotedEntries: QueueEntry[] = [];
+  
+  if (queue.length > 0) {
+    // We don't automatically grant them here, we just return them so the caller can call acquireLock
+    // Actually, in the original implementation, the caller calls acquireLock for the next user.
+    // So we just return the first one that can be granted.
+    
+    // Find first entry in queue that no longer overlaps with current locks
+    const nextValidIndex = queue.findIndex(q => !fileLocks.some(l => checkOverlap(l, q as any)));
+    
+    if (nextValidIndex !== -1) {
+      promotedEntries.push(queue[nextValidIndex]);
+      queue.splice(nextValidIndex, 1);
+    }
+
+    if (queue.length === 0) {
+      queues.delete(key);
+    } else {
+      queues.set(key, queue);
+    }
+  }
+
+  return { status: 'released', lock: releasedLock, nextInQueue: promotedEntries };
 }
 
 export function refreshHeartbeat(roomId: number, fileId: number, userId: number): boolean {
   const key = `${roomId}:${fileId}`;
-  const existing = locks.get(key);
-  if (!existing || existing.userId !== userId) return false;
-  existing.lastHeartbeat = Date.now();
-  return true;
+  const fileLocks = locks.get(key);
+  if (!fileLocks) return false;
+  
+  let found = false;
+  for (const lock of fileLocks) {
+    if (lock.userId === userId) {
+      lock.lastHeartbeat = Date.now();
+      found = true;
+    }
+  }
+  return found;
 }
 
 export interface ReleasedLock {
   roomId: number;
   fileId: number;
   lock: FileLock;
-  nextInQueue: QueueEntry | null;
+  nextInQueue: QueueEntry[];
 }
 
 export function releaseAllLocksForSocket(socketId: string): ReleasedLock[] {
   const released: ReleasedLock[] = [];
 
-  for (const [key, lock] of locks.entries()) {
-    if (lock.socketId === socketId) {
-      const parts = key.split(':');
-      if (!parts[0] || !parts[1]) continue;
-      const roomId = parseInt(parts[0], 10);
-      const fileId = parseInt(parts[1], 10);
+  for (const [key, fileLocks] of locks.entries()) {
+    const parts = key.split(':');
+    if (!parts[0] || !parts[1]) continue;
+    const roomId = parseInt(parts[0], 10);
+    const fileId = parseInt(parts[1], 10);
 
-      locks.delete(key);
-
-      const queue = queues.get(key);
-      const next = queue?.shift() ?? null;
-      if (queue && queue.length === 0) {
-        queues.delete(key);
+    const locksToRemove = fileLocks.filter(l => l.socketId === socketId);
+    
+    for (const lock of locksToRemove) {
+      const res = releaseLock(roomId, fileId, lock.userId, lock.id);
+      if (res.status === 'released') {
+        released.push({ roomId, fileId, lock: res.lock, nextInQueue: res.nextInQueue });
       }
-
-      released.push({ roomId, fileId, lock, nextInQueue: next });
     }
   }
 
@@ -157,13 +218,20 @@ export function releaseAllLocksForSocket(socketId: string): ReleasedLock[] {
   return released;
 }
 
-export function getExpiredLocks(): Array<{ key: string; lock: FileLock }> {
+export function getExpiredLocks(): Array<{ roomId: number, fileId: number, lock: FileLock }> {
   const now = Date.now();
-  const expired: Array<{ key: string; lock: FileLock }> = [];
+  const expired: Array<{ roomId: number, fileId: number, lock: FileLock }> = [];
 
-  for (const [key, lock] of locks.entries()) {
-    if (now - lock.lastHeartbeat > HEARTBEAT_TIMEOUT_MS) {
-      expired.push({ key, lock });
+  for (const [key, fileLocks] of locks.entries()) {
+    const parts = key.split(':');
+    if (!parts[0] || !parts[1]) continue;
+    const roomId = parseInt(parts[0], 10);
+    const fileId = parseInt(parts[1], 10);
+
+    for (const lock of fileLocks) {
+      if (now - lock.lastHeartbeat > HEARTBEAT_TIMEOUT_MS) {
+        expired.push({ roomId, fileId, lock });
+      }
     }
   }
 
@@ -173,9 +241,9 @@ export function getExpiredLocks(): Array<{ key: string; lock: FileLock }> {
 export function getLocksForRoom(roomId: number): FileLock[] {
   const result: FileLock[] = [];
   const prefix = `${roomId}:`;
-  for (const [key, lock] of locks.entries()) {
+  for (const [key, fileLocks] of locks.entries()) {
     if (key.startsWith(prefix)) {
-      result.push(lock);
+      result.push(...fileLocks);
     }
   }
   return result;

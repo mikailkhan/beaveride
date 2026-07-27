@@ -151,9 +151,14 @@ export const FileTreeNode: React.FC<FileTreeNodeProps> = ({
 
   const authUser = useAuthStore((state) => state.user);
   const fileIdNum = Number(node.id);
-  const lockInfo = useLockStore((state) => state.fileLocks.get(fileIdNum));
-  const isLockedByMe = lockInfo !== undefined && authUser !== null && String(lockInfo.userId) === String(authUser.id);
-  const isLockedByOther = lockInfo !== undefined && authUser !== null && String(lockInfo.userId) !== String(authUser.id);
+  const fileLocks = useLockStore((state) => state.fileLocks.get(fileIdNum)) || [];
+  
+  const myLocks = fileLocks.filter(l => authUser !== null && String(l.userId) === String(authUser.id));
+  const otherLocks = fileLocks.filter(l => authUser !== null && String(l.userId) !== String(authUser.id));
+  
+  const isLockedByMe = myLocks.length > 0;
+  const isFileLockedByOther = otherLocks.some(l => l.lockScope === 'file');
+  const isLockedByOther = otherLocks.length > 0;
 
   const isDirectory = node.type === 'directory';
   const isActive = node.id === activeFileId;
@@ -285,6 +290,9 @@ export const FileTreeNode: React.FC<FileTreeNodeProps> = ({
     }
   };
 
+  const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+  const lockShortcut = isMac ? '⌘⇧L' : 'Ctrl+Shift+L';
+
   const menuItems = isDirectory
     ? [
         {
@@ -314,8 +322,11 @@ export const FileTreeNode: React.FC<FileTreeNodeProps> = ({
               {
                 label: 'Unlock File',
                 icon: 'lock_open',
+                shortcut: lockShortcut,
                 onClick: () => {
-                  socket?.emit('lock:release', { fileId: fileIdNum });
+                  myLocks.forEach(lock => {
+                    socket?.emit('lock:release', { fileId: fileIdNum, lockId: lock.id });
+                  });
                 },
               },
             ]
@@ -324,15 +335,9 @@ export const FileTreeNode: React.FC<FileTreeNodeProps> = ({
               {
                 label: 'Lock File',
                 icon: 'lock',
+                shortcut: lockShortcut,
                 onClick: () => {
                   socket?.emit('lock:acquire', { fileId: fileIdNum, lockScope: 'file' });
-                },
-              },
-              {
-                label: 'Lock (Function Scope)',
-                icon: 'view_cozy',
-                onClick: () => {
-                  socket?.emit('lock:acquire', { fileId: fileIdNum, lockScope: 'function' });
                 },
               },
             ]
@@ -367,7 +372,7 @@ export const FileTreeNode: React.FC<FileTreeNodeProps> = ({
 
   return (
     <div
-      draggable={renamingNodeId !== node.id && !isLockedByOther}
+      draggable={renamingNodeId !== node.id && !isFileLockedByOther}
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -397,15 +402,13 @@ export const FileTreeNode: React.FC<FileTreeNodeProps> = ({
           getFileIcon(node.name)
         )}
         <span className="truncate text-[13px]">{node.name}</span>
-        {lockInfo && (
+        {fileLocks.length > 0 && (
           <span
             className={`material-symbols-outlined text-[14px] ml-auto mr-1 shrink-0 ${
-              isLockedByMe ? 'text-blue-500' : 'text-error'
+              isLockedByMe && myLocks.some(l => l.lockScope === 'file') ? 'text-blue-500' : isLockedByMe ? 'text-blue-500/50' : 'text-error'
             }`}
             title={
-              isLockedByMe
-                ? `Locked by you (${lockInfo.lockScope} scope)`
-                : `Locked by ${lockInfo.username} (${lockInfo.lockScope} scope)`
+              fileLocks.map(l => l.lockScope === 'function' ? `${l.username} (Lines ${l.startLine}-${l.endLine})` : `${l.username} (File)`).join(', ')
             }
           >
             lock

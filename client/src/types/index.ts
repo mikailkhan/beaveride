@@ -79,11 +79,14 @@ export interface ActivityEntry {
 export type LockScope = 'file' | 'function';
 
 export interface FileLockInfo {
+  id: string;
   fileId: number;
   userId: number;
   username: string;
   socketId: string;
   lockScope: LockScope;
+  startLine?: number;
+  endLine?: number;
   acquiredAt: number;
   lastHeartbeat: number;
 }

@@ -191,4 +191,39 @@
       border-color: transparent !important;
     }
   }
+
+  /* Block Lock Decorations */
+  .block-lock-mine {
+    background-color: rgba(59, 130, 246, 0.2) !important;
+  }
+  .block-lock-other {
+    background-color: rgba(239, 68, 68, 0.2) !important;
+  }
+  .block-lock-preview {
+    background-color: rgba(59, 130, 246, 0.1) !important;
+  }
+  .block-lock-icon-mine::after {
+    content: '\e897'; /* Material symbol lock */
+    font-family: 'Material Symbols Outlined';
+    color: #3b82f6;
+    font-size: 14px;
+    margin-left: 4px;
+    display: inline-block;
+  }
+  .block-lock-icon-other::after {
+    content: '\e897';
+    font-family: 'Material Symbols Outlined';
+    color: #ef4444;
+    font-size: 14px;
+    margin-left: 4px;
+    display: inline-block;
+  }
+  .block-lock-icon-preview::after {
+    content: '\e897';
+    font-family: 'Material Symbols Outlined';
+    color: rgba(59, 130, 246, 0.5);
+    font-size: 14px;
+    margin-left: 4px;
+    display: inline-block;
+  }
 }

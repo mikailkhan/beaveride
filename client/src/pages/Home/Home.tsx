@@ -4,10 +4,6 @@ import BeaverMascotLogo from "../../assets/logos/beaveride-mascot-logo.png";
 import step1 from "../../assets/home-images/image1.png";
 import step2 from "../../assets/home-images/image2.png";
 import step3 from "../../assets/home-images/image3.png";
-import step4 from "../../assets/home-images/image4.png";
-import step5 from "../../assets/home-images/image5.png";
-import step6 from "../../assets/home-images/image6.png";
-import step7 from "../../assets/home-images/image7.png";
 import brandMascot from "../../assets/logos/brand-mascot.svg";
 
 const steps = [

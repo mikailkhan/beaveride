@@ -79,8 +79,8 @@ export const EditorRoom = () => {
   // Sync activeRoom roles/permissions to local state when activeRoom is loaded
   useEffect(() => {
     if (activeRoom) {
-      setMyRole(activeRoom.role);
-      setMyCanRun(activeRoom.canRun);
+      if (activeRoom.role) setMyRole(activeRoom.role);
+      if (activeRoom.canRun !== undefined) setMyCanRun(activeRoom.canRun);
     }
   }, [activeRoom]);
 
@@ -135,9 +135,42 @@ export const EditorRoom = () => {
         awareness.setLocalStateField('activeFileId', activeFileId);
       }
       awareness.setLocalStateField('role', myRole);
-      awareness.setLocalStateField('canRun', myCanRun);
     }
   }, [awareness, activeFileId, myRole, myCanRun]);
+  // Global keyboard shortcut listener for Cmd+Shift+L / Ctrl+Shift+L (Lock/Unlock file)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isCmdOrCtrl = e.metaKey || e.ctrlKey;
+      if (isCmdOrCtrl && e.shiftKey && e.code === 'KeyL') {
+        const activeElement = document.activeElement;
+        const isMonacoFocused = activeElement?.classList.contains('inputarea') || activeElement?.closest('.monaco-editor');
+        if (isMonacoFocused) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        const targetFileId = activeFileId ? Number(activeFileId) : null;
+        if (!targetFileId || isNaN(targetFileId) || !authUser || !socket) return;
+
+        const currentLocks = useLockStore.getState().getLocks(targetFileId);
+        const myLocks = currentLocks.filter(l => String(l.userId) === String(authUser.id));
+
+        if (myLocks.length > 0) {
+          myLocks.forEach(lock => {
+            socket.emit('lock:release', { fileId: targetFileId, lockId: lock.id });
+          });
+        } else {
+          const isLockedByOther = currentLocks.some(l => String(l.userId) !== String(authUser.id));
+          if (!isLockedByOther) {
+            socket.emit('lock:acquire', { fileId: targetFileId, lockScope: 'file' });
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [activeFileId, authUser, socket]);
 
   // Use custom socket hook for room mutations, member status updates, activities, and global run state
   const { activities } = useRoomSocket({
@@ -209,14 +242,6 @@ export const EditorRoom = () => {
     return 'markdown';
   };
 
-  const formatLanguageName = (lang: string) => {
-    switch (lang.toLowerCase()) {
-      case 'javascript': return 'JavaScript (Node.js)';
-      case 'python': return 'Python 3';
-      case 'go': return 'Go (Golang)';
-      default: return lang.charAt(0).toUpperCase() + lang.slice(1);
-    }
-  };
 
   const getFileName = (fileId: string | null) => {
     if (!fileId) return 'No active file';
@@ -598,10 +623,11 @@ export const EditorRoom = () => {
             {/* Monaco-inspired Editor Container */}
             <div className="flex-1 relative min-h-0">
               {activeFile ? (() => {
-                const activeFileLock = useLockStore.getState().fileLocks.get(Number(activeFile.id));
-                const isActiveFileLocked = activeFileLock !== undefined && authUser !== null && String(activeFileLock.userId) !== String(authUser.id);
+                const isActiveFileLocked = useLockStore.getState().isFileLockedByOther(Number(activeFile.id), authUser ? Number(authUser.id) : 0);
                 return (
                   <MonacoEditor 
+                    key={activeFile.id}
+                    fileId={Number(activeFile.id)}
                     language={getLanguageType(activeFile.name)} 
                     readOnly={isViewer || isActiveFileLocked}
                     onMount={(editorInstance) => setEditor(editorInstance)}

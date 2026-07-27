@@ -40,8 +40,8 @@ export const EditorTabs: React.FC = () => {
         const isActive = tab.id === activeFileId;
         const isDragging = index === draggedIndex;
 
-        const lockInfo = fileLocks.get(Number(tab.id));
-        const isLockedByMe = lockInfo !== undefined && authUser !== null && String(lockInfo.userId) === String(authUser.id);
+        const tabLocks = fileLocks.get(Number(tab.id)) || [];
+        const isLockedByMe = tabLocks.some(l => authUser !== null && String(l.userId) === String(authUser.id));
 
         return (
           <div
@@ -59,15 +59,13 @@ export const EditorTabs: React.FC = () => {
           >
             {getFileIcon(tab.name)}
             <span className="truncate max-w-[120px] text-[13px]">{tab.name}</span>
-            {lockInfo && (
+            {tabLocks.length > 0 && (
               <span
                 className={`material-symbols-outlined text-[13px] ${
-                  isLockedByMe ? 'text-blue-500' : 'text-error'
+                  isLockedByMe && tabLocks.some(l => l.lockScope === 'file' && authUser !== null && String(l.userId) === String(authUser.id)) ? 'text-blue-500' : isLockedByMe ? 'text-blue-500/50' : 'text-error'
                 }`}
                 title={
-                  isLockedByMe
-                    ? `Locked by you (${lockInfo.lockScope} scope)`
-                    : `Locked by ${lockInfo.username} (${lockInfo.lockScope} scope)`
+                  tabLocks.map(l => l.lockScope === 'function' ? `${l.username} (Lines ${l.startLine}-${l.endLine})` : `${l.username} (File)`).join(', ')
                 }
               >
                 lock
