@@ -5,7 +5,9 @@ export type ActivityEventType =
   | 'code_edit' 
   | 'role_changed' 
   | 'run_toggled' 
-  | 'kicked';
+  | 'kicked'
+  | 'file_locked'
+  | 'file_unlocked';
 
 export interface ActivityEntry {
   username: string;
