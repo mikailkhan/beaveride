@@ -5,6 +5,7 @@ export interface FileLock {
   username: string;
   socketId: string;
   lockScope: 'file' | 'function';
+  unitName?: string | undefined;
   startLine?: number | undefined;
   endLine?: number | undefined;
   acquiredAt: number;
@@ -17,6 +18,7 @@ export interface QueueEntry {
   socketId: string;
   requestedAt: number;
   lockScope: 'file' | 'function';
+  unitName?: string | undefined;
   startLine?: number | undefined;
   endLine?: number | undefined;
 }
@@ -50,13 +52,13 @@ export function acquireLock(
   socketId: string,
   lockScope: 'file' | 'function',
   startLine?: number,
-  endLine?: number
+  endLine?: number,
+  unitName?: string
 ): AcquireLockResult {
   const key = `${roomId}:${fileId}`;
   let fileLocks = locks.get(key) ?? [];
 
-  // Check if same user already holds the exact exact lock scope (if file) or exact range (if function)
-  // Or simply, if they already hold a lock that covers this request.
+  // Check if same user already holds the exact lock scope (if file) or exact range (if function)
   const existingLock = fileLocks.find(l => 
     l.userId === userId && 
     (l.lockScope === 'file' || (lockScope === 'function' && l.startLine === startLine && l.endLine === endLine))
@@ -66,7 +68,7 @@ export function acquireLock(
     return { status: 'already_held' };
   }
 
-  const requestedLock = { lockScope, startLine, endLine };
+  const requestedLock = { lockScope, startLine, endLine, unitName };
 
   // Check for overlaps with other users
   const overlappingLock = fileLocks.find(l => l.userId !== userId && checkOverlap(l, requestedLock as any));
@@ -79,6 +81,7 @@ export function acquireLock(
       username,
       socketId,
       lockScope,
+      unitName,
       startLine,
       endLine,
       acquiredAt: Date.now(),
@@ -96,7 +99,7 @@ export function acquireLock(
   );
   
   if (!alreadyQueued) {
-    queue.push({ userId, username, socketId, requestedAt: Date.now(), lockScope, startLine, endLine });
+    queue.push({ userId, username, socketId, requestedAt: Date.now(), lockScope, unitName, startLine, endLine });
     queues.set(key, queue);
   }
 

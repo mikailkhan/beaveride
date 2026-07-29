@@ -183,6 +183,7 @@ export interface FileLockInfo {
   username: string;
   socketId: string;
   lockScope: LockScope;
+  unitName?: string;
   startLine?: number;
   endLine?: number;
   acquiredAt: number;
