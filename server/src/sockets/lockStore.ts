@@ -252,3 +252,46 @@ export function getQueueForFile(roomId: number, fileId: number): QueueEntry[] {
   const key = `${roomId}:${fileId}`;
   return queues.get(key) ?? [];
 }
+
+export function adjustLockSpansOnEdit(
+  roomId: number,
+  fileId: number,
+  editStartLine: number,
+  lineDelta: number
+): FileLock[] {
+  const key = `${roomId}:${fileId}`;
+  const fileLocks = locks.get(key) ?? [];
+
+  for (const lock of fileLocks) {
+    if (lock.lockScope === 'function' && lock.startLine !== undefined && lock.endLine !== undefined) {
+      if (editStartLine < lock.startLine) {
+        // Edit above the lock -> shift entire range
+        lock.startLine += lineDelta;
+        lock.endLine += lineDelta;
+      } else if (editStartLine >= lock.startLine && editStartLine <= lock.endLine) {
+        // Edit inside the lock -> expand/contract endLine
+        lock.endLine += lineDelta;
+        if (lock.endLine < lock.startLine) {
+          lock.endLine = lock.startLine;
+        }
+      }
+    }
+  }
+
+  const queue = queues.get(key) ?? [];
+  for (const q of queue) {
+    if (q.lockScope === 'function' && q.startLine !== undefined && q.endLine !== undefined) {
+      if (editStartLine < q.startLine) {
+        q.startLine += lineDelta;
+        q.endLine += lineDelta;
+      } else if (editStartLine >= q.startLine && editStartLine <= q.endLine) {
+        q.endLine += lineDelta;
+        if (q.endLine < q.startLine) {
+          q.endLine = q.startLine;
+        }
+      }
+    }
+  }
+
+  return fileLocks;
+}
