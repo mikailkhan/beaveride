@@ -18,6 +18,7 @@ import {
   releaseAllLocksForSocket,
   getLocksForRoom,
   getExpiredLocks,
+  adjustLockSpansOnEdit,
 } from './lockStore.js';
 
 const userRepository = new UserRepository();
@@ -452,10 +453,10 @@ export function registerRoomNamespace(io: SocketServer): void {
     });
 
     // Lock handlers
-    socket.on('lock:acquire', async (data: { fileId: number; lockScope?: 'file' | 'function'; startLine?: number; endLine?: number }) => {
+    socket.on('lock:acquire', async (data: { fileId: number; lockScope?: 'file' | 'function'; startLine?: number; endLine?: number; unitName?: string }) => {
       const scope = data.lockScope === 'function' ? 'function' : 'file';
       const correlationId = eventService.generateCorrelationId();
-      const result = acquireLock(roomId, data.fileId, userId, username, socket.id, scope, data.startLine, data.endLine);
+      const result = acquireLock(roomId, data.fileId, userId, username, socket.id, scope, data.startLine, data.endLine, data.unitName);
 
       if (result.status === 'acquired') {
         lockCorrelations.set(result.lock.id, correlationId);
@@ -469,9 +470,10 @@ export function registerRoomNamespace(io: SocketServer): void {
           eventType: 'lock_granted',
           targetFileId: data.fileId,
           targetScope: scope,
+          targetUnitName: data.unitName,
           outcome: 'granted',
           correlationId,
-          metadata: { startLine: data.startLine, endLine: data.endLine },
+          metadata: { startLine: data.startLine, endLine: data.endLine, unitName: data.unitName },
         });
         await broadcastActivities(roomId);
       } else if (result.status === 'queued') {
@@ -483,6 +485,7 @@ export function registerRoomNamespace(io: SocketServer): void {
           eventType: 'lock_requested',
           targetFileId: data.fileId,
           targetScope: scope,
+          targetUnitName: data.unitName,
           correlationId,
         });
 
@@ -494,9 +497,10 @@ export function registerRoomNamespace(io: SocketServer): void {
           eventType: 'lock_queued',
           targetFileId: data.fileId,
           targetScope: scope,
+          targetUnitName: data.unitName,
           outcome: 'queued',
           correlationId,
-          metadata: { position: result.position, heldBy: result.heldBy },
+          metadata: { position: result.position, heldBy: result.heldBy, unitName: data.unitName },
         });
         await broadcastActivities(roomId);
 
@@ -514,6 +518,7 @@ export function registerRoomNamespace(io: SocketServer): void {
           eventType: 'lock_denied',
           targetFileId: data.fileId,
           targetScope: scope,
+          targetUnitName: data.unitName,
           outcome: 'denied',
           reason: 'overlap_conflict',
           correlationId,
@@ -540,6 +545,7 @@ export function registerRoomNamespace(io: SocketServer): void {
           eventType: 'lock_released_explicit',
           targetFileId: data.fileId,
           targetScope: result.lock.lockScope,
+          targetUnitName: result.lock.unitName,
           outcome: 'completed',
           correlationId: lockCorrelationId,
         });
@@ -548,7 +554,7 @@ export function registerRoomNamespace(io: SocketServer): void {
         if (result.nextInQueue && result.nextInQueue.length > 0) {
           for (const next of result.nextInQueue) {
             const nextCorrelationId = eventService.generateCorrelationId();
-            const grantResult = acquireLock(roomId, data.fileId, next.userId, next.username, next.socketId, next.lockScope, next.startLine, next.endLine);
+            const grantResult = acquireLock(roomId, data.fileId, next.userId, next.username, next.socketId, next.lockScope, next.startLine, next.endLine, next.unitName);
             if (grantResult.status === 'acquired') {
               lockCorrelations.set(grantResult.lock.id, nextCorrelationId);
 
@@ -560,6 +566,7 @@ export function registerRoomNamespace(io: SocketServer): void {
                 eventType: 'lock_queue_promoted',
                 targetFileId: data.fileId,
                 targetScope: next.lockScope,
+                targetUnitName: next.unitName,
                 outcome: 'promoted',
                 correlationId: nextCorrelationId,
               });
@@ -572,6 +579,7 @@ export function registerRoomNamespace(io: SocketServer): void {
                 eventType: 'lock_granted',
                 targetFileId: data.fileId,
                 targetScope: next.lockScope,
+                targetUnitName: next.unitName,
                 outcome: 'granted',
                 correlationId: nextCorrelationId,
               });
