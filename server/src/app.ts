@@ -7,6 +7,7 @@ import { authRoutes } from './routes/authRoutes.js';
 import { healthRoutes, rootHealthRoutes } from './routes/healthRoutes.js';
 import { roomRoutes } from './routes/roomRoutes.js';
 import { fileRoutes } from './routes/fileRoutes.js';
+import { activityRoutes } from './routes/activityRoutes.js';
 import { apiRateLimiter } from './middleware/rateLimitMiddleware.js';
 
 export const createApp = () => {
@@ -46,6 +47,7 @@ export const createApp = () => {
   app.use('/api', healthRoutes);
   app.use('/api/auth', authRoutes);
   app.use('/api/rooms', fileRoutes);
+  app.use('/api/rooms', activityRoutes);
   app.use('/api/rooms', roomRoutes);
 
   app.use(notFoundHandler);

@@ -14,7 +14,7 @@ import { EditorTabs } from '../../components/editor/EditorTabs';
 import { useFileStore } from '../../store/fileStore';
 import { useLockStore } from '../../store/lockStore';
 import { GlobalSearchModal } from '../../components/editor/GlobalSearchModal';
-import type { ActivityEntry, ProjectFile } from '../../types';
+import type { ActivityEvent, ProjectFile } from '../../types';
 
 
 export const EditorRoom = () => {
@@ -249,66 +249,113 @@ export const EditorRoom = () => {
     return file ? file.name : 'Unknown file';
   };
 
-  const formatActivity = (entry: ActivityEntry) => {
-    switch (entry.event) {
+  const formatActivity = (entry: ActivityEvent) => {
+    const name = entry.actorName || (entry as any).username || 'System';
+    const isAgent = entry.actorType === 'agent';
+    const nameLabel = isAgent ? `🤖 ${name}` : name;
+    const detail = (entry.metadata?.detail as string) || (entry as any).detail;
+
+    switch (entry.eventType || (entry as any).event) {
+      case 'lock_granted':
       case 'file_locked':
         return {
           icon: 'lock',
-          label: `${entry.username} ${entry.detail || 'locked a file'}`,
+          label: `${nameLabel} locked file #${entry.targetFileId ?? ''}`.trim(),
           colorClass: 'text-tertiary',
         };
+      case 'lock_released_explicit':
+      case 'lock_released_disconnect':
+      case 'lock_released_idle_timeout':
       case 'file_unlocked':
         return {
           icon: 'lock_open',
-          label: `${entry.username} ${entry.detail || 'unlocked a file'}`,
+          label: `${nameLabel} unlocked file #${entry.targetFileId ?? ''}`.trim(),
           colorClass: 'text-primary',
         };
+      case 'lock_queued':
+        return {
+          icon: 'hourglass_empty',
+          label: `${nameLabel} queued for file #${entry.targetFileId ?? ''}`,
+          colorClass: 'text-amber-500',
+        };
+      case 'lock_denied':
+        return {
+          icon: 'block',
+          label: `${nameLabel} lock request denied`,
+          colorClass: 'text-red-500',
+        };
+      case 'participant_joined':
       case 'joined':
         return {
           icon: 'login',
-          label: `${entry.username} joined`,
+          label: `${nameLabel} joined`,
           colorClass: 'text-green-600',
         };
+      case 'participant_left':
+      case 'participant_disconnected':
       case 'left':
         return {
           icon: 'logout',
-          label: `${entry.username} left`,
+          label: `${nameLabel} left`,
           colorClass: 'text-red-500',
         };
+      case 'global_run_started':
       case 'global_run':
         return {
           icon: 'play_arrow',
-          label: `${entry.username} ran code`,
+          label: `${nameLabel} ran code`,
           colorClass: 'text-primary',
         };
+      case 'code_edited':
       case 'code_edit':
         return {
           icon: 'edit',
-          label: `${entry.username} edited code`,
+          label: `${nameLabel} edited code`,
           colorClass: 'text-tertiary',
         };
+      case 'file_created':
+        return {
+          icon: 'note_add',
+          label: `${nameLabel} created file`,
+          colorClass: 'text-green-600',
+        };
+      case 'file_renamed':
+        return {
+          icon: 'edit_note',
+          label: `${nameLabel} renamed file`,
+          colorClass: 'text-tertiary',
+        };
+      case 'file_deleted':
+        return {
+          icon: 'delete',
+          label: `${nameLabel} deleted file`,
+          colorClass: 'text-red-500',
+        };
+      case 'member_role_changed':
       case 'role_changed':
         return {
           icon: 'badge',
-          label: `${entry.username} ${entry.detail || 'updated role'}`,
+          label: `${nameLabel} ${detail || 'updated role'}`,
           colorClass: 'text-primary',
         };
+      case 'member_run_toggled':
       case 'run_toggled':
         return {
           icon: 'bolt',
-          label: `${entry.username} ${entry.detail || 'updated run permissions'}`,
+          label: `${nameLabel} ${detail || 'updated run permissions'}`,
           colorClass: 'text-tertiary',
         };
+      case 'member_kicked':
       case 'kicked':
         return {
           icon: 'person_remove',
-          label: `${entry.username} ${entry.detail || 'kicked user'}`,
+          label: `${nameLabel} ${detail || 'kicked user'}`,
           colorClass: 'text-error',
         };
       default:
         return {
           icon: 'info',
-          label: `${entry.username} performed action`,
+          label: `${nameLabel} ${detail || 'performed action'}`,
           colorClass: 'text-outline',
         };
     }
@@ -793,9 +840,9 @@ export const EditorRoom = () => {
                                 {details.icon}
                               </span>
                               <span className="flex-1 truncate" title={details.label}>{details.label}</span>
-                              <span className="text-[10px] text-outline shrink-0">
-                                {new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              </span>
+                                <span className="text-[10px] text-outline shrink-0">
+                                  {new Date(entry.occurredAt || (entry as any).timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </span>
                             </div>
                           );
                         })}

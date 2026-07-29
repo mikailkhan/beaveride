@@ -15,6 +15,13 @@
       "when": 1785056168433,
       "tag": "0001_lumpy_baron_strucker",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785302232560,
+      "tag": "0002_colossal_talon",
+      "breakpoints": true
     }
   ]
 }

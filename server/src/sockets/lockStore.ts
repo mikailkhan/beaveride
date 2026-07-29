@@ -5,8 +5,8 @@ export interface FileLock {
   username: string;
   socketId: string;
   lockScope: 'file' | 'function';
-  startLine?: number;
-  endLine?: number;
+  startLine?: number | undefined;
+  endLine?: number | undefined;
   acquiredAt: number;
   lastHeartbeat: number;
 }
@@ -17,8 +17,8 @@ export interface QueueEntry {
   socketId: string;
   requestedAt: number;
   lockScope: 'file' | 'function';
-  startLine?: number;
-  endLine?: number;
+  startLine?: number | undefined;
+  endLine?: number | undefined;
 }
 
 const HEARTBEAT_TIMEOUT_MS = 30_000; // 30 seconds
@@ -127,7 +127,7 @@ export function releaseLock(
     return { status: 'not_held' };
   }
 
-  const releasedLock = fileLocks[lockIndex];
+  const releasedLock = fileLocks[lockIndex]!;
   fileLocks.splice(lockIndex, 1);
   
   if (fileLocks.length === 0) {
@@ -142,15 +142,11 @@ export function releaseLock(
   const promotedEntries: QueueEntry[] = [];
   
   if (queue.length > 0) {
-    // We don't automatically grant them here, we just return them so the caller can call acquireLock
-    // Actually, in the original implementation, the caller calls acquireLock for the next user.
-    // So we just return the first one that can be granted.
-    
     // Find first entry in queue that no longer overlaps with current locks
     const nextValidIndex = queue.findIndex(q => !fileLocks.some(l => checkOverlap(l, q as any)));
     
-    if (nextValidIndex !== -1) {
-      promotedEntries.push(queue[nextValidIndex]);
+    if (nextValidIndex !== -1 && queue[nextValidIndex]) {
+      promotedEntries.push(queue[nextValidIndex]!);
       queue.splice(nextValidIndex, 1);
     }
 

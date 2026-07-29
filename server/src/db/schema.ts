@@ -1,14 +1,17 @@
 import {
+  bigint,
   boolean,
   customType,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   serial,
   text,
   timestamp,
   uniqueIndex,
+  uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
@@ -16,6 +19,90 @@ import { relations } from 'drizzle-orm';
 export const userRoomRoleEnum = pgEnum('user_room_role', ['owner', 'editor', 'viewer']);
 export const runStatusEnum = pgEnum('run_status', ['queued', 'running', 'success', 'error', 'cancelled']);
 export const fileNodeTypeEnum = pgEnum('file_node_type', ['file', 'directory']);
+
+export const activityActorTypeEnum = pgEnum('activity_actor_type', ['human', 'agent', 'system']);
+export const activityLockScopeEnum = pgEnum('activity_lock_scope', ['file', 'function']);
+export const activityOutcomeEnum = pgEnum('activity_outcome', [
+  'granted',
+  'denied',
+  'queued',
+  'expired',
+  'revoked',
+  'applied',
+  'rejected',
+  'promoted',
+  'withdrawn',
+  'completed',
+  'failed',
+  'cancelled',
+]);
+export const activityReasonEnum = pgEnum('activity_reason', [
+  'overlap_conflict',
+  'idle_timeout',
+  'heartbeat_loss',
+  'disconnect',
+  'target_deleted',
+  'stale_version',
+  'out_of_scope',
+  'execution_error',
+  'cancelled_by_participant',
+  'retry_exhausted',
+  'unknown',
+]);
+export const activityEventTypeEnum = pgEnum('activity_event_type', [
+  // Lock requests
+  'lock_requested',
+  'lock_granted',
+  'lock_denied',
+  // Queueing
+  'lock_queued',
+  'lock_queue_position_changed',
+  'lock_queue_withdrawn',
+  'lock_queue_promoted',
+  'lock_waiter_notified',
+  // Lock release
+  'lock_released_explicit',
+  'lock_released_idle_timeout',
+  'lock_released_heartbeat_loss',
+  'lock_released_disconnect',
+  'lock_released_target_deleted',
+  // Writes
+  'write_applied',
+  'write_rejected_stale',
+  'write_regenerated',
+  'write_refused_out_of_scope',
+  'write_failed',
+  // Agent tasks
+  'agent_task_assigned',
+  'agent_task_accepted',
+  'agent_stage_planning',
+  'agent_stage_waiting',
+  'agent_stage_writing',
+  'agent_stage_verifying',
+  'agent_task_completed',
+  'agent_task_failed',
+  'agent_task_cancelled',
+  // Participants
+  'participant_joined',
+  'participant_left',
+  'participant_disconnected',
+  'participant_reconnected',
+  'participant_heartbeat_lost',
+  // Files
+  'file_opened_read',
+  'file_opened_edit',
+  'file_closed',
+  'file_created',
+  'file_renamed',
+  'file_deleted',
+  // Legacy v1 events
+  'code_edited',
+  'global_run_started',
+  'global_run_ended',
+  'member_role_changed',
+  'member_run_toggled',
+  'member_kicked',
+]);
 
 const bytea = customType<{ data: Buffer }>({
   dataType() {
@@ -183,6 +270,7 @@ export const roomsRelations = relations(rooms, ({ one, many }) => ({
   codeSnapshots: many(codeSnapshots),
   runSnapshots: many(runSnapshots),
   projectFiles: many(projectFiles),
+  activityEvents: many(activityEvents),
 }));
 
 export const userRoomsRelations = relations(userRooms, ({ one }) => ({
@@ -222,6 +310,58 @@ export const projectFilesRelations = relations(projectFiles, ({ one }) => ({
   }),
   parent: one(projectFiles, {
     fields: [projectFiles.parentId],
+    references: [projectFiles.id],
+  }),
+}));
+
+export const activityEvents = pgTable(
+  'activity_events',
+  {
+    id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+    eventId: uuid('event_id').notNull(),
+    roomId: integer('room_id')
+      .notNull()
+      .references(() => rooms.id, { onDelete: 'cascade' }),
+    seq: bigint('seq', { mode: 'number' }).notNull(),
+    occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
+    actorId: integer('actor_id').references(() => users.id, { onDelete: 'set null' }),
+    actorName: varchar('actor_name', { length: 80 }).notNull(),
+    actorType: activityActorTypeEnum('actor_type').notNull(),
+    eventType: activityEventTypeEnum('event_type').notNull(),
+    targetFileId: integer('target_file_id').references(() => projectFiles.id, { onDelete: 'set null' }),
+    targetScope: activityLockScopeEnum('target_scope'),
+    targetUnitName: varchar('target_unit_name', { length: 255 }),
+    outcome: activityOutcomeEnum('outcome'),
+    reason: activityReasonEnum('reason'),
+    correlationId: uuid('correlation_id'),
+    versionRef: text('version_ref'),
+    versionProduced: text('version_produced'),
+    metadata: jsonb('metadata'),
+  },
+  (table) => ({
+    eventIdIdx: uniqueIndex('activity_events_event_id_idx').on(table.eventId),
+    roomSeqIdx: uniqueIndex('activity_events_room_seq_idx').on(table.roomId, table.seq),
+    roomOccurredIdx: index('activity_events_room_occurred_idx').on(table.roomId, table.occurredAt),
+    actorIdx: index('activity_events_actor_idx').on(table.actorId),
+    actorTypeIdx: index('activity_events_actor_type_idx').on(table.actorType),
+    fileIdx: index('activity_events_file_idx').on(table.targetFileId),
+    eventTypeIdx: index('activity_events_event_type_idx').on(table.eventType),
+    outcomeIdx: index('activity_events_outcome_idx').on(table.outcome),
+    correlationIdx: index('activity_events_correlation_idx').on(table.correlationId),
+  }),
+);
+
+export const activityEventsRelations = relations(activityEvents, ({ one }) => ({
+  room: one(rooms, {
+    fields: [activityEvents.roomId],
+    references: [rooms.id],
+  }),
+  actor: one(users, {
+    fields: [activityEvents.actorId],
+    references: [users.id],
+  }),
+  targetFile: one(projectFiles, {
+    fields: [activityEvents.targetFileId],
     references: [projectFiles.id],
   }),
 }));

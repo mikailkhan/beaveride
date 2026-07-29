@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Socket } from 'socket.io-client';
-import type { ActivityEntry, User } from '../types';
+import type { ActivityEvent, User } from '../types';
 import { useFileStore } from '../store/fileStore';
 import { useLockStore } from '../store/lockStore';
 import type { FileLockInfo } from '../types';
@@ -21,8 +21,8 @@ export function useRoomSocket({
   setMyCanRun,
   setGlobalRunStatus,
   setGlobalOutput,
-}: UseRoomSocketProps): { activities: ActivityEntry[] } {
-  const [activities, setActivities] = useState<ActivityEntry[]>([]);
+}: UseRoomSocketProps): { activities: ActivityEvent[] } {
+  const [activities, setActivities] = useState<ActivityEvent[]>([]);
   const setSocket = useFileStore((state) => state.setSocket);
 
   // Sync socket state in fileStore and listen to broadcast mutations & member management events
@@ -104,7 +104,7 @@ export function useRoomSocket({
       setGlobalOutput(`\r\n\x1b[31m[${message}]\x1b[0m\r\n`);
     };
 
-    const onActivityUpdate = (entries: ActivityEntry[]) => {
+    const onActivityUpdate = (entries: ActivityEvent[]) => {
       setActivities(entries);
     };
 

@@ -1,7 +1,6 @@
 import * as Y from 'yjs';
 import { SnapshotRepository } from '../repositories/snapshotRepository.js';
 import { FileRepository } from '../repositories/fileRepository.js';
-import { clearActivities } from './activityStore.js';
 
 const snapshotRepository = new SnapshotRepository();
 const fileRepository = new FileRepository();
@@ -152,8 +151,7 @@ export async function decrementConnections(roomId: number): Promise<void> {
       await persistDoc(roomId);
     }
     cache.delete(roomId);
-    clearActivities(roomId);
-    console.info(`Room ${roomId} connection count is 0. Saved and removed doc from cache. Activities cleared.`);
+    console.info(`Room ${roomId} connection count is 0. Saved and removed doc from cache.`);
   }
 }
 
