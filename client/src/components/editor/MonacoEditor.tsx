@@ -139,6 +139,7 @@ export const MonacoEditor = ({ fileId, language, value, options, onChange, onMou
   const decorationsCollection = useRef<monaco.editor.IEditorDecorationsCollection | null>(null);
   
   const [dynamicReadOnly, setDynamicReadOnly] = useState(false);
+  const [dynamicReadOnlyReason, setDynamicReadOnlyReason] = useState<{ type: 'collaborator' | 'out_of_scope'; unitName?: string } | null>(null);
 
   const fileIdRef = useRef(fileId);
   useEffect(() => {
@@ -338,35 +339,60 @@ export const MonacoEditor = ({ fileId, language, value, options, onChange, onMou
       }
     });
 
-    // Cursor overlap detection for partial read-only
+    // Cursor overlap detection & out-of-scope edit prevention
     editor.onDidChangeCursorSelection(() => {
       const currentFileId = fileIdRef.current;
       if (readOnly || !authUser || !currentFileId) {
         setDynamicReadOnly(false);
+        setDynamicReadOnlyReason(null);
         return;
       }
+
       const selections = editor.getSelections();
       const currentLocks = useLockStore.getState().getLocks(currentFileId);
       
-      let isOverlappingOtherLock = false;
+      const myLock = currentLocks.find(l => 
+        String(l.userId) === String(authUser.id) &&
+        l.lockScope === 'function' &&
+        l.startLine !== undefined &&
+        l.endLine !== undefined
+      );
+
+      let isBlocked = false;
+      let reason: { type: 'collaborator' | 'out_of_scope'; unitName?: string } | null = null;
+
       if (selections) {
         for (const sel of selections) {
           const start = sel.startLineNumber;
           const end = sel.endLineNumber;
-          const overlap = currentLocks.some(l => 
+
+          // Rule 1: If user holds a function lock, block any edit outside their locked scope [startLine, endLine]
+          if (myLock && myLock.startLine !== undefined && myLock.endLine !== undefined) {
+            if (start < myLock.startLine || end > myLock.endLine) {
+              isBlocked = true;
+              reason = { type: 'out_of_scope', unitName: myLock.unitName };
+              break;
+            }
+          }
+
+          // Rule 2: Block editing if selection overlaps a function lock owned by a collaborator
+          const overlapCollaborator = currentLocks.some(l => 
             String(l.userId) !== String(authUser.id) &&
             l.lockScope === 'function' &&
             l.startLine !== undefined && l.endLine !== undefined &&
             start <= l.endLine && end >= l.startLine
           );
-          if (overlap) {
-            isOverlappingOtherLock = true;
+
+          if (overlapCollaborator) {
+            isBlocked = true;
+            reason = { type: 'collaborator' };
             break;
           }
         }
       }
       
-      setDynamicReadOnly(isOverlappingOtherLock);
+      setDynamicReadOnly(isBlocked);
+      setDynamicReadOnlyReason(isBlocked ? reason : null);
     });
 
     if (onMount) {
@@ -419,7 +445,9 @@ export const MonacoEditor = ({ fileId, language, value, options, onChange, onMou
       {dynamicReadOnly && !readOnly && (
         <div className="flex items-center gap-xs px-sm py-1 bg-amber-500/10 text-amber-600 text-xs font-label-md border-b border-amber-500/20 shrink-0">
           <span className="material-symbols-outlined text-[14px]">edit_off</span>
-          Cursor is inside a block locked by another user. Read-only mode active.
+          {dynamicReadOnlyReason?.type === 'out_of_scope'
+            ? `You hold a lock on ${dynamicReadOnlyReason.unitName ? `function "${dynamicReadOnlyReason.unitName}"` : 'a code unit'}. Edits outside your locked scope are disabled.`
+            : 'Cursor is inside a block locked by another user. Read-only mode active.'}
         </div>
       )}
       <div className="flex-1 w-full relative">
