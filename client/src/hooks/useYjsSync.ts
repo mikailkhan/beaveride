@@ -3,6 +3,7 @@ import * as Y from 'yjs';
 import { io, Socket } from 'socket.io-client';
 import { Awareness, encodeAwarenessUpdate, applyAwarenessUpdate } from 'y-protocols/awareness';
 import { useAuthStore } from '../store/authStore';
+import { useFileStore } from '../store/fileStore';
 
 interface UseYjsSyncProps {
   roomId: string;
@@ -112,7 +113,8 @@ export function useYjsSync({ roomId, token }: UseYjsSyncProps): {
     // Broadcast local doc edits
     const handleDocUpdate = (update: Uint8Array, origin: any) => {
       if (origin !== 'remote' && socket.connected) {
-        socket.emit('sync:update', update);
+        const activeFileId = useFileStore.getState().activeFileId;
+        socket.emit('sync:update', update, activeFileId ? Number(activeFileId) : undefined);
       }
     };
     doc.on('update', handleDocUpdate);

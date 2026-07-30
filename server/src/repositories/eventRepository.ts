@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gte, lte, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, lt, lte, sql } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { activityEvents } from '../db/schema.js';
 import {
@@ -182,5 +182,14 @@ export class EventRepository {
       ...r,
       occurredAt: r.occurredAt.toISOString(),
     })) as unknown as ActivityEvent[];
+  }
+
+  async deleteOldEvents(cutoffDate: Date): Promise<number> {
+    const deleted = await db
+      .delete(activityEvents)
+      .where(lt(activityEvents.occurredAt, cutoffDate))
+      .returning({ id: activityEvents.id });
+
+    return deleted.length;
   }
 }

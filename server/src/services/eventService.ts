@@ -16,10 +16,34 @@ export class EventService {
 
   constructor(repository = new EventRepository()) {
     this.repository = repository;
+    this.startAutoCleanup();
+  }
+
+  private startAutoCleanup(): void {
+    // Run cleanup on startup after 10 seconds, then repeat every 24 hours
+    setTimeout(() => {
+      this.cleanOldEvents(7).catch((err) => {
+        console.error('[EventService] Auto-cleanup job failed on startup:', err);
+      });
+    }, 10_000);
+
+    const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+    setInterval(() => {
+      this.cleanOldEvents(7).catch((err) => {
+        console.error('[EventService] Periodic auto-cleanup job failed:', err);
+      });
+    }, TWENTY_FOUR_HOURS);
   }
 
   generateCorrelationId(): string {
     return randomUUID();
+  }
+
+  async cleanOldEvents(days = 7): Promise<number> {
+    const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const count = await this.repository.deleteOldEvents(cutoff);
+    console.log(`[EventService] Cleanup job completed: Purged ${count} activity log entries older than ${days} days (cutoff: ${cutoff.toISOString()}).`);
+    return count;
   }
 
   emit(event: NewActivityEvent): void {

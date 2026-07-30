@@ -8,6 +8,7 @@ interface FileState {
   files: ProjectFile[];
   openTabs: FileTab[];
   activeFileId: string | null;
+  vibratingTabId: string | null;
   validationError: string | null;
   socket: Socket | null;
   setSocket: (socket: Socket | null) => void;
@@ -22,6 +23,7 @@ interface FileState {
   openFile: (file: ProjectFile) => void;
   closeTab: (fileId: string) => void;
   setActiveFile: (fileId: string) => void;
+  triggerTabVibration: (fileId: string) => void;
   reorderTabs: (fromIndex: number, toIndex: number) => void;
   updateFileContent: (fileId: string, content: string) => void;
   deleteNode: (roomId: string, fileId: string) => Promise<void>;
@@ -38,11 +40,21 @@ export const useFileStore = create<FileState>((set, get) => ({
   files: [],
   openTabs: [],
   activeFileId: null,
+  vibratingTabId: null,
   validationError: null,
   socket: null,
 
   setSocket: (socket) => set({ socket }),
   setValidationError: (err) => set({ validationError: err }),
+
+  triggerTabVibration: (fileId) => {
+    set({ vibratingTabId: fileId });
+    setTimeout(() => {
+      if (get().vibratingTabId === fileId) {
+        set({ vibratingTabId: null });
+      }
+    }, 500);
+  },
   setFiles: (files) => set({ files }),
 
   fetchFileTree: async (roomId) => {

@@ -5,7 +5,7 @@ import { useAuthStore } from '../../store/authStore';
 import { getFileIcon } from '../../utils/fileUtils';
 
 export const EditorTabs: React.FC = () => {
-  const { openTabs, activeFileId, setActiveFile, closeTab, reorderTabs } = useFileStore();
+  const { openTabs, activeFileId, vibratingTabId, setActiveFile, closeTab, reorderTabs } = useFileStore();
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   const authUser = useAuthStore((state) => state.user);
@@ -38,6 +38,7 @@ export const EditorTabs: React.FC = () => {
     <div className="flex items-center w-full overflow-x-auto bg-surface-container/60 border-b border-outline-variant/20 scrollbar-thin h-9 shrink-0">
       {openTabs.map((tab, index) => {
         const isActive = tab.id === activeFileId;
+        const isVibrating = tab.id === vibratingTabId;
         const isDragging = index === draggedIndex;
 
         const tabLocks = fileLocks.get(Number(tab.id)) || [];
@@ -52,7 +53,9 @@ export const EditorTabs: React.FC = () => {
             onDrop={(e) => handleDrop(e, index)}
             onClick={() => setActiveFile(tab.id)}
             className={`group flex items-center gap-xs px-sm py-1.5 h-full border-r border-outline-variant/20 text-xs cursor-pointer select-none transition-all duration-150 shrink-0 ${
-              isActive
+              isVibrating
+                ? 'animate-vibrate bg-amber-500/20 text-amber-600 font-bold border-b-2 border-b-amber-500'
+                : isActive
                 ? 'bg-surface-bright text-primary font-medium border-b-2 border-b-primary'
                 : 'text-on-surface-variant/70 hover:bg-surface-container-high/40 hover:text-on-surface'
             } ${isDragging ? 'opacity-40' : 'opacity-100'}`}

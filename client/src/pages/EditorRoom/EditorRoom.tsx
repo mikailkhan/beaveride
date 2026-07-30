@@ -27,6 +27,8 @@ export const EditorRoom = () => {
     activeFileId,
     fetchFileTree,
     clearFileStore,
+    openFile,
+    triggerTabVibration,
     validationError,
   } = useFileStore();
   const activeFile = files.find((f) => f.id === activeFileId) || null;
@@ -255,110 +257,121 @@ export const EditorRoom = () => {
     const nameLabel = isAgent ? `🤖 ${name}` : name;
     const detail = (entry.metadata?.detail as string) || (entry as any).detail;
 
+    const fileIdStr = entry.targetFileId ? String(entry.targetFileId) : null;
+    const targetFile = fileIdStr ? files.find((f) => f.id === fileIdStr) : null;
+    const fileName = targetFile ? targetFile.name : (fileIdStr ? `file #${fileIdStr}` : null);
+
+    let icon = 'info';
+    let actionPrefix = '';
+    let targetFileName: string | null = fileName;
+    let colorClass = 'text-primary';
+
     switch (entry.eventType || (entry as any).event) {
       case 'lock_granted':
       case 'file_locked':
-        return {
-          icon: 'lock',
-          label: `${nameLabel} locked file #${entry.targetFileId ?? ''}`.trim(),
-          colorClass: 'text-tertiary',
-        };
+        icon = 'lock';
+        actionPrefix = `${nameLabel} locked`;
+        colorClass = 'text-tertiary';
+        break;
       case 'lock_released_explicit':
       case 'lock_released_disconnect':
       case 'lock_released_idle_timeout':
       case 'file_unlocked':
-        return {
-          icon: 'lock_open',
-          label: `${nameLabel} unlocked file #${entry.targetFileId ?? ''}`.trim(),
-          colorClass: 'text-primary',
-        };
+        icon = 'lock_open';
+        actionPrefix = `${nameLabel} unlocked`;
+        colorClass = 'text-primary';
+        break;
       case 'lock_queued':
-        return {
-          icon: 'hourglass_empty',
-          label: `${nameLabel} queued for file #${entry.targetFileId ?? ''}`,
-          colorClass: 'text-amber-500',
-        };
+        icon = 'hourglass_empty';
+        actionPrefix = `${nameLabel} queued for`;
+        colorClass = 'text-amber-500';
+        break;
       case 'lock_denied':
-        return {
-          icon: 'block',
-          label: `${nameLabel} lock request denied`,
-          colorClass: 'text-red-500',
-        };
+        icon = 'block';
+        actionPrefix = `${nameLabel} lock request denied`;
+        targetFileName = null;
+        colorClass = 'text-red-500';
+        break;
       case 'participant_joined':
       case 'joined':
-        return {
-          icon: 'login',
-          label: `${nameLabel} joined`,
-          colorClass: 'text-green-600',
-        };
+        icon = 'login';
+        actionPrefix = `${nameLabel} joined`;
+        targetFileName = null;
+        colorClass = 'text-green-600';
+        break;
       case 'participant_left':
       case 'participant_disconnected':
       case 'left':
-        return {
-          icon: 'logout',
-          label: `${nameLabel} left`,
-          colorClass: 'text-red-500',
-        };
+        icon = 'logout';
+        actionPrefix = `${nameLabel} left`;
+        targetFileName = null;
+        colorClass = 'text-red-500';
+        break;
       case 'global_run_started':
       case 'global_run':
-        return {
-          icon: 'play_arrow',
-          label: `${nameLabel} ran code`,
-          colorClass: 'text-primary',
-        };
+        icon = 'play_arrow';
+        actionPrefix = `${nameLabel} ran`;
+        targetFileName = fileName || 'code';
+        colorClass = 'text-primary';
+        break;
       case 'code_edited':
       case 'code_edit':
-        return {
-          icon: 'edit',
-          label: `${nameLabel} edited code`,
-          colorClass: 'text-tertiary',
-        };
+        icon = 'edit';
+        actionPrefix = `${nameLabel} edited`;
+        targetFileName = fileName || 'code';
+        colorClass = 'text-tertiary';
+        break;
       case 'file_created':
-        return {
-          icon: 'note_add',
-          label: `${nameLabel} created file`,
-          colorClass: 'text-green-600',
-        };
+        icon = 'note_add';
+        actionPrefix = `${nameLabel} created`;
+        colorClass = 'text-green-600';
+        break;
       case 'file_renamed':
-        return {
-          icon: 'edit_note',
-          label: `${nameLabel} renamed file`,
-          colorClass: 'text-tertiary',
-        };
+        icon = 'edit_note';
+        actionPrefix = `${nameLabel} renamed`;
+        colorClass = 'text-tertiary';
+        break;
       case 'file_deleted':
-        return {
-          icon: 'delete',
-          label: `${nameLabel} deleted file`,
-          colorClass: 'text-red-500',
-        };
+        icon = 'delete';
+        actionPrefix = `${nameLabel} deleted`;
+        colorClass = 'text-red-500';
+        break;
       case 'member_role_changed':
       case 'role_changed':
-        return {
-          icon: 'badge',
-          label: `${nameLabel} ${detail || 'updated role'}`,
-          colorClass: 'text-primary',
-        };
+        icon = 'badge';
+        actionPrefix = `${nameLabel} ${detail || 'updated role'}`;
+        targetFileName = null;
+        colorClass = 'text-primary';
+        break;
       case 'member_run_toggled':
       case 'run_toggled':
-        return {
-          icon: 'bolt',
-          label: `${nameLabel} ${detail || 'updated run permissions'}`,
-          colorClass: 'text-tertiary',
-        };
+        icon = 'bolt';
+        actionPrefix = `${nameLabel} ${detail || 'updated run permissions'}`;
+        targetFileName = null;
+        colorClass = 'text-tertiary';
+        break;
       case 'member_kicked':
       case 'kicked':
-        return {
-          icon: 'person_remove',
-          label: `${nameLabel} ${detail || 'kicked user'}`,
-          colorClass: 'text-error',
-        };
+        icon = 'person_remove';
+        actionPrefix = `${nameLabel} ${detail || 'kicked user'}`;
+        targetFileName = null;
+        colorClass = 'text-error';
+        break;
       default:
-        return {
-          icon: 'info',
-          label: `${nameLabel} ${detail || 'performed action'}`,
-          colorClass: 'text-outline',
-        };
+        icon = 'info';
+        actionPrefix = `${nameLabel} ${detail || 'performed action'}`;
+        targetFileName = null;
+        colorClass = 'text-outline';
+        break;
     }
+
+    return {
+      icon,
+      actionPrefix,
+      targetFileName,
+      targetFile,
+      colorClass,
+    };
   };
 
   const handleRoleSelect = (targetUserId: number, targetUsername: string, newRole: 'owner' | 'editor' | 'viewer') => {
@@ -839,10 +852,31 @@ export const EditorRoom = () => {
                               <span className={`material-symbols-outlined text-[14px] ${details.colorClass}`}>
                                 {details.icon}
                               </span>
-                              <span className="flex-1 truncate" title={details.label}>{details.label}</span>
-                                <span className="text-[10px] text-outline shrink-0">
-                                  {new Date(entry.occurredAt || (entry as any).timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                </span>
+                              <div className="flex-1 truncate flex items-center gap-1">
+                                <span>{details.actionPrefix}</span>
+                                {details.targetFileName && details.targetFile ? (
+                                  <button
+                                    onClick={() => {
+                                      if (details.targetFile) {
+                                        if (activeFileId === details.targetFile.id) {
+                                          triggerTabVibration(details.targetFile.id);
+                                        } else {
+                                          openFile(details.targetFile);
+                                        }
+                                      }
+                                    }}
+                                    className="font-semibold text-primary hover:underline hover:text-primary-container cursor-pointer transition-colors"
+                                    title={`Click to open ${details.targetFile.name}`}
+                                  >
+                                    {details.targetFileName}
+                                  </button>
+                                ) : details.targetFileName ? (
+                                  <span className="font-semibold text-on-surface">{details.targetFileName}</span>
+                                ) : null}
+                              </div>
+                              <span className="text-[10px] text-outline shrink-0">
+                                {new Date(entry.occurredAt || (entry as any).timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
                             </div>
                           );
                         })}

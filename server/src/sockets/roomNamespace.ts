@@ -106,12 +106,14 @@ export function registerRoomNamespace(io: SocketServer): void {
       }
     });
 
-    socket.on('sync:update', async (update: Uint8Array) => {
+    socket.on('sync:update', async (update: Uint8Array, fileId?: number | string) => {
       try {
         await docPromise;
         updateDoc(roomId, update, userId);
         // Relay the update to all other users in the room
         socket.to(roomChannel).emit('sync:update', update);
+
+        const targetFileId = fileId ? Number(fileId) : undefined;
 
         // Record a code_edit activity with a 10s debounce per user
         const debounceKey = `${roomId}:${userId}`;
@@ -125,6 +127,7 @@ export function registerRoomNamespace(io: SocketServer): void {
             actorName: username,
             actorType: 'human',
             eventType: 'code_edited',
+            targetFileId,
             outcome: 'completed',
           });
           await broadcastActivities(roomId);
