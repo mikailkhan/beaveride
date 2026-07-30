@@ -103,7 +103,28 @@ function findCurlyBraceBlock(model: monaco.editor.ITextModel, lineNumber: number
   return null;
 }
 
-function findBlock(editor: monaco.editor.ICodeEditor, language: string): { startLine: number; endLine: number } | null {
+import { parseCodeUnits } from '../../utils/codeParser';
+
+function findBlock(editor: monaco.editor.ICodeEditor, language: string): { startLine: number; endLine: number; unitName?: string } | null {
+  const model = editor.getModel();
+  if (!model) return null;
+
+  const position = editor.getPosition();
+  const lineNumber = position?.lineNumber ?? 1;
+
+  // 1. Match against parsed code units (functions/classes/methods)
+  const codeUnits = parseCodeUnits(model.getValue(), language);
+  const matchedUnit = codeUnits.find(u => lineNumber >= u.startLine && lineNumber <= u.endLine);
+
+  if (matchedUnit) {
+    return {
+      startLine: matchedUnit.startLine,
+      endLine: matchedUnit.endLine,
+      unitName: matchedUnit.unitName,
+    };
+  }
+
+  // 2. Selection fallback
   const selection = editor.getSelection();
   if (selection && selection.startLineNumber !== selection.endLineNumber) {
     return {
@@ -112,23 +133,17 @@ function findBlock(editor: monaco.editor.ICodeEditor, language: string): { start
     };
   }
 
-  const position = editor.getPosition();
-  if (!position) return null;
-
-  const model = editor.getModel();
-  if (!model) return null;
-
+  // 3. Language brace/indentation fallback
   const lang = language.toLowerCase();
-
   if (lang === 'python' || lang === 'yaml' || lang === 'yml') {
-    const pythonBlock = findPythonIndentedBlock(model, position.lineNumber);
+    const pythonBlock = findPythonIndentedBlock(model, lineNumber);
     if (pythonBlock) return pythonBlock;
   }
 
-  const braceBlock = findCurlyBraceBlock(model, position.lineNumber);
+  const braceBlock = findCurlyBraceBlock(model, lineNumber);
   if (braceBlock) return braceBlock;
 
-  return { startLine: position.lineNumber, endLine: position.lineNumber };
+  return { startLine: lineNumber, endLine: lineNumber };
 }
 
 const EMPTY_ARRAY: any[] = [];
@@ -224,7 +239,8 @@ export const MonacoEditor = ({ fileId, language, value, options, onChange, onMou
                 fileId: currentFileId, 
                 lockScope: 'function', 
                 startLine: block.startLine, 
-                endLine: block.endLine 
+                endLine: block.endLine,
+                unitName: block.unitName,
               });
             }
           }
@@ -261,7 +277,8 @@ export const MonacoEditor = ({ fileId, language, value, options, onChange, onMou
               fileId: currentFileId, 
               lockScope: 'function', 
               startLine: block.startLine, 
-              endLine: block.endLine 
+              endLine: block.endLine,
+              unitName: block.unitName,
             });
           }
         }
@@ -409,6 +426,8 @@ export const MonacoEditor = ({ fileId, language, value, options, onChange, onMou
     for (const lock of fileLocks) {
       if (lock.lockScope === 'function' && lock.startLine && lock.endLine) {
         const isMine = authUser && String(lock.userId) === String(authUser.id);
+        const unitNameText = lock.unitName ? ` (${lock.unitName})` : '';
+        const lineRangeText = `L${lock.startLine}-L${lock.endLine}`;
         
         newDecorations.push({
           range: new monacoRef.current.Range(lock.startLine, 1, lock.endLine, 1),
@@ -417,8 +436,8 @@ export const MonacoEditor = ({ fileId, language, value, options, onChange, onMou
             className: isMine ? 'block-lock-mine' : 'block-lock-other',
             glyphMarginClassName: isMine ? 'block-lock-icon-mine' : 'block-lock-icon-other',
             linesDecorationsClassName: isMine ? 'block-lock-icon-mine' : 'block-lock-icon-other',
-            glyphMarginHoverMessage: { value: isMine ? 'Locked by you (double-click to release)' : `Locked by ${lock.username}` },
-            hoverMessage: isMine ? undefined : { value: `Locked by ${lock.username}` }
+            glyphMarginHoverMessage: { value: isMine ? `Locked by you${unitNameText} [${lineRangeText}] - double-click to release` : `Locked by ${lock.username}${unitNameText} [${lineRangeText}]` },
+            hoverMessage: isMine ? undefined : { value: `Locked by ${lock.username}${unitNameText} [${lineRangeText}]` }
           }
         });
       }

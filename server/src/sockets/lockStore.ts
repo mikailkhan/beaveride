@@ -295,3 +295,53 @@ export function adjustLockSpansOnEdit(
 
   return fileLocks;
 }
+
+export type TerminateLockResult =
+  | { status: 'terminated'; lock: FileLock; clearedWaiters: QueueEntry[] }
+  | { status: 'not_found' };
+
+export function terminateLockOnUnitDeletion(
+  roomId: number,
+  fileId: number,
+  userId: number,
+  lockId: string
+): TerminateLockResult {
+  const key = `${roomId}:${fileId}`;
+  let fileLocks = locks.get(key) ?? [];
+
+  const lockIndex = fileLocks.findIndex(l => l.id === lockId && l.userId === userId);
+  if (lockIndex === -1) {
+    return { status: 'not_found' };
+  }
+
+  const terminatedLock = fileLocks[lockIndex]!;
+  fileLocks.splice(lockIndex, 1);
+
+  if (fileLocks.length === 0) {
+    locks.delete(key);
+  } else {
+    locks.set(key, fileLocks);
+  }
+
+  // Remove queued waiters that were waiting for this specific deleted unit
+  const queue = queues.get(key) ?? [];
+  const clearedWaiters: QueueEntry[] = [];
+  const remainingQueue: QueueEntry[] = [];
+
+  for (const q of queue) {
+    const isOverlapWithDeleted = checkOverlap(terminatedLock, q);
+    if (isOverlapWithDeleted) {
+      clearedWaiters.push(q);
+    } else {
+      remainingQueue.push(q);
+    }
+  }
+
+  if (remainingQueue.length === 0) {
+    queues.delete(key);
+  } else {
+    queues.set(key, remainingQueue);
+  }
+
+  return { status: 'terminated', lock: terminatedLock, clearedWaiters };
+}
