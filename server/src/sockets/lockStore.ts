@@ -1,3 +1,9 @@
+export interface LockSpan {
+  fileId: number;
+  startLine: number;
+  endLine: number;
+}
+
 export interface FileLock {
   id: string;
   fileId: number;
@@ -8,6 +14,9 @@ export interface FileLock {
   unitName?: string | undefined;
   startLine?: number | undefined;
   endLine?: number | undefined;
+  includeUsages?: boolean | undefined;
+  usageSpans?: LockSpan[] | undefined;
+  groupId?: string | undefined;
   acquiredAt: number;
   lastHeartbeat: number;
 }
@@ -21,6 +30,9 @@ export interface QueueEntry {
   unitName?: string | undefined;
   startLine?: number | undefined;
   endLine?: number | undefined;
+  includeUsages?: boolean | undefined;
+  usageSpans?: LockSpan[] | undefined;
+  groupId?: string | undefined;
 }
 
 const HEARTBEAT_TIMEOUT_MS = 30_000; // 30 seconds
@@ -29,7 +41,7 @@ const HEARTBEAT_TIMEOUT_MS = 30_000; // 30 seconds
 const locks = new Map<string, FileLock[]>();
 const queues = new Map<string, QueueEntry[]>();
 
-function generateId(): string {
+export function generateId(): string {
   return Math.random().toString(36).substring(2, 9);
 }
 
@@ -53,7 +65,10 @@ export function acquireLock(
   lockScope: 'file' | 'function',
   startLine?: number,
   endLine?: number,
-  unitName?: string
+  unitName?: string,
+  includeUsages: boolean = false,
+  usageSpans: LockSpan[] = [],
+  groupId?: string
 ): AcquireLockResult {
   const key = `${roomId}:${fileId}`;
   let fileLocks = locks.get(key) ?? [];
@@ -84,6 +99,9 @@ export function acquireLock(
       unitName,
       startLine,
       endLine,
+      includeUsages,
+      usageSpans,
+      groupId,
       acquiredAt: Date.now(),
       lastHeartbeat: Date.now(),
     };
@@ -99,7 +117,19 @@ export function acquireLock(
   );
   
   if (!alreadyQueued) {
-    queue.push({ userId, username, socketId, requestedAt: Date.now(), lockScope, unitName, startLine, endLine });
+    queue.push({
+      userId,
+      username,
+      socketId,
+      requestedAt: Date.now(),
+      lockScope,
+      unitName,
+      startLine,
+      endLine,
+      includeUsages,
+      usageSpans,
+      groupId,
+    });
     queues.set(key, queue);
   }
 
@@ -109,6 +139,161 @@ export function acquireLock(
     position,
     heldBy: { userId: overlappingLock.userId, username: overlappingLock.username },
   };
+}
+
+export type AcquireUsageLockResult =
+  | { status: 'acquired'; locks: FileLock[] }
+  | { status: 'queued'; position: number; blockedBy: { fileId: number; userId: number; username: string }[] }
+  | { status: 'already_held' };
+
+/**
+ * Atomically acquires a function lock + all usage span locks.
+ * ALL-OR-NOTHING per PRD §7.2
+ */
+export function acquireUsageLock(
+  roomId: number,
+  definitionFileId: number,
+  userId: number,
+  username: string,
+  socketId: string,
+  unitName: string,
+  defStartLine: number,
+  defEndLine: number,
+  usageSpans: LockSpan[],
+  groupId: string
+): AcquireUsageLockResult {
+  const defKey = `${roomId}:${definitionFileId}`;
+  const defLocks = locks.get(defKey) ?? [];
+
+  const existingDef = defLocks.find(l =>
+    l.userId === userId &&
+    l.lockScope === 'function' &&
+    l.startLine === defStartLine &&
+    l.endLine === defEndLine
+  );
+  if (existingDef) {
+    return { status: 'already_held' };
+  }
+
+  const blockedBy: { fileId: number; userId: number; username: string }[] = [];
+
+  const defRequest = { lockScope: 'function' as const, startLine: defStartLine, endLine: defEndLine };
+  const defOverlap = defLocks.find(l => l.userId !== userId && checkOverlap(l, defRequest as any));
+  if (defOverlap) {
+    blockedBy.push({ fileId: definitionFileId, userId: defOverlap.userId, username: defOverlap.username });
+  }
+
+  for (const span of usageSpans) {
+    const spanKey = `${roomId}:${span.fileId}`;
+    const spanLocks = locks.get(spanKey) ?? [];
+    const spanRequest = { lockScope: 'function' as const, startLine: span.startLine, endLine: span.endLine };
+    const spanOverlap = spanLocks.find(l => l.userId !== userId && checkOverlap(l, spanRequest as any));
+    if (spanOverlap) {
+      blockedBy.push({ fileId: span.fileId, userId: spanOverlap.userId, username: spanOverlap.username });
+    }
+  }
+
+  if (blockedBy.length > 0) {
+    let queue = queues.get(defKey) ?? [];
+    const alreadyQueued = queue.some(q => q.userId === userId && q.groupId === groupId);
+
+    if (!alreadyQueued) {
+      queue.push({
+        userId,
+        username,
+        socketId,
+        requestedAt: Date.now(),
+        lockScope: 'function',
+        unitName,
+        startLine: defStartLine,
+        endLine: defEndLine,
+        includeUsages: true,
+        usageSpans,
+        groupId,
+      });
+      queues.set(defKey, queue);
+    }
+
+    const position = queue.findIndex(q => q.userId === userId && q.groupId === groupId) + 1;
+    return { status: 'queued', position, blockedBy };
+  }
+
+  const acquiredLocks: FileLock[] = [];
+
+  const defLock: FileLock = {
+    id: generateId(),
+    fileId: definitionFileId,
+    userId,
+    username,
+    socketId,
+    lockScope: 'function',
+    unitName,
+    startLine: defStartLine,
+    endLine: defEndLine,
+    includeUsages: true,
+    usageSpans,
+    groupId,
+    acquiredAt: Date.now(),
+    lastHeartbeat: Date.now(),
+  };
+  locks.set(defKey, [...(locks.get(defKey) ?? []), defLock]);
+  acquiredLocks.push(defLock);
+
+  for (const span of usageSpans) {
+    const spanKey = `${roomId}:${span.fileId}`;
+    const spanLock: FileLock = {
+      id: generateId(),
+      fileId: span.fileId,
+      userId,
+      username,
+      socketId,
+      lockScope: 'function',
+      unitName: `${unitName} (usage)`,
+      startLine: span.startLine,
+      endLine: span.endLine,
+      includeUsages: false,
+      usageSpans: [],
+      groupId,
+      acquiredAt: Date.now(),
+      lastHeartbeat: Date.now(),
+    };
+    locks.set(spanKey, [...(locks.get(spanKey) ?? []), spanLock]);
+    acquiredLocks.push(spanLock);
+  }
+
+  return { status: 'acquired', locks: acquiredLocks };
+}
+
+export interface ReleaseGroupResult {
+  status: 'released';
+  releasedLocks: { roomId: number; fileId: number; lock: FileLock; nextInQueue: QueueEntry[] }[];
+}
+
+export function releaseGroupLocks(
+  roomId: number,
+  groupId: string,
+  userId: number
+): ReleaseGroupResult {
+  const releasedLocks: { roomId: number; fileId: number; lock: FileLock; nextInQueue: QueueEntry[] }[] = [];
+  const prefix = `${roomId}:`;
+
+  for (const [key, fileLocks] of locks.entries()) {
+    if (!key.startsWith(prefix)) continue;
+
+    const parts = key.split(':');
+    const fileId = parseInt(parts[1]!, 10);
+
+    const groupLocksInFile = fileLocks.filter(l => l.groupId === groupId && l.userId === userId);
+
+    for (const lock of groupLocksInFile) {
+      const result = releaseLock(roomId, fileId, userId, lock.id);
+      if (result.status === 'released') {
+        releasedLocks.push({ roomId, fileId, lock: result.lock, nextInQueue: result.nextInQueue });
+      }
+    }
+  }
+
+  return { status: 'released', releasedLocks };
 }
 
 export type ReleaseLockResult =

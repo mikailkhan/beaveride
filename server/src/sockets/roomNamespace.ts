@@ -3,7 +3,7 @@ import * as Y from 'yjs';
 import { UserRepository } from '../repositories/userRepository.js';
 import { AuthService } from '../services/authService.js';
 import { ChatRepository } from '../repositories/chatRepository.js';
-import { getOrCreateDoc, updateDoc, decrementConnections, getOrCreateFileText, deleteFileText } from './docStore.js';
+import { getOrCreateDoc, getDoc, updateDoc, decrementConnections, getOrCreateFileText, deleteFileText } from './docStore.js';
 import { ExecutorService } from '../services/executorService.js';
 import { FileService } from '../services/fileService.js';
 import { eventService } from '../services/eventService.js';
@@ -19,7 +19,11 @@ import {
   getLocksForRoom,
   getExpiredLocks,
   adjustLockSpansOnEdit,
+  acquireUsageLock,
+  releaseGroupLocks,
+  generateId,
 } from './lockStore.js';
+import { scanUsages } from '../utils/usageScanner.js';
 
 const userRepository = new UserRepository();
 const authService = new AuthService();
@@ -601,6 +605,271 @@ export function registerRoomNamespace(io: SocketServer): void {
 
     socket.on('lock:heartbeat', (data: { fileId: number }) => {
       refreshHeartbeat(roomId, data.fileId, userId);
+    });
+
+    // Usage scanning — server scans workspace for usages of a named code unit
+    socket.on('lock:scan-usages', async (data: {
+      fileId: number;
+      unitName: string;
+    }) => {
+      try {
+        const allFiles = await fileService.getFileTree(userId, roomId);
+        const yDoc = getDoc(roomId);
+        const yFilesMap = yDoc?.getMap('files');
+
+        const fileContents = allFiles
+          .filter(f => f.type === 'file')
+          .map(f => {
+            let content = '';
+            if (yFilesMap) {
+              const yText = yFilesMap.get(`file:${f.id}`);
+              if (yText) {
+                content = yText.toString();
+              }
+            }
+            if (!content && f.content) {
+              content = f.content;
+            }
+            return {
+              fileId: f.id,
+              fileName: f.name,
+              content,
+            };
+          });
+
+        const result = scanUsages(data.unitName, data.fileId, fileContents);
+        socket.emit('lock:usage-scan-result', result);
+      } catch (err) {
+        console.error(`Failed to scan usages in room ${roomId}:`, err);
+        socket.emit('lock:usage-scan-result', {
+          definitionFileId: data.fileId,
+          unitName: data.unitName,
+          usages: [],
+          isComplete: false,
+          warnings: ['Server error during usage scan'],
+        });
+      }
+    });
+
+    // Usage-inclusive lock acquisition — atomic all-or-nothing
+    socket.on('lock:acquire-usage', async (data: {
+      fileId: number;
+      unitName: string;
+      startLine: number;
+      endLine: number;
+      usageSpans: Array<{ fileId: number; startLine: number; endLine: number }>;
+    }) => {
+      const correlationId = eventService.generateCorrelationId();
+      const groupId = generateId();
+
+      const result = acquireUsageLock(
+        roomId,
+        data.fileId,
+        userId,
+        username,
+        socket.id,
+        data.unitName,
+        data.startLine,
+        data.endLine,
+        data.usageSpans,
+        groupId
+      );
+
+      if (result.status === 'acquired') {
+        for (const lock of result.locks) {
+          lockCorrelations.set(lock.id, correlationId);
+          roomNsp.to(roomChannel).emit('lock:acquired', lock);
+        }
+
+        eventService.emit({
+          roomId,
+          actorId: userId,
+          actorName: username,
+          actorType: 'human',
+          eventType: 'lock_granted',
+          targetFileId: data.fileId,
+          targetScope: 'function',
+          targetUnitName: data.unitName,
+          outcome: 'granted',
+          correlationId,
+          metadata: {
+            includeUsages: true,
+            groupId,
+            usageCount: data.usageSpans.length,
+            startLine: data.startLine,
+            endLine: data.endLine,
+          },
+        });
+        await broadcastActivities(roomId);
+
+        socket.emit('lock:usage-acquired', {
+          groupId,
+          locks: result.locks,
+        });
+      } else if (result.status === 'queued') {
+        eventService.emit({
+          roomId,
+          actorId: userId,
+          actorName: username,
+          actorType: 'human',
+          eventType: 'lock_requested',
+          targetFileId: data.fileId,
+          targetScope: 'function',
+          targetUnitName: data.unitName,
+          correlationId,
+          metadata: { includeUsages: true, groupId },
+        });
+
+        eventService.emit({
+          roomId,
+          actorId: userId,
+          actorName: username,
+          actorType: 'human',
+          eventType: 'lock_queued',
+          targetFileId: data.fileId,
+          targetScope: 'function',
+          targetUnitName: data.unitName,
+          outcome: 'queued',
+          correlationId,
+          metadata: {
+            position: result.position,
+            blockedBy: result.blockedBy,
+            includeUsages: true,
+            groupId,
+          },
+        });
+        await broadcastActivities(roomId);
+
+        socket.emit('lock:usage-queued', {
+          fileId: data.fileId,
+          groupId,
+          position: result.position,
+          blockedBy: result.blockedBy,
+        });
+      } else if (result.status === 'already_held') {
+        socket.emit('lock:already_held', { fileId: data.fileId });
+      }
+    });
+
+    // Release all locks in a usage-inclusive group
+    socket.on('lock:release-group', async (data: { groupId: string }) => {
+      const result = releaseGroupLocks(roomId, data.groupId, userId);
+
+      for (const released of result.releasedLocks) {
+        const lockCorrId = lockCorrelations.get(released.lock.id);
+        lockCorrelations.delete(released.lock.id);
+
+        roomNsp.to(roomChannel).emit('lock:released', {
+          fileId: released.fileId,
+          lockId: released.lock.id,
+          releasedBy: userId,
+        });
+
+        eventService.emit({
+          roomId,
+          actorId: userId,
+          actorName: username,
+          actorType: 'human',
+          eventType: 'lock_released_explicit',
+          targetFileId: released.fileId,
+          targetScope: released.lock.lockScope,
+          targetUnitName: released.lock.unitName,
+          outcome: 'completed',
+          correlationId: lockCorrId,
+          metadata: { groupId: data.groupId },
+        });
+
+        if (released.nextInQueue && released.nextInQueue.length > 0) {
+          for (const next of released.nextInQueue) {
+            const nextCorrelationId = eventService.generateCorrelationId();
+
+            if (next.includeUsages && next.usageSpans && next.usageSpans.length > 0 && next.groupId) {
+              const grantResult = acquireUsageLock(
+                roomId,
+                released.fileId,
+                next.userId,
+                next.username,
+                next.socketId,
+                next.unitName ?? '',
+                next.startLine ?? 0,
+                next.endLine ?? 0,
+                next.usageSpans,
+                next.groupId
+              );
+              if (grantResult.status === 'acquired') {
+                for (const lock of grantResult.locks) {
+                  lockCorrelations.set(lock.id, nextCorrelationId);
+                  roomNsp.to(roomChannel).emit('lock:acquired', lock);
+                }
+                eventService.emit({
+                  roomId,
+                  actorId: next.userId,
+                  actorName: next.username,
+                  actorType: 'human',
+                  eventType: 'lock_queue_promoted',
+                  targetFileId: released.fileId,
+                  targetScope: 'function',
+                  targetUnitName: next.unitName,
+                  outcome: 'promoted',
+                  correlationId: nextCorrelationId,
+                  metadata: { includeUsages: true, groupId: next.groupId },
+                });
+                roomNsp.to(next.socketId).emit('lock:usage-acquired', {
+                  groupId: next.groupId,
+                  locks: grantResult.locks,
+                });
+              }
+            } else {
+              const grantResult = acquireLock(
+                roomId,
+                released.fileId,
+                next.userId,
+                next.username,
+                next.socketId,
+                next.lockScope,
+                next.startLine,
+                next.endLine,
+                next.unitName
+              );
+              if (grantResult.status === 'acquired') {
+                lockCorrelations.set(grantResult.lock.id, nextCorrelationId);
+                eventService.emit({
+                  roomId,
+                  actorId: next.userId,
+                  actorName: next.username,
+                  actorType: 'human',
+                  eventType: 'lock_queue_promoted',
+                  targetFileId: released.fileId,
+                  targetScope: next.lockScope,
+                  targetUnitName: next.unitName,
+                  outcome: 'promoted',
+                  correlationId: nextCorrelationId,
+                });
+                eventService.emit({
+                  roomId,
+                  actorId: next.userId,
+                  actorName: next.username,
+                  actorType: 'human',
+                  eventType: 'lock_granted',
+                  targetFileId: released.fileId,
+                  targetScope: next.lockScope,
+                  targetUnitName: next.unitName,
+                  outcome: 'granted',
+                  correlationId: nextCorrelationId,
+                });
+                await broadcastActivities(roomId);
+                roomNsp.to(next.socketId).emit('lock:granted', {
+                  fileId: released.fileId,
+                  lock: grantResult.lock,
+                });
+                roomNsp.to(roomChannel).emit('lock:acquired', grantResult.lock);
+              }
+            }
+          }
+        }
+      }
+
+      await broadcastActivities(roomId);
     });
 
     // Handle global code run requests with mutex locking
