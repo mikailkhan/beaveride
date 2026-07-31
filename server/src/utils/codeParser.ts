@@ -1,40 +1,27 @@
-export interface CodeUnit {
-  unitName: string;
-  unitType: 'function' | 'class' | 'method';
-  startLine: number; // 1-indexed
-  endLine: number;   // 1-indexed, inclusive
-}
+import type { CodeUnit, LanguageGrammar } from './grammars/index.js';
+import { getGrammarForLanguage } from './grammars/index.js';
+
+export type { CodeUnit };
 
 /**
  * Parses source code and returns named code units (functions, classes, methods) with line spans.
+ * Supports JavaScript/TypeScript, Python, Go, Java, C/C++, C#, PHP, Ruby, Rust and generic brace fallbacks.
  */
 export function parseCodeUnits(code: string, language: string): CodeUnit[] {
-  const lang = language.toLowerCase().trim();
+  const grammar = getGrammarForLanguage(language);
   const lines = code.split(/\r?\n/);
 
-  if (lang === 'python' || lang === 'py') {
-    return parsePythonUnits(lines);
-  } else if (['javascript', 'typescript', 'js', 'ts', 'jsx', 'tsx', 'go', 'golang'].includes(lang)) {
-    return parseBraceUnits(lines, lang);
+  if (grammar?.delimiterType === 'indentation') {
+    return parseIndentationUnits(lines, grammar);
+  } else if (grammar?.delimiterType === 'keyword_block') {
+    return parseKeywordBlockUnits(lines, grammar);
   }
 
-  // Fallback for unrecognized languages: fallback to brace-based parsing
-  return parseBraceUnits(lines, lang);
+  return parseBraceGrammarUnits(lines, grammar);
 }
 
-/**
- * Parses brace-delimited languages (JS/TS, Go)
- */
-function parseBraceUnits(lines: string[], lang: string): CodeUnit[] {
+function parseBraceGrammarUnits(lines: string[], grammar: LanguageGrammar | null): CodeUnit[] {
   const units: CodeUnit[] = [];
-
-  // Patterns
-  const jsFnDecl = /(?:export\s+)?(?:async\s+)?function(?:\s*\*|\s+)?([a-zA-Z0-9_$]+)/;
-  const jsArrowFn = /(?:export\s+)?(?:const|let|var)\s+([a-zA-Z0-9_$]+)\s*=\s*(?:async\s*)?(?:\([^)]*\)|[a-zA-Z0-9_$]+)\s*=>/;
-  const jsClassDecl = /(?:export\s+)?class\s+([a-zA-Z0-9_$]+)/;
-  const jsMethodDecl = /^(?:\s*)(?:async\s+)?([a-zA-Z0-9_$]+)\s*\([^)]*\)\s*\{/;
-
-  const goFnDecl = /func\s+(?:\([^)]+\)\s+)?([a-zA-Z0-9_$]+)\s*\(/;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
@@ -43,36 +30,26 @@ function parseBraceUnits(lines: string[], lang: string): CodeUnit[] {
     let unitName: string | null = null;
     let unitType: 'function' | 'class' | 'method' = 'function';
 
-    if (lang.includes('go')) {
-      const match = line.match(goFnDecl);
-      if (match && match[1]) {
-        unitName = match[1];
-        unitType = line.includes('func (') ? 'method' : 'function';
+    if (grammar) {
+      for (const pattern of grammar.patterns) {
+        const match = line.match(pattern.regex);
+        if (match && match[1]) {
+          unitName = match[1];
+          unitType = pattern.unitType;
+          break;
+        }
       }
     } else {
-      // JS / TS
-      const classMatch = line.match(jsClassDecl);
-      const fnMatch = line.match(jsFnDecl);
-      const arrowMatch = line.match(jsArrowFn);
-      const methodMatch = line.match(jsMethodDecl);
-
-      if (classMatch && classMatch[1]) {
-        unitName = classMatch[1];
-        unitType = 'class';
-      } else if (fnMatch && fnMatch[1]) {
-        unitName = fnMatch[1];
+      // Fallback for unrecognized brace languages
+      const defaultFn = /(?:export\s+)?(?:async\s+)?function(?:\s*\*|\s+)?([a-zA-Z0-9_$]+)/;
+      const match = line.match(defaultFn);
+      if (match && match[1]) {
+        unitName = match[1];
         unitType = 'function';
-      } else if (arrowMatch && arrowMatch[1]) {
-        unitName = arrowMatch[1];
-        unitType = 'function';
-      } else if (methodMatch && methodMatch[1] && !['if', 'for', 'while', 'switch', 'catch'].includes(methodMatch[1])) {
-        unitName = methodMatch[1];
-        unitType = 'method';
       }
     }
 
     if (unitName) {
-      // Find end line by tracking curly braces
       const endLine = findBraceEndLine(lines, i);
       units.push({
         unitName,
@@ -102,51 +79,35 @@ function findBraceEndLine(lines: string[], startIdx: number): number {
       }
 
       if (started && braceCount === 0) {
-        return i + 1; // 1-indexed
+        return i + 1;
       }
     }
   }
 
-  // If no matching closing brace found, default to start line
   return startIdx + 1;
 }
 
-/**
- * Parses indentation-delimited languages (Python)
- */
-function parsePythonUnits(lines: string[]): CodeUnit[] {
+function parseIndentationUnits(lines: string[], grammar: LanguageGrammar): CodeUnit[] {
   const units: CodeUnit[] = [];
-  const pyDef = /^\s*(?:async\s+)?def\s+([a-zA-Z0-9_]+)\s*\(/;
-  const pyClass = /^\s*class\s+([a-zA-Z0-9_]+)\s*(?:\(|:)/;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
     const lineNum = i + 1;
 
-    const defMatch = line.match(pyDef);
-    const classMatch = line.match(pyClass);
-
-    if (defMatch && defMatch[1]) {
-      const unitName = defMatch[1];
-      const indent = getIndentLevel(line);
-      const isMethod = indent > 0;
-      const endLine = findPythonEndLine(lines, i, indent);
-      units.push({
-        unitName,
-        unitType: isMethod ? 'method' : 'function',
-        startLine: lineNum,
-        endLine,
-      });
-    } else if (classMatch && classMatch[1]) {
-      const unitName = classMatch[1];
-      const indent = getIndentLevel(line);
-      const endLine = findPythonEndLine(lines, i, indent);
-      units.push({
-        unitName,
-        unitType: 'class',
-        startLine: lineNum,
-        endLine,
-      });
+    for (const pattern of grammar.patterns) {
+      const match = line.match(pattern.regex);
+      if (match && match[1]) {
+        const unitName = match[1];
+        const indent = getIndentLevel(line);
+        const endLine = findIndentationEndLine(lines, i, indent);
+        units.push({
+          unitName,
+          unitType: pattern.unitType,
+          startLine: lineNum,
+          endLine,
+        });
+        break;
+      }
     }
   }
 
@@ -158,21 +119,19 @@ function getIndentLevel(line: string): number {
   return match ? match[1]!.length : 0;
 }
 
-function findPythonEndLine(lines: string[], startIdx: number, baseIndent: number): number {
+function findIndentationEndLine(lines: string[], startIdx: number, baseIndent: number): number {
   let lastNonEmpty = startIdx + 1;
 
   for (let i = startIdx + 1; i < lines.length; i++) {
     const line = lines[i]!;
     const trimmed = line.trim();
 
-    // Skip blank lines or full-line comments when computing boundaries
-    if (trimmed === '' || trimmed.startsWith('#')) {
+    if (trimmed === '' || trimmed.startsWith('#') || trimmed.startsWith('//')) {
       continue;
     }
 
     const indent = getIndentLevel(line);
     if (indent <= baseIndent) {
-      // Reached the end of this block
       return lastNonEmpty;
     }
 
@@ -180,4 +139,49 @@ function findPythonEndLine(lines: string[], startIdx: number, baseIndent: number
   }
 
   return lastNonEmpty;
+}
+
+function parseKeywordBlockUnits(lines: string[], grammar: LanguageGrammar): CodeUnit[] {
+  const units: CodeUnit[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    const lineNum = i + 1;
+
+    for (const pattern of grammar.patterns) {
+      const match = line.match(pattern.regex);
+      if (match && match[1]) {
+        const unitName = match[1];
+        const endLine = findKeywordEndLine(lines, i);
+        units.push({
+          unitName,
+          unitType: pattern.unitType,
+          startLine: lineNum,
+          endLine,
+        });
+        break;
+      }
+    }
+  }
+
+  return units;
+}
+
+function findKeywordEndLine(lines: string[], startIdx: number): number {
+  let blockDepth = 0;
+
+  for (let i = startIdx; i < lines.length; i++) {
+    const line = lines[i]!.trim();
+    if (/^\b(def|class|if|unless|while|until|for|begin|case|do)\b/.test(line)) {
+      blockDepth++;
+    }
+    if (/^\bend\b/.test(line)) {
+      blockDepth--;
+      if (blockDepth === 0) {
+        return i + 1;
+      }
+    }
+  }
+
+  return startIdx + 1;
 }
