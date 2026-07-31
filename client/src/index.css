@@ -210,6 +210,14 @@
   .block-lock-other {
     background-color: rgba(239, 68, 68, 0.2) !important;
   }
+  .block-lock-mine-usage {
+    background-color: rgba(96, 165, 250, 0.12) !important;
+    border-left: 2px dashed rgba(96, 165, 250, 0.6);
+  }
+  .block-lock-other-usage {
+    background-color: rgba(248, 113, 113, 0.12) !important;
+    border-left: 2px dashed rgba(248, 113, 113, 0.6);
+  }
   .block-lock-preview {
     background-color: rgba(59, 130, 246, 0.1) !important;
   }

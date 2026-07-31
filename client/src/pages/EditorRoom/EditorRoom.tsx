@@ -14,7 +14,8 @@ import { EditorTabs } from '../../components/editor/EditorTabs';
 import { useFileStore } from '../../store/fileStore';
 import { useLockStore } from '../../store/lockStore';
 import { GlobalSearchModal } from '../../components/editor/GlobalSearchModal';
-import type { ActivityEvent, ProjectFile } from '../../types';
+import { UsagePreviewModal } from '../../components/editor/UsagePreviewModal';
+import type { ActivityEvent, ProjectFile, UsageScanResult } from '../../types';
 
 
 export const EditorRoom = () => {
@@ -54,6 +55,17 @@ export const EditorRoom = () => {
 
   // Search Modal state
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+  // Usage lock modal state
+  const [isUsageScanOpen, setIsUsageScanOpen] = useState(false);
+  const [isUsageScanning, setIsUsageScanning] = useState(false);
+  const [usageScanResult, setUsageScanResult] = useState<UsageScanResult | null>(null);
+  const [pendingUsageLock, setPendingUsageLock] = useState<{
+    fileId: number;
+    unitName: string;
+    startLine: number;
+    endLine: number;
+  } | null>(null);
 
   // Global keyboard shortcut (Cmd+K / Ctrl+K) for Search Modal
   useEffect(() => {
@@ -173,6 +185,71 @@ export const EditorRoom = () => {
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [activeFileId, authUser, socket]);
+
+  // Handle usage lock request from Monaco context menu
+  const handleRequestUsageLock = (data: {
+    fileId: number;
+    unitName: string;
+    startLine: number;
+    endLine: number;
+  }) => {
+    if (!socket) return;
+
+    setPendingUsageLock(data);
+    setIsUsageScanOpen(true);
+    setIsUsageScanning(true);
+    setUsageScanResult(null);
+
+    socket.emit('lock:scan-usages', {
+      fileId: data.fileId,
+      unitName: data.unitName,
+    });
+  };
+
+  // Handle usage scan result from server
+  useEffect(() => {
+    if (!socket) return;
+
+    const onScanResult = (result: UsageScanResult) => {
+      setUsageScanResult(result);
+      setIsUsageScanning(false);
+    };
+
+    socket.on('lock:usage-scan-result', onScanResult);
+    return () => {
+      socket.off('lock:usage-scan-result', onScanResult);
+    };
+  }, [socket]);
+
+  // Handle usage lock confirmation
+  const handleConfirmUsageLock = () => {
+    if (!socket || !pendingUsageLock || !usageScanResult) return;
+
+    const usageSpans = usageScanResult.usages.map(u => ({
+      fileId: u.fileId,
+      startLine: u.startLine,
+      endLine: u.endLine,
+    }));
+
+    socket.emit('lock:acquire-usage', {
+      fileId: pendingUsageLock.fileId,
+      unitName: pendingUsageLock.unitName,
+      startLine: pendingUsageLock.startLine,
+      endLine: pendingUsageLock.endLine,
+      usageSpans,
+    });
+
+    setIsUsageScanOpen(false);
+    setPendingUsageLock(null);
+    setUsageScanResult(null);
+  };
+
+  const handleCloseUsageModal = () => {
+    setIsUsageScanOpen(false);
+    setPendingUsageLock(null);
+    setUsageScanResult(null);
+    setIsUsageScanning(false);
+  };
 
   // Use custom socket hook for room mutations, member status updates, activities, and global run state
   const { activities } = useRoomSocket({
@@ -691,6 +768,7 @@ export const EditorRoom = () => {
                     language={getLanguageType(activeFile.name)} 
                     readOnly={isViewer || isActiveFileLocked}
                     onMount={(editorInstance) => setEditor(editorInstance)}
+                    onRequestUsageLock={handleRequestUsageLock}
                   />
                 );
               })() : (
@@ -912,6 +990,16 @@ export const EditorRoom = () => {
         onClose={() => setIsSearchOpen(false)}
         doc={doc}
         editor={editor}
+      />
+
+      {/* Usage Lock Preview Modal */}
+      <UsagePreviewModal
+        isOpen={isUsageScanOpen}
+        onClose={handleCloseUsageModal}
+        onConfirm={handleConfirmUsageLock}
+        scanResult={usageScanResult}
+        unitName={pendingUsageLock?.unitName ?? ''}
+        isLoading={isUsageScanning}
       />
     </div>
   );

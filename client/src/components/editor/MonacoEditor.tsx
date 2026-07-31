@@ -14,6 +14,12 @@ interface MonacoEditorProps {
   onChange?: (value: string | undefined) => void;
   onMount?: OnMount;
   readOnly?: boolean;
+  onRequestUsageLock?: (data: {
+    fileId: number;
+    unitName: string;
+    startLine: number;
+    endLine: number;
+  }) => void;
 }
 
 function getIndentLevel(text: string): number {
@@ -148,7 +154,7 @@ function findBlock(editor: monaco.editor.ICodeEditor, language: string): { start
 
 const EMPTY_ARRAY: any[] = [];
 
-export const MonacoEditor = ({ fileId, language, value, options, onChange, onMount, readOnly }: MonacoEditorProps) => {
+export const MonacoEditor = ({ fileId, language, value, options, onChange, onMount, readOnly, onRequestUsageLock }: MonacoEditorProps) => {
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<typeof monaco | null>(null);
   const decorationsCollection = useRef<monaco.editor.IEditorDecorationsCollection | null>(null);
@@ -224,7 +230,11 @@ export const MonacoEditor = ({ fileId, language, value, options, onChange, onMou
         const sock = useFileStore.getState().socket;
 
         if (myLock) {
-          sock?.emit('lock:release', { fileId: currentFileId, lockId: myLock.id });
+          if (myLock.groupId) {
+            sock?.emit('lock:release-group', { groupId: myLock.groupId });
+          } else {
+            sock?.emit('lock:release', { fileId: currentFileId, lockId: myLock.id });
+          }
         } else {
           const block = findBlock(editor, language);
           if (block) {
@@ -285,6 +295,49 @@ export const MonacoEditor = ({ fileId, language, value, options, onChange, onMou
       }
     });
 
+    // Context menu action: Lock with Usages
+    editor.addAction({
+      id: 'lock-with-usages',
+      label: 'Lock with Usages',
+      contextMenuGroupId: '1_modification',
+      contextMenuOrder: 2,
+      run: (ed) => {
+        const currentFileId = fileIdRef.current;
+        if (!currentFileId) return;
+        const currentUser = useAuthStore.getState().user;
+        if (!currentUser) return;
+
+        const block = findBlock(ed, language);
+        if (block && block.unitName) {
+          // Check if user already holds a definition-only lock on this block -> release first (widening)
+          const currentLocks = useLockStore.getState().getLocks(currentFileId);
+          const myExistingLock = currentLocks.find(l =>
+            String(l.userId) === String(currentUser.id) &&
+            l.lockScope === 'function' &&
+            l.startLine !== undefined && l.endLine !== undefined &&
+            block.startLine >= l.startLine && block.endLine <= l.endLine &&
+            !l.includeUsages
+          );
+
+          if (myExistingLock) {
+            const sock = useFileStore.getState().socket;
+            if (myExistingLock.groupId) {
+              sock?.emit('lock:release-group', { groupId: myExistingLock.groupId });
+            } else {
+              sock?.emit('lock:release', { fileId: currentFileId, lockId: myExistingLock.id });
+            }
+          }
+
+          onRequestUsageLock?.({
+            fileId: currentFileId,
+            unitName: block.unitName,
+            startLine: block.startLine,
+            endLine: block.endLine,
+          });
+        }
+      },
+    });
+
     editor.addAction({
       id: 'unlock-block-scope',
       label: 'Unlock Block/Function Scope',
@@ -312,7 +365,11 @@ export const MonacoEditor = ({ fileId, language, value, options, onChange, onMou
 
         if (myLock) {
           const sock = useFileStore.getState().socket;
-          sock?.emit('lock:release', { fileId: currentFileId, lockId: myLock.id });
+          if (myLock.groupId) {
+            sock?.emit('lock:release-group', { groupId: myLock.groupId });
+          } else {
+            sock?.emit('lock:release', { fileId: currentFileId, lockId: myLock.id });
+          }
         }
       }
     });
@@ -339,7 +396,6 @@ export const MonacoEditor = ({ fileId, language, value, options, onChange, onMou
         const isDoubleClick = now - lastClick.time < 400 && lastClick.line === lineNumber;
         lastClickTimeRef.current = { time: now, line: lineNumber };
 
-        // Check if there is a lock owned by me at this line
         const currentLocks = useLockStore.getState().getLocks(currentFileId);
         const myLock = currentLocks.find(l => 
           String(l.userId) === String(authUser.id) &&
@@ -350,7 +406,11 @@ export const MonacoEditor = ({ fileId, language, value, options, onChange, onMou
         );
 
         if (isDoubleClick && myLock) {
-          socket?.emit('lock:release', { fileId: currentFileId, lockId: myLock.id });
+          if (myLock.groupId) {
+            socket?.emit('lock:release-group', { groupId: myLock.groupId });
+          } else {
+            socket?.emit('lock:release', { fileId: currentFileId, lockId: myLock.id });
+          }
           e.event.preventDefault();
         }
       }
@@ -426,17 +486,23 @@ export const MonacoEditor = ({ fileId, language, value, options, onChange, onMou
     for (const lock of fileLocks) {
       if (lock.lockScope === 'function' && lock.startLine && lock.endLine) {
         const isMine = authUser && String(lock.userId) === String(authUser.id);
-        const unitNameText = lock.unitName ? ` (${lock.unitName})` : '';
+        const isUsageSpan = lock.unitName?.endsWith('(usage)');
+        const displayName = isUsageSpan
+          ? lock.unitName?.replace(' (usage)', '')
+          : lock.unitName;
+        const unitNameText = displayName ? ` (${displayName}${isUsageSpan ? ' — usage' : ''})` : '';
         const lineRangeText = `L${lock.startLine}-L${lock.endLine}`;
         
         newDecorations.push({
           range: new monacoRef.current.Range(lock.startLine, 1, lock.endLine, 1),
           options: {
             isWholeLine: true,
-            className: isMine ? 'block-lock-mine' : 'block-lock-other',
+            className: isMine 
+              ? (isUsageSpan ? 'block-lock-mine-usage' : 'block-lock-mine')
+              : (isUsageSpan ? 'block-lock-other-usage' : 'block-lock-other'),
             glyphMarginClassName: isMine ? 'block-lock-icon-mine' : 'block-lock-icon-other',
             linesDecorationsClassName: isMine ? 'block-lock-icon-mine' : 'block-lock-icon-other',
-            glyphMarginHoverMessage: { value: isMine ? `Locked by you${unitNameText} [${lineRangeText}] - double-click to release` : `Locked by ${lock.username}${unitNameText} [${lineRangeText}]` },
+            glyphMarginHoverMessage: { value: isMine ? `Locked by you${unitNameText} [${lineRangeText}]${isUsageSpan ? ' — usage span' : ''} - double-click to release` : `Locked by ${lock.username}${unitNameText} [${lineRangeText}]${isUsageSpan ? ' — usage span' : ''}` },
             hoverMessage: isMine ? undefined : { value: `Locked by ${lock.username}${unitNameText} [${lineRangeText}]` }
           }
         });
