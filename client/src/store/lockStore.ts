@@ -41,8 +41,8 @@ interface LockState {
   /** Get group ID for a lock */
   getGroupForLock: (lockId: string) => string | undefined;
 
-  /** Check if a lock is part of a usage-inclusive group */
-  isUsageLock: (lockId: string) => boolean;
+  /** Adjust lock line spans when lines are added/removed during editing */
+  adjustLockSpans: (fileId: number, editStartLine: number, lineDelta: number) => void;
 
   /** Clear all lock state (on room leave) */
   clearLockStore: () => void;
@@ -52,6 +52,36 @@ export const useLockStore = create<LockState>((set, get) => ({
   fileLocks: new Map(),
   queuePositions: new Map(),
   usageGroups: new Map(),
+
+  adjustLockSpans: (fileId, editStartLine, lineDelta) => {
+    if (lineDelta === 0) return;
+    set((state) => {
+      const updated = new Map(state.fileLocks);
+      const existing = updated.get(fileId);
+      if (!existing) return {};
+
+      const modified = existing.map((lock) => {
+        if (lock.lockScope === 'function' && lock.startLine !== undefined && lock.endLine !== undefined) {
+          let newStart = lock.startLine;
+          let newEnd = lock.endLine;
+
+          if (editStartLine < lock.startLine) {
+            newStart += lineDelta;
+            newEnd += lineDelta;
+          } else if (editStartLine >= lock.startLine && editStartLine <= lock.endLine) {
+            newEnd += lineDelta;
+            if (newEnd < newStart) newEnd = newStart;
+          }
+
+          return { ...lock, startLine: newStart, endLine: newEnd };
+        }
+        return lock;
+      });
+
+      updated.set(fileId, modified);
+      return { fileLocks: updated };
+    });
+  },
 
   setLockState: (locks) => {
     const map = new Map<number, FileLockInfo[]>();
@@ -164,7 +194,7 @@ export const useLockStore = create<LockState>((set, get) => ({
     });
   },
 
-  getGroupForLock: (lockId) => {
+  getGroupForLock: (lockId: string) => {
     const { usageGroups } = get();
     for (const [groupId, lockIds] of usageGroups.entries()) {
       if (lockIds.includes(lockId)) return groupId;
@@ -172,7 +202,7 @@ export const useLockStore = create<LockState>((set, get) => ({
     return undefined;
   },
 
-  isUsageLock: (lockId) => {
+  isUsageLock: (lockId: string) => {
     return !!get().getGroupForLock(lockId);
   },
 

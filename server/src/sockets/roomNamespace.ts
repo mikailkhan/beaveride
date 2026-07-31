@@ -607,6 +607,12 @@ export function registerRoomNamespace(io: SocketServer): void {
       refreshHeartbeat(roomId, data.fileId, userId);
     });
 
+    socket.on('lock:span-shift', (data: { fileId: number; editStartLine: number; lineDelta: number }) => {
+      if (typeof data.fileId !== 'number' || typeof data.editStartLine !== 'number' || typeof data.lineDelta !== 'number') return;
+      adjustLockSpansOnEdit(roomId, data.fileId, data.editStartLine, data.lineDelta);
+      roomNsp.to(roomChannel).emit('lock:state', getLocksForRoom(roomId));
+    });
+
     // Usage scanning — server scans workspace for usages of a named code unit
     socket.on('lock:scan-usages', async (data: {
       fileId: number;
