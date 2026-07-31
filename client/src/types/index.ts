@@ -176,6 +176,12 @@ export interface ActivityEntry {
 
 export type LockScope = 'file' | 'function';
 
+export interface LockSpan {
+  fileId: number;
+  startLine: number;
+  endLine: number;
+}
+
 export interface FileLockInfo {
   id: string;
   fileId: number;
@@ -186,7 +192,25 @@ export interface FileLockInfo {
   unitName?: string;
   startLine?: number;
   endLine?: number;
+  includeUsages?: boolean;
+  usageSpans?: LockSpan[];
+  groupId?: string;
   acquiredAt: number;
   lastHeartbeat: number;
+}
+
+export interface UsageScanResult {
+  definitionFileId: number;
+  unitName: string;
+  usages: Array<{
+    fileId: number;
+    fileName: string;
+    startLine: number;
+    endLine: number;
+    lineContent: string;
+    confidence: 'high' | 'medium';
+  }>;
+  isComplete: boolean;
+  warnings: string[];
 }
 

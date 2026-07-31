@@ -29,6 +29,21 @@ interface LockState {
   /** Get all locks for a specific file */
   getLocks: (fileId: number) => FileLockInfo[];
 
+  /** Map of groupId → array of lock IDs belonging to that usage-inclusive group */
+  usageGroups: Map<string, string[]>;
+
+  /** Track a usage group */
+  addUsageGroup: (groupId: string, lockIds: string[]) => void;
+
+  /** Remove a usage group */
+  removeUsageGroup: (groupId: string) => void;
+
+  /** Get group ID for a lock */
+  getGroupForLock: (lockId: string) => string | undefined;
+
+  /** Check if a lock is part of a usage-inclusive group */
+  isUsageLock: (lockId: string) => boolean;
+
   /** Clear all lock state (on room leave) */
   clearLockStore: () => void;
 }
@@ -36,22 +51,29 @@ interface LockState {
 export const useLockStore = create<LockState>((set, get) => ({
   fileLocks: new Map(),
   queuePositions: new Map(),
+  usageGroups: new Map(),
 
   setLockState: (locks) => {
     const map = new Map<number, FileLockInfo[]>();
+    const groups = new Map<string, string[]>();
     for (const lock of locks) {
       const existing = map.get(lock.fileId) || [];
       existing.push(lock);
       map.set(lock.fileId, existing);
+
+      if (lock.groupId) {
+        const groupLocks = groups.get(lock.groupId) || [];
+        groupLocks.push(lock.id);
+        groups.set(lock.groupId, groupLocks);
+      }
     }
-    set({ fileLocks: map });
+    set({ fileLocks: map, usageGroups: groups });
   },
 
   addLock: (lock) => {
     set((state) => {
       const updated = new Map(state.fileLocks);
       const existing = updated.get(lock.fileId) || [];
-      // Replace if same lock id already exists, else append
       const index = existing.findIndex(l => l.id === lock.id);
       if (index >= 0) {
         existing[index] = lock;
@@ -59,7 +81,17 @@ export const useLockStore = create<LockState>((set, get) => ({
         existing.push(lock);
       }
       updated.set(lock.fileId, [...existing]);
-      return { fileLocks: updated };
+
+      const groups = new Map(state.usageGroups);
+      if (lock.groupId) {
+        const groupLocks = groups.get(lock.groupId) || [];
+        if (!groupLocks.includes(lock.id)) {
+          groupLocks.push(lock.id);
+          groups.set(lock.groupId, groupLocks);
+        }
+      }
+
+      return { fileLocks: updated, usageGroups: groups };
     });
   },
 
@@ -73,7 +105,20 @@ export const useLockStore = create<LockState>((set, get) => ({
       } else {
         updated.set(fileId, filtered);
       }
-      return { fileLocks: updated };
+
+      const groups = new Map(state.usageGroups);
+      for (const [groupId, lockIds] of groups.entries()) {
+        if (lockIds.includes(lockId)) {
+          const newIds = lockIds.filter(id => id !== lockId);
+          if (newIds.length === 0) {
+            groups.delete(groupId);
+          } else {
+            groups.set(groupId, newIds);
+          }
+        }
+      }
+
+      return { fileLocks: updated, usageGroups: groups };
     });
   },
 
@@ -96,7 +141,6 @@ export const useLockStore = create<LockState>((set, get) => ({
   isFileLockedByOther: (fileId, currentUserId) => {
     const locks = get().fileLocks.get(fileId);
     if (!locks) return false;
-    // True if there is a 'file' scope lock owned by someone else
     return locks.some(l => l.lockScope === 'file' && l.userId !== currentUserId);
   },
 
@@ -104,10 +148,39 @@ export const useLockStore = create<LockState>((set, get) => ({
     return get().fileLocks.get(fileId) || [];
   },
 
+  addUsageGroup: (groupId, lockIds) => {
+    set((state) => {
+      const updated = new Map(state.usageGroups);
+      updated.set(groupId, lockIds);
+      return { usageGroups: updated };
+    });
+  },
+
+  removeUsageGroup: (groupId) => {
+    set((state) => {
+      const updated = new Map(state.usageGroups);
+      updated.delete(groupId);
+      return { usageGroups: updated };
+    });
+  },
+
+  getGroupForLock: (lockId) => {
+    const { usageGroups } = get();
+    for (const [groupId, lockIds] of usageGroups.entries()) {
+      if (lockIds.includes(lockId)) return groupId;
+    }
+    return undefined;
+  },
+
+  isUsageLock: (lockId) => {
+    return !!get().getGroupForLock(lockId);
+  },
+
   clearLockStore: () => {
     set({
       fileLocks: new Map(),
       queuePositions: new Map(),
+      usageGroups: new Map(),
     });
   },
 }));

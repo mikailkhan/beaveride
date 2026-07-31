@@ -151,11 +151,30 @@ export function useRoomSocket({
       addLock(data.lock);
     };
 
+    const onUsageAcquired = (data: { groupId: string; locks: FileLockInfo[] }) => {
+      for (const lock of data.locks) {
+        addLock(lock);
+      }
+      const lockIds = data.locks.map(l => l.id);
+      useLockStore.getState().addUsageGroup(data.groupId, lockIds);
+    };
+
+    const onUsageQueued = (data: {
+      fileId: number;
+      groupId: string;
+      position: number;
+      blockedBy: Array<{ fileId: number; userId: number; username: string }>;
+    }) => {
+      setQueuePosition(data.fileId, data.position);
+    };
+
     socket.on('lock:state', onLockState);
     socket.on('lock:acquired', onLockAcquired);
     socket.on('lock:released', onLockReleased);
     socket.on('lock:queued', onLockQueued);
     socket.on('lock:granted', onLockGranted);
+    socket.on('lock:usage-acquired', onUsageAcquired);
+    socket.on('lock:usage-queued', onUsageQueued);
 
     return () => {
       socket.off('lock:state', onLockState);
@@ -163,6 +182,8 @@ export function useRoomSocket({
       socket.off('lock:released', onLockReleased);
       socket.off('lock:queued', onLockQueued);
       socket.off('lock:granted', onLockGranted);
+      socket.off('lock:usage-acquired', onUsageAcquired);
+      socket.off('lock:usage-queued', onUsageQueued);
     };
   }, [socket]);
 
