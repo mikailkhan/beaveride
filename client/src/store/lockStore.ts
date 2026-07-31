@@ -41,6 +41,9 @@ interface LockState {
   /** Get group ID for a lock */
   getGroupForLock: (lockId: string) => string | undefined;
 
+  /** Re-anchor lock line spans using parsed code units */
+  reanchorLockSpans: (fileId: number, codeUnits: Array<{ unitName: string; startLine: number; endLine: number }>, editStartLine: number, lineDelta: number) => void;
+
   /** Adjust lock line spans when lines are added/removed during editing */
   adjustLockSpans: (fileId: number, editStartLine: number, lineDelta: number) => void;
 
@@ -52,6 +55,49 @@ export const useLockStore = create<LockState>((set, get) => ({
   fileLocks: new Map(),
   queuePositions: new Map(),
   usageGroups: new Map(),
+
+  reanchorLockSpans: (fileId, codeUnits, editStartLine, lineDelta) => {
+    set((state) => {
+      const updated = new Map(state.fileLocks);
+      const existing = updated.get(fileId);
+      if (!existing) return {};
+
+      const modified = existing.map((lock) => {
+        if (lock.lockScope === 'function' && lock.unitName) {
+          // Clean unitName if it's a usage span
+          const cleanName = lock.unitName.endsWith('(usage)')
+            ? lock.unitName.replace(' (usage)', '')
+            : lock.unitName;
+
+          const matchedUnit = codeUnits.find(u => u.unitName === cleanName);
+          if (matchedUnit) {
+            return { ...lock, startLine: matchedUnit.startLine, endLine: matchedUnit.endLine };
+          }
+        }
+
+        // Fallback line shift math if unit name not matched
+        if (lock.lockScope === 'function' && lock.startLine !== undefined && lock.endLine !== undefined && lineDelta !== 0) {
+          let newStart = lock.startLine;
+          let newEnd = lock.endLine;
+
+          if (editStartLine <= lock.startLine) {
+            newStart += lineDelta;
+            newEnd += lineDelta;
+          } else if (editStartLine > lock.startLine && editStartLine <= lock.endLine) {
+            newEnd += lineDelta;
+            if (newEnd < newStart) newEnd = newStart;
+          }
+
+          return { ...lock, startLine: newStart, endLine: newEnd };
+        }
+
+        return lock;
+      });
+
+      updated.set(fileId, modified);
+      return { fileLocks: updated };
+    });
+  },
 
   adjustLockSpans: (fileId, editStartLine, lineDelta) => {
     if (lineDelta === 0) return;

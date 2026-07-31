@@ -449,12 +449,12 @@ export function adjustLockSpansOnEdit(
 
   for (const lock of fileLocks) {
     if (lock.lockScope === 'function' && lock.startLine !== undefined && lock.endLine !== undefined) {
-      if (editStartLine < lock.startLine) {
-        // Edit above the lock -> shift entire range
+      if (editStartLine <= lock.startLine) {
+        // Edit above or at start of lock header -> shift entire range
         lock.startLine += lineDelta;
         lock.endLine += lineDelta;
-      } else if (editStartLine >= lock.startLine && editStartLine <= lock.endLine) {
-        // Edit inside the lock -> expand/contract endLine
+      } else if (editStartLine > lock.startLine && editStartLine <= lock.endLine) {
+        // Edit inside the body of the lock -> expand/contract endLine
         lock.endLine += lineDelta;
         if (lock.endLine < lock.startLine) {
           lock.endLine = lock.startLine;
@@ -466,10 +466,10 @@ export function adjustLockSpansOnEdit(
   const queue = queues.get(key) ?? [];
   for (const q of queue) {
     if (q.lockScope === 'function' && q.startLine !== undefined && q.endLine !== undefined) {
-      if (editStartLine < q.startLine) {
+      if (editStartLine <= q.startLine) {
         q.startLine += lineDelta;
         q.endLine += lineDelta;
-      } else if (editStartLine >= q.startLine && editStartLine <= q.endLine) {
+      } else if (editStartLine > q.startLine && editStartLine <= q.endLine) {
         q.endLine += lineDelta;
         if (q.endLine < q.startLine) {
           q.endLine = q.startLine;

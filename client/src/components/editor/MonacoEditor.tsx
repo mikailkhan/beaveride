@@ -416,18 +416,27 @@ export const MonacoEditor = ({ fileId, language, value, options, onChange, onMou
       }
     });
 
-    // Dynamically adjust lock line spans when lines are inserted/deleted inside or above locked units
+    // Dynamically adjust and re-anchor lock line spans when lines are inserted/deleted
     editor.onDidChangeModelContent((e) => {
       const currentFileId = fileIdRef.current;
-      if (!currentFileId) return;
+      const model = editor.getModel();
+      if (!currentFileId || !model) return;
+
+      const codeUnits = parseCodeUnits(model.getValue(), language);
 
       for (const change of e.changes) {
         const addedLines = (change.text.match(/\n/g) || []).length;
         const removedLines = change.range.endLineNumber - change.range.startLineNumber;
         const lineDelta = addedLines - removedLines;
 
+        useLockStore.getState().reanchorLockSpans(
+          currentFileId,
+          codeUnits,
+          change.range.startLineNumber,
+          lineDelta
+        );
+
         if (lineDelta !== 0) {
-          useLockStore.getState().adjustLockSpans(currentFileId, change.range.startLineNumber, lineDelta);
           const sock = useFileStore.getState().socket;
           sock?.emit('lock:span-shift', {
             fileId: currentFileId,
