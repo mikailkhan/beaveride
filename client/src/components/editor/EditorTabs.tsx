@@ -44,6 +44,22 @@ export const EditorTabs: React.FC = () => {
         const tabLocks = fileLocks.get(Number(tab.id)) || [];
         const isLockedByMe = tabLocks.some(l => authUser !== null && String(l.userId) === String(authUser.id));
 
+        const handleReleaseMyLock = (e: React.MouseEvent, tabFileId: string) => {
+          e.stopPropagation();
+          const socket = useFileStore.getState().socket;
+          if (!socket || !authUser) return;
+
+          const tabLocks = fileLocks.get(Number(tabFileId)) || [];
+          const myLock = tabLocks.find(l => String(l.userId) === String(authUser.id));
+          if (!myLock) return;
+
+          if (myLock.groupId) {
+            socket.emit('lock:release-group', { groupId: myLock.groupId });
+          } else {
+            socket.emit('lock:release', { fileId: Number(tabFileId), lockId: myLock.id });
+          }
+        };
+
         return (
           <div
             key={tab.id}
@@ -63,16 +79,20 @@ export const EditorTabs: React.FC = () => {
             {getFileIcon(tab.name)}
             <span className="truncate max-w-[120px] text-[13px]">{tab.name}</span>
             {tabLocks.length > 0 && (
-              <span
-                className={`material-symbols-outlined text-[13px] ${
-                  isLockedByMe && tabLocks.some(l => l.lockScope === 'file' && authUser !== null && String(l.userId) === String(authUser.id)) ? 'text-blue-500' : isLockedByMe ? 'text-blue-500/50' : 'text-error'
+              <button
+                type="button"
+                onClick={isLockedByMe ? (e) => handleReleaseMyLock(e, tab.id) : (e) => e.stopPropagation()}
+                className={`material-symbols-outlined text-[13px] border-none bg-transparent p-0 ${
+                  isLockedByMe ? 'text-blue-500 hover:text-red-500 cursor-pointer' : 'text-error cursor-default'
                 }`}
                 title={
-                  tabLocks.map(l => l.lockScope === 'function' ? `${l.username} (Lines ${l.startLine}-${l.endLine})` : `${l.username} (File)`).join(', ')
+                  isLockedByMe 
+                    ? `Click to release your lock on ${tab.name}`
+                    : tabLocks.map(l => l.lockScope === 'function' ? `${l.username} (Lines ${l.startLine}-${l.endLine})` : `${l.username} (File)`).join(', ')
                 }
               >
                 lock
-              </span>
+              </button>
             )}
             <button
               onClick={(e) => {

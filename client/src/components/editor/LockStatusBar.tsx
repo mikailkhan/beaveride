@@ -3,12 +3,15 @@ import { useLockStore } from '../../store/lockStore';
 import { useAuthStore } from '../../store/authStore';
 import { getUserColor } from '../../utils/userColorMap';
 
+import type { FileLockInfo } from '../../types';
+
 interface LockStatusBarProps {
   fileId: number | null;
   editor: any;
+  onReleaseLock?: (lock: FileLockInfo) => void;
 }
 
-export const LockStatusBar: React.FC<LockStatusBarProps> = ({ fileId, editor }) => {
+export const LockStatusBar: React.FC<LockStatusBarProps> = ({ fileId, editor, onReleaseLock }) => {
   const currentUser = useAuthStore((state) => state.user);
 
   const fileLocks = useLockStore((state) => (fileId ? state.fileLocks.get(fileId) : undefined)) || [];
@@ -54,11 +57,11 @@ export const LockStatusBar: React.FC<LockStatusBarProps> = ({ fileId, editor }) 
           const usageCount = lock.usageSpans?.length || 0;
 
           return (
-            <button
+            <div
               key={lock.id}
               onClick={() => handleScrollToLock(lock.startLine)}
               title={isFileLock ? `Locked by ${lock.username}` : `Click to jump to line ${lock.startLine}`}
-              className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-xs font-medium bg-white border border-[#eae8e7] hover:border-primary/40 transition-all cursor-pointer shadow-xs shrink-0"
+              className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-xs font-medium bg-white border border-[#eae8e7] hover:border-primary/40 transition-all cursor-pointer shadow-xs shrink-0 group relative"
               style={{
                 borderLeftWidth: '3px',
                 borderLeftColor: colorInfo.icon,
@@ -82,7 +85,19 @@ export const LockStatusBar: React.FC<LockStatusBarProps> = ({ fileId, editor }) 
                   +{usageCount} usage{usageCount > 1 ? 's' : ''}
                 </span>
               )}
-            </button>
+              {isMine && onReleaseLock && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onReleaseLock(lock);
+                  }}
+                  title="Release this lock"
+                  className="ml-1 w-4 h-4 rounded-full flex items-center justify-center text-neutral-400 hover:text-red-600 hover:bg-red-100 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[12px]">close</span>
+                </button>
+              )}
+            </div>
           );
         })}
       </div>

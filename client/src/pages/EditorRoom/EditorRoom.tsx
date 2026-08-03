@@ -17,7 +17,7 @@ import { GlobalSearchModal } from '../../components/editor/GlobalSearchModal';
 import { UsagePreviewModal } from '../../components/editor/UsagePreviewModal';
 import { LockStatusBar } from '../../components/editor/LockStatusBar';
 import { LockScopePopover } from '../../components/editor/LockScopePopover';
-import type { ActivityEvent, ProjectFile, UsageScanResult } from '../../types';
+import type { ActivityEvent, ProjectFile, UsageScanResult, FileLockInfo } from '../../types';
 
 
 export const EditorRoom = () => {
@@ -220,6 +220,15 @@ export const EditorRoom = () => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [activeFileId, authUser, socket]);
+
+  const handleReleaseLock = (lock: FileLockInfo) => {
+    if (!socket) return;
+    if (lock.groupId) {
+      socket.emit('lock:release-group', { groupId: lock.groupId });
+    } else {
+      socket.emit('lock:release', { fileId: lock.fileId, lockId: lock.id });
+    }
+  };
 
   // Handle usage lock request from Monaco context menu
   const handleRequestUsageLock = (data: {
@@ -780,7 +789,11 @@ export const EditorRoom = () => {
             <EditorTabs />
 
             {/* Lock Status Bar */}
-            <LockStatusBar fileId={activeFile ? Number(activeFile.id) : null} editor={editor} />
+            <LockStatusBar 
+              fileId={activeFile ? Number(activeFile.id) : null} 
+              editor={editor} 
+              onReleaseLock={handleReleaseLock}
+            />
 
             {/* Queue position notification banner */}
             {(() => {
