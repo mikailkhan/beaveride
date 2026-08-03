@@ -199,6 +199,17 @@ export interface FileLockInfo {
   lastHeartbeat: number;
 }
 
+export interface QueueInfo {
+  position: number;
+  heldBy?: {
+    userId: number;
+    username: string;
+    unitName?: string;
+    lockScope?: LockScope;
+    includeUsages?: boolean;
+  };
+}
+
 export interface UsageScanResult {
   definitionFileId: number;
   unitName: string;

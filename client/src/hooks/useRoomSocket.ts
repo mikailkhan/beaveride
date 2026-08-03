@@ -142,8 +142,11 @@ export function useRoomSocket({
       removeLock(data.fileId, data.lockId);
     };
 
-    const onLockQueued = (data: { fileId: number; position: number; heldBy: { userId: number; username: string } }) => {
-      setQueuePosition(data.fileId, data.position);
+    const onLockQueued = (data: { fileId: number; position: number; heldBy?: { userId: number; username: string; unitName?: string; lockScope?: 'file' | 'function'; includeUsages?: boolean } }) => {
+      setQueuePosition(data.fileId, {
+        position: data.position,
+        heldBy: data.heldBy,
+      });
     };
 
     const onLockGranted = (data: { fileId: number; lock: FileLockInfo }) => {
@@ -163,9 +166,13 @@ export function useRoomSocket({
       fileId: number;
       groupId: string;
       position: number;
-      blockedBy: Array<{ fileId: number; userId: number; username: string }>;
+      blockedBy?: Array<{ fileId: number; userId: number; username: string }>;
     }) => {
-      setQueuePosition(data.fileId, data.position);
+      const firstBlocker = data.blockedBy && data.blockedBy.length > 0 ? data.blockedBy[0] : undefined;
+      setQueuePosition(data.fileId, {
+        position: data.position,
+        heldBy: firstBlocker ? { userId: firstBlocker.userId, username: firstBlocker.username, lockScope: 'function', includeUsages: true } : undefined,
+      });
     };
 
     socket.on('lock:state', onLockState);

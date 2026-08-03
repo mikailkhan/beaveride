@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { MonacoEditor } from '../../components/editor/MonacoEditor';
+import { MonacoEditor, findBlock } from '../../components/editor/MonacoEditor';
 import { TerminalPanel } from '../../components/editor/TerminalPanel';
 import { ChatPanel } from '../../components/editor/ChatPanel';
 import { useRoomStore } from '../../store/roomStore';
@@ -16,6 +16,7 @@ import { useLockStore } from '../../store/lockStore';
 import { GlobalSearchModal } from '../../components/editor/GlobalSearchModal';
 import { UsagePreviewModal } from '../../components/editor/UsagePreviewModal';
 import { LockStatusBar } from '../../components/editor/LockStatusBar';
+import { LockScopePopover } from '../../components/editor/LockScopePopover';
 import type { ActivityEvent, ProjectFile, UsageScanResult } from '../../types';
 
 
@@ -68,7 +69,41 @@ export const EditorRoom = () => {
     endLine: number;
   } | null>(null);
 
-  // Global keyboard shortcut (Cmd+K / Ctrl+K) for Search Modal
+  // Scope Selection Popover state
+  const [isScopePopoverOpen, setIsScopePopoverOpen] = useState(false);
+  const [currentScopeBlock, setCurrentScopeBlock] = useState<{ unitName?: string; startLine: number; endLine: number } | null>(null);
+
+  const handleOpenScopePopover = () => {
+    if (!editor || !activeFile) return;
+    const block = findBlock(editor, getLanguageType(activeFile.name));
+    setCurrentScopeBlock(block);
+    setIsScopePopoverOpen(true);
+  };
+
+  const handleSelectScope = (scope: 'file' | 'function' | 'usage') => {
+    setIsScopePopoverOpen(false);
+    if (!activeFile || !socket) return;
+    const fileIdNum = Number(activeFile.id);
+
+    if (scope === 'file') {
+      socket.emit('lock:acquire', { fileId: fileIdNum, lockScope: 'file' });
+    } else if (scope === 'function' && currentScopeBlock) {
+      socket.emit('lock:acquire', {
+        fileId: fileIdNum,
+        lockScope: 'function',
+        startLine: currentScopeBlock.startLine,
+        endLine: currentScopeBlock.endLine,
+        unitName: currentScopeBlock.unitName,
+      });
+    } else if (scope === 'usage' && currentScopeBlock && currentScopeBlock.unitName) {
+      handleRequestUsageLock({
+        fileId: fileIdNum,
+        unitName: currentScopeBlock.unitName,
+        startLine: currentScopeBlock.startLine,
+        endLine: currentScopeBlock.endLine,
+      });
+    }
+  };
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
@@ -750,12 +785,24 @@ export const EditorRoom = () => {
             {/* Queue position notification banner */}
             {(() => {
               if (!activeFile) return null;
-              const queuePos = useLockStore.getState().queuePositions.get(Number(activeFile.id));
-              if (!queuePos) return null;
+              const queueInfo = useLockStore.getState().queuePositions.get(Number(activeFile.id));
+              if (!queueInfo) return null;
+
+              const blockerName = queueInfo.heldBy?.username;
+              const unitName = queueInfo.heldBy?.unitName;
+              const scopeText = queueInfo.heldBy?.lockScope === 'file' ? 'entire file' : (unitName ? `function "${unitName}"` : 'code unit');
+
               return (
-                <div className="flex items-center gap-xs px-sm py-1.5 bg-amber-500/10 text-amber-600 text-xs font-label-md border-b border-amber-500/20 shrink-0">
-                  <span className="material-symbols-outlined text-[14px]">hourglass_top</span>
-                  You are #{queuePos} in queue for this file. You will automatically receive the lock when it becomes available.
+                <div 
+                  role="alert"
+                  aria-live="polite"
+                  className="flex items-center gap-2 px-4 py-1.5 bg-amber-500/10 text-amber-700 text-xs font-medium border-b border-amber-500/20 shrink-0 select-none"
+                >
+                  <span className="material-symbols-outlined text-sm animate-pulse text-amber-600">hourglass_top</span>
+                  <span>
+                    <strong>Queue Position #{queueInfo.position}</strong> — Waiting for{' '}
+                    <strong className="text-amber-900">{blockerName || 'another user'}</strong> to release {scopeText}. You will automatically receive the lock when it becomes available.
+                  </span>
                 </div>
               );
             })()}
@@ -772,6 +819,7 @@ export const EditorRoom = () => {
                     readOnly={isViewer || isActiveFileLocked}
                     onMount={(editorInstance) => setEditor(editorInstance)}
                     onRequestUsageLock={handleRequestUsageLock}
+                    onOpenScopePopover={handleOpenScopePopover}
                   />
                 );
               })() : (
@@ -1003,6 +1051,15 @@ export const EditorRoom = () => {
         scanResult={usageScanResult}
         unitName={pendingUsageLock?.unitName ?? ''}
         isLoading={isUsageScanning}
+      />
+
+      {/* Lock Scope Selection Popover */}
+      <LockScopePopover
+        isOpen={isScopePopoverOpen}
+        onClose={() => setIsScopePopoverOpen(false)}
+        onSelectScope={handleSelectScope}
+        currentBlock={currentScopeBlock}
+        fileName={activeFile?.name ?? ''}
       />
     </div>
   );

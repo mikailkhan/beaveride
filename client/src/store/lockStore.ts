@@ -1,12 +1,12 @@
 import { create } from 'zustand';
-import type { FileLockInfo } from '../types';
+import type { FileLockInfo, QueueInfo } from '../types';
 
 interface LockState {
   /** Map of fileId → FileLockInfo[] for all locks in the current room */
   fileLocks: Map<number, FileLockInfo[]>;
 
-  /** Files the current user is queued for: fileId → queue position */
-  queuePositions: Map<number, number>;
+  /** Files the current user is queued for: fileId → queue position & info */
+  queuePositions: Map<number, QueueInfo>;
 
   /** Set the full lock state (on initial connect) */
   setLockState: (locks: FileLockInfo[]) => void;
@@ -18,7 +18,7 @@ interface LockState {
   removeLock: (fileId: number, lockId: string) => void;
 
   /** Update queue position for a file */
-  setQueuePosition: (fileId: number, position: number) => void;
+  setQueuePosition: (fileId: number, info: number | QueueInfo) => void;
 
   /** Remove from queue (lock was granted or cancelled) */
   removeFromQueue: (fileId: number) => void;
@@ -198,10 +198,11 @@ export const useLockStore = create<LockState>((set, get) => ({
     });
   },
 
-  setQueuePosition: (fileId, position) => {
+  setQueuePosition: (fileId, info) => {
     set((state) => {
       const updated = new Map(state.queuePositions);
-      updated.set(fileId, position);
+      const queueInfo: QueueInfo = typeof info === 'number' ? { position: info } : info;
+      updated.set(fileId, queueInfo);
       return { queuePositions: updated };
     });
   },

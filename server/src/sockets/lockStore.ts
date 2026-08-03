@@ -137,7 +137,13 @@ export function acquireLock(
   return {
     status: 'queued',
     position,
-    heldBy: { userId: overlappingLock.userId, username: overlappingLock.username },
+    heldBy: {
+      userId: overlappingLock.userId,
+      username: overlappingLock.username,
+      unitName: overlappingLock.unitName,
+      lockScope: overlappingLock.lockScope,
+      includeUsages: overlappingLock.includeUsages,
+    },
   };
 }
 

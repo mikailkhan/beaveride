@@ -21,6 +21,7 @@ interface MonacoEditorProps {
     startLine: number;
     endLine: number;
   }) => void;
+  onOpenScopePopover?: () => void;
 }
 
 function getIndentLevel(text: string): number {
@@ -112,7 +113,7 @@ function findCurlyBraceBlock(model: monaco.editor.ITextModel, lineNumber: number
 
 import { parseCodeUnits } from '../../utils/codeParser';
 
-function findBlock(editor: monaco.editor.ICodeEditor, language: string): { startLine: number; endLine: number; unitName?: string } | null {
+export function findBlock(editor: monaco.editor.ICodeEditor, language: string): { startLine: number; endLine: number; unitName?: string } | null {
   const model = editor.getModel();
   if (!model) return null;
 
@@ -155,10 +156,15 @@ function findBlock(editor: monaco.editor.ICodeEditor, language: string): { start
 
 const EMPTY_ARRAY: any[] = [];
 
-export const MonacoEditor = ({ fileId, language, value, options, onChange, onMount, readOnly, onRequestUsageLock }: MonacoEditorProps) => {
+export const MonacoEditor = ({ fileId, language, value, options, onChange, onMount, readOnly, onRequestUsageLock, onOpenScopePopover }: MonacoEditorProps) => {
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<typeof monaco | null>(null);
   const decorationsCollection = useRef<monaco.editor.IEditorDecorationsCollection | null>(null);
+
+  const onOpenScopePopoverRef = useRef(onOpenScopePopover);
+  useEffect(() => {
+    onOpenScopePopoverRef.current = onOpenScopePopover;
+  }, [onOpenScopePopover]);
   
   const [dynamicReadOnly, setDynamicReadOnly] = useState(false);
   const [dynamicReadOnlyReason, setDynamicReadOnlyReason] = useState<{ type: 'collaborator' | 'out_of_scope'; unitName?: string } | null>(null);
@@ -239,6 +245,11 @@ export const MonacoEditor = ({ fileId, language, value, options, onChange, onMou
           sock?.emit('lock:release', { fileId: currentFileId, lockId: myLock.id });
         }
       } else {
+        if (onOpenScopePopoverRef.current) {
+          onOpenScopePopoverRef.current();
+          return;
+        }
+
         const block = findBlock(ed, language);
         if (block) {
           const overlap = currentLocks.some(l => 
