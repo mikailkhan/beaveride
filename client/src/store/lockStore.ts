@@ -47,6 +47,15 @@ interface LockState {
   /** Adjust lock line spans when lines are added/removed during editing */
   adjustLockSpans: (fileId: number, editStartLine: number, lineDelta: number) => void;
 
+  /** Map of lockId → SHA-256 baseline content hash */
+  contentHashes: Map<string, string>;
+
+  /** Set content hash for a lock */
+  setContentHash: (lockId: string, hash: string) => void;
+
+  /** Get baseline content hash for user's lock on a file */
+  getContentHashForFile: (fileId: number, userId: number | string) => string | undefined;
+
   /** Clear all lock state (on room leave) */
   clearLockStore: () => void;
 }
@@ -253,11 +262,29 @@ export const useLockStore = create<LockState>((set, get) => ({
     return !!get().getGroupForLock(lockId);
   },
 
+  contentHashes: new Map(),
+
+  setContentHash: (lockId, hash) => {
+    set((state) => {
+      const updated = new Map(state.contentHashes);
+      updated.set(lockId, hash);
+      return { contentHashes: updated };
+    });
+  },
+
+  getContentHashForFile: (fileId, userId) => {
+    const locks = get().fileLocks.get(fileId) || [];
+    const myLock = locks.find((l) => String(l.userId) === String(userId) && (l.contentHash || get().contentHashes.get(l.id)));
+    if (!myLock) return undefined;
+    return myLock.contentHash || get().contentHashes.get(myLock.id);
+  },
+
   clearLockStore: () => {
     set({
       fileLocks: new Map(),
       queuePositions: new Map(),
       usageGroups: new Map(),
+      contentHashes: new Map(),
     });
   },
 }));

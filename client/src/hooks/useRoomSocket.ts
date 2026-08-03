@@ -3,6 +3,7 @@ import type { Socket } from 'socket.io-client';
 import type { ActivityEvent, User } from '../types';
 import { useFileStore } from '../store/fileStore';
 import { useLockStore } from '../store/lockStore';
+import { useAuthStore } from '../store/authStore';
 import type { FileLockInfo } from '../types';
 
 interface UseRoomSocketProps {
@@ -127,15 +128,23 @@ export function useRoomSocket({
   useEffect(() => {
     if (!socket) return;
 
-    const { setLockState, addLock, removeLock, setQueuePosition, removeFromQueue } =
+    const { setLockState, addLock, removeLock, setQueuePosition, removeFromQueue, setContentHash } =
       useLockStore.getState();
 
     const onLockState = (locks: FileLockInfo[]) => {
       setLockState(locks);
+      for (const lock of locks) {
+        if (lock.contentHash) {
+          setContentHash(lock.id, lock.contentHash);
+        }
+      }
     };
 
     const onLockAcquired = (lock: FileLockInfo) => {
       addLock(lock);
+      if (lock.contentHash) {
+        setContentHash(lock.id, lock.contentHash);
+      }
     };
 
     const onLockReleased = (data: { fileId: number; lockId: string }) => {
@@ -152,11 +161,27 @@ export function useRoomSocket({
     const onLockGranted = (data: { fileId: number; lock: FileLockInfo }) => {
       removeFromQueue(data.fileId);
       addLock(data.lock);
+      if (data.lock.contentHash) {
+        setContentHash(data.lock.id, data.lock.contentHash);
+      }
+    };
+
+    const onWriteAccepted = (data: { fileId: number; lockId?: string; newContentHash: string }) => {
+      const authUser = useAuthStore.getState().user;
+      if (!authUser) return;
+      const locks = useLockStore.getState().getLocks(data.fileId);
+      const myLock = locks.find(l => String(l.userId) === String(authUser.id));
+      if (myLock) {
+        setContentHash(myLock.id, data.newContentHash);
+      }
     };
 
     const onUsageAcquired = (data: { groupId: string; locks: FileLockInfo[] }) => {
       for (const lock of data.locks) {
         addLock(lock);
+        if (lock.contentHash) {
+          setContentHash(lock.id, lock.contentHash);
+        }
       }
       const lockIds = data.locks.map(l => l.id);
       useLockStore.getState().addUsageGroup(data.groupId, lockIds);
@@ -180,6 +205,7 @@ export function useRoomSocket({
     socket.on('lock:released', onLockReleased);
     socket.on('lock:queued', onLockQueued);
     socket.on('lock:granted', onLockGranted);
+    socket.on('write:accepted', onWriteAccepted);
     socket.on('lock:usage-acquired', onUsageAcquired);
     socket.on('lock:usage-queued', onUsageQueued);
 
@@ -189,6 +215,7 @@ export function useRoomSocket({
       socket.off('lock:released', onLockReleased);
       socket.off('lock:queued', onLockQueued);
       socket.off('lock:granted', onLockGranted);
+      socket.off('write:accepted', onWriteAccepted);
       socket.off('lock:usage-acquired', onUsageAcquired);
       socket.off('lock:usage-queued', onUsageQueued);
     };

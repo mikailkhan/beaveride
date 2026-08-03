@@ -197,6 +197,7 @@ export interface FileLockInfo {
   groupId?: string;
   acquiredAt: number;
   lastHeartbeat: number;
+  contentHash?: string;
 }
 
 export interface QueueInfo {

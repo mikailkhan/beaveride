@@ -4,6 +4,7 @@ import { io, Socket } from 'socket.io-client';
 import { Awareness, encodeAwarenessUpdate, applyAwarenessUpdate } from 'y-protocols/awareness';
 import { useAuthStore } from '../store/authStore';
 import { useFileStore } from '../store/fileStore';
+import { useLockStore } from '../store/lockStore';
 
 interface UseYjsSyncProps {
   roomId: string;
@@ -114,7 +115,9 @@ export function useYjsSync({ roomId, token }: UseYjsSyncProps): {
     const handleDocUpdate = (update: Uint8Array, origin: any) => {
       if (origin !== 'remote' && socket.connected) {
         const activeFileId = useFileStore.getState().activeFileId;
-        socket.emit('sync:update', update, activeFileId ? Number(activeFileId) : undefined);
+        const numericFileId = activeFileId ? Number(activeFileId) : undefined;
+        const lockHash = (numericFileId && !isNaN(numericFileId)) ? useLockStore.getState().getContentHashForFile(numericFileId, userId) : undefined;
+        socket.emit('sync:update', update, numericFileId, lockHash);
       }
     };
     doc.on('update', handleDocUpdate);
