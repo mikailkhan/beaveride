@@ -15,6 +15,7 @@ import { useFileStore } from '../../store/fileStore';
 import { useLockStore } from '../../store/lockStore';
 import { GlobalSearchModal } from '../../components/editor/GlobalSearchModal';
 import { UsagePreviewModal } from '../../components/editor/UsagePreviewModal';
+import { LockStatusBar } from '../../components/editor/LockStatusBar';
 import type { ActivityEvent, ProjectFile, UsageScanResult } from '../../types';
 
 
@@ -742,6 +743,9 @@ export const EditorRoom = () => {
           <div className="flex-1 flex flex-col min-h-0 relative">
             {/* Editor Header / Tabs */}
             <EditorTabs />
+
+            {/* Lock Status Bar */}
+            <LockStatusBar fileId={activeFile ? Number(activeFile.id) : null} editor={editor} />
 
             {/* Queue position notification banner */}
             {(() => {
