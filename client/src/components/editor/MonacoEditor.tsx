@@ -5,6 +5,7 @@ import * as monaco from 'monaco-editor';
 import { useLockStore } from '../../store/lockStore';
 import { useAuthStore } from '../../store/authStore';
 import { useFileStore } from '../../store/fileStore';
+import { getUserColor } from '../../utils/userColorMap';
 
 interface MonacoEditorProps {
   fileId?: number;
@@ -503,6 +504,7 @@ export const MonacoEditor = ({ fileId, language, value, options, onChange, onMou
       for (const lock of locks) {
         if (lock.lockScope === 'function' && lock.startLine && lock.endLine) {
           const isMine = currentUser && String(lock.userId) === String(currentUser.id);
+          const userColor = getUserColor(lock.userId, currentUser ? Number(currentUser.id) : undefined);
           const isUsageSpan = lock.unitName?.endsWith('(usage)');
           const displayName = isUsageSpan
             ? lock.unitName?.replace(' (usage)', '')
@@ -510,17 +512,25 @@ export const MonacoEditor = ({ fileId, language, value, options, onChange, onMou
           const unitNameText = displayName ? ` (${displayName}${isUsageSpan ? ' — usage' : ''})` : '';
           const lineRangeText = `L${lock.startLine}-L${lock.endLine}`;
 
+          const className = isMine
+            ? (isUsageSpan ? 'block-lock-mine-usage' : 'block-lock-mine')
+            : (isUsageSpan ? `block-lock-user-${userColor.classIndex}-usage` : `block-lock-user-${userColor.classIndex}`);
+
+          const glyphMarginClassName = isMine
+            ? 'block-lock-icon-mine'
+            : `block-lock-icon-user-${userColor.classIndex}`;
+
+          const colorLabelText = !isMine && userColor.label ? ` (${userColor.label})` : '';
+
           newDecorations.push({
             range: new monacoInstance.Range(lock.startLine, 1, lock.endLine, 1),
             options: {
               isWholeLine: true,
-              className: isMine
-                ? (isUsageSpan ? 'block-lock-mine-usage' : 'block-lock-mine')
-                : (isUsageSpan ? 'block-lock-other-usage' : 'block-lock-other'),
-              glyphMarginClassName: isMine ? 'block-lock-icon-mine' : 'block-lock-icon-other',
-              linesDecorationsClassName: isMine ? 'block-lock-icon-mine' : 'block-lock-icon-other',
-              glyphMarginHoverMessage: { value: isMine ? `Locked by you${unitNameText} [${lineRangeText}]${isUsageSpan ? ' — usage span' : ''} - double-click to release` : `Locked by ${lock.username}${unitNameText} [${lineRangeText}]${isUsageSpan ? ' — usage span' : ''}` },
-              hoverMessage: isMine ? undefined : { value: `Locked by ${lock.username}${unitNameText} [${lineRangeText}]` }
+              className,
+              glyphMarginClassName,
+              linesDecorationsClassName: glyphMarginClassName,
+              glyphMarginHoverMessage: { value: isMine ? `Locked by you${unitNameText} [${lineRangeText}]${isUsageSpan ? ' — usage span' : ''} - double-click to release` : `Locked by ${lock.username}${colorLabelText}${unitNameText} [${lineRangeText}]${isUsageSpan ? ' — usage span' : ''}` },
+              hoverMessage: isMine ? undefined : { value: `Locked by ${lock.username}${colorLabelText}${unitNameText} [${lineRangeText}]` }
             }
           });
         }
