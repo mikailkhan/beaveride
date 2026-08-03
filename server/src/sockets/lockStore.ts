@@ -440,6 +440,12 @@ export function getLocksForRoom(roomId: number): FileLock[] {
   return result;
 }
 
+export function getLocksForUserInFile(roomId: number, fileId: number, userId: number): FileLock[] {
+  const key = `${roomId}:${fileId}`;
+  const fileLocks = locks.get(key) ?? [];
+  return fileLocks.filter(l => l.userId === userId);
+}
+
 export function getQueueForFile(roomId: number, fileId: number): QueueEntry[] {
   const key = `${roomId}:${fileId}`;
   return queues.get(key) ?? [];

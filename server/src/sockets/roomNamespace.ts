@@ -4,7 +4,7 @@ import { UserRepository } from '../repositories/userRepository.js';
 import { AuthService } from '../services/authService.js';
 import { ChatRepository } from '../repositories/chatRepository.js';
 import { getOrCreateDoc, getDoc, updateDoc, decrementConnections, getOrCreateFileText, deleteFileText, getFileContent } from './docStore.js';
-import { computeScopeHash } from '../utils/contentHash.js';
+import { computeScopeHash, validateWriteFreshness } from '../utils/contentHash.js';
 import { ExecutorService } from '../services/executorService.js';
 import { FileService } from '../services/fileService.js';
 import { eventService } from '../services/eventService.js';
@@ -18,6 +18,7 @@ import {
   refreshHeartbeat,
   releaseAllLocksForSocket,
   getLocksForRoom,
+  getLocksForUserInFile,
   getExpiredLocks,
   adjustLockSpansOnEdit,
   acquireUsageLock,
@@ -111,9 +112,51 @@ export function registerRoomNamespace(io: SocketServer): void {
       }
     });
 
-    socket.on('sync:update', async (update: Uint8Array, fileId?: number | string) => {
+    socket.on('sync:update', async (update: Uint8Array, fileId?: number | string, contentHash?: string) => {
       try {
         await docPromise;
+        const targetFileId = fileId ? Number(fileId) : undefined;
+
+        // Perform Server-Side Stale Write Validation if targetFileId and contentHash are provided
+        if (targetFileId) {
+          const userLocks = getLocksForUserInFile(roomId, targetFileId, userId);
+          if (userLocks.length > 0) {
+            const currentFileContent = getFileContent(roomId, targetFileId);
+            if (currentFileContent !== null) {
+              for (const lock of userLocks) {
+                if (lock.contentHash && contentHash) {
+                  const freshness = validateWriteFreshness(currentFileContent, lock);
+                  if (contentHash !== freshness.currentHash || freshness.status === 'stale') {
+                    // Stale write detected: REJECT write
+                    socket.emit('write:rejected_stale', {
+                      fileId: targetFileId,
+                      reason: 'stale_version',
+                      currentHash: freshness.currentHash,
+                    });
+
+                    eventService.emit({
+                      roomId,
+                      actorId: userId,
+                      actorName: username,
+                      actorType: 'human',
+                      eventType: 'write_rejected_stale',
+                      targetFileId,
+                      targetScope: lock.lockScope,
+                      targetUnitName: lock.unitName,
+                      outcome: 'rejected',
+                      reason: 'stale_version',
+                      versionRef: contentHash,
+                      metadata: { currentHash: freshness.currentHash },
+                    });
+                    await broadcastActivities(roomId);
+                    return; // Do NOT apply updateDoc or broadcast sync:update
+                  }
+                }
+              }
+            }
+          }
+        }
+
         updateDoc(roomId, update, userId);
         // Relay the update to all other users in the room
         socket.to(roomChannel).emit('sync:update', update);
