@@ -151,17 +151,16 @@ export const EditorRoom = () => {
       awareness.setLocalStateField('role', myRole);
     }
   }, [awareness, activeFileId, myRole, myCanRun]);
-  // Global keyboard shortcut listener for Cmd+Shift+L / Ctrl+Shift+L (Lock/Unlock file)
+  // Global keyboard shortcut listener for Cmd+Alt+L / Ctrl+Alt+L (Lock/Unlock entire file)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isCmdOrCtrl = e.metaKey || e.ctrlKey;
-      if (isCmdOrCtrl && e.shiftKey && e.code === 'KeyL') {
+      if (isCmdOrCtrl && e.altKey && e.code === 'KeyL') {
         const activeElement = document.activeElement;
         const isMonacoFocused = activeElement?.classList.contains('inputarea') || activeElement?.closest('.monaco-editor');
         if (isMonacoFocused) return;
 
         e.preventDefault();
-        e.stopPropagation();
 
         const targetFileId = activeFileId ? Number(activeFileId) : null;
         if (!targetFileId || isNaN(targetFileId) || !authUser || !socket) return;
@@ -182,8 +181,8 @@ export const EditorRoom = () => {
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown, true);
-    return () => window.removeEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [activeFileId, authUser, socket]);
 
   // Handle usage lock request from Monaco context menu

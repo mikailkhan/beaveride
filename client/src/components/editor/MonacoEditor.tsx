@@ -174,6 +174,11 @@ export const MonacoEditor = ({ fileId, language, value, options, onChange, onMou
   // Track double click timing for releasing locks via gutter
   const lastClickTimeRef = useRef<{ time: number; line: number }>({ time: 0, line: 0 });
 
+  // Stable ref to a function that re-draws lock decorations by reading directly from Zustand.
+  // Using a ref (not a closure) lets us call it from inside Monaco event listeners
+  // (handleEditorMount scope) which cannot access React state, but CAN read from Zustand.getState().
+  const applyDecorationsRef = useRef<() => void>(() => {});
+
   const handleEditorMount: OnMount = (editor, monacoInstance) => {
     editorRef.current = editor;
     monacoRef.current = monacoInstance;
@@ -207,74 +212,34 @@ export const MonacoEditor = ({ fileId, language, value, options, onChange, onMou
     editor.onDidChangeCursorPosition(updateBlockLockedKey);
     editor.onContextMenu(updateBlockLockedKey);
 
-    // Register Command for Cmd+Shift+L / Ctrl+Shift+L shortcut
-    editor.addCommand(
-      monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyMod.Shift | monacoInstance.KeyCode.KeyL,
-      () => {
-        const currentFileId = fileIdRef.current;
-        if (!currentFileId) return;
-        const position = editor.getPosition();
-        if (!position) return;
-        const currentUser = useAuthStore.getState().user;
-        if (!currentUser) return;
+    const handleToggleLock = (ed: monaco.editor.ICodeEditor) => {
+      const currentFileId = fileIdRef.current;
+      if (!currentFileId) return;
+      const position = ed.getPosition();
+      if (!position) return;
+      const currentUser = useAuthStore.getState().user;
+      if (!currentUser) return;
 
-        const currentLocks = useLockStore.getState().getLocks(currentFileId);
-        const myLock = currentLocks.find(l => 
-          String(l.userId) === String(currentUser.id) &&
-          l.lockScope === 'function' &&
-          l.startLine !== undefined &&
-          l.endLine !== undefined &&
-          position.lineNumber >= l.startLine && position.lineNumber <= l.endLine
-        );
+      const currentLocks = useLockStore.getState().getLocks(currentFileId);
+      const myLock = currentLocks.find(l => 
+        String(l.userId) === String(currentUser.id) &&
+        l.lockScope === 'function' &&
+        l.startLine !== undefined &&
+        l.endLine !== undefined &&
+        position.lineNumber >= l.startLine && position.lineNumber <= l.endLine
+      );
 
-        const sock = useFileStore.getState().socket;
+      const sock = useFileStore.getState().socket;
 
-        if (myLock) {
-          if (myLock.groupId) {
-            sock?.emit('lock:release-group', { groupId: myLock.groupId });
-          } else {
-            sock?.emit('lock:release', { fileId: currentFileId, lockId: myLock.id });
-          }
+      if (myLock) {
+        if (myLock.groupId) {
+          sock?.emit('lock:release-group', { groupId: myLock.groupId });
         } else {
-          const block = findBlock(editor, language);
-          if (block) {
-            const overlap = currentLocks.some(l => 
-              l.lockScope === 'file' ||
-              (l.startLine !== undefined && l.endLine !== undefined &&
-              l.startLine <= block.endLine && l.endLine >= block.startLine)
-            );
-
-            if (!overlap) {
-              sock?.emit('lock:acquire', { 
-                fileId: currentFileId, 
-                lockScope: 'function', 
-                startLine: block.startLine, 
-                endLine: block.endLine,
-                unitName: block.unitName,
-              });
-            }
-          }
+          sock?.emit('lock:release', { fileId: currentFileId, lockId: myLock.id });
         }
-      }
-    );
-
-    // Register Context Menu Actions for Lock & Unlock Block Scope
-    editor.addAction({
-      id: 'lock-block-scope',
-      label: 'Lock Block/Function Scope',
-      keybindings: [
-        monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyMod.Shift | monacoInstance.KeyCode.KeyL
-      ],
-      contextMenuGroupId: '1_modification',
-      contextMenuOrder: 1,
-      precondition: '!isCurrentBlockLockedByMe',
-      run: (ed) => {
-        const currentFileId = fileIdRef.current;
-        if (!currentFileId) return;
-        
+      } else {
         const block = findBlock(ed, language);
         if (block) {
-          const currentLocks = useLockStore.getState().getLocks(currentFileId);
           const overlap = currentLocks.some(l => 
             l.lockScope === 'file' ||
             (l.startLine !== undefined && l.endLine !== undefined &&
@@ -282,7 +247,6 @@ export const MonacoEditor = ({ fileId, language, value, options, onChange, onMou
           );
 
           if (!overlap) {
-            const sock = useFileStore.getState().socket;
             sock?.emit('lock:acquire', { 
               fileId: currentFileId, 
               lockScope: 'function', 
@@ -293,14 +257,28 @@ export const MonacoEditor = ({ fileId, language, value, options, onChange, onMou
           }
         }
       }
+    };
+
+    // Register Context Menu Actions for Lock & Unlock Block Scope
+    editor.addAction({
+      id: 'lock-block-scope',
+      label: 'Lock Block/Function Scope',
+      keybindings: [
+        monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyMod.Shift | monacoInstance.KeyCode.KeyL
+      ],
+      contextMenuGroupId: '1_modification',
+      contextMenuOrder: 1.0,
+      precondition: '!isCurrentBlockLockedByMe',
+      run: (ed) => handleToggleLock(ed),
     });
 
-    // Context menu action: Lock with Usages
+    // Context menu action: Lock with Usages (ordered directly under Lock Block/Function Scope)
     editor.addAction({
       id: 'lock-with-usages',
       label: 'Lock with Usages',
       contextMenuGroupId: '1_modification',
-      contextMenuOrder: 2,
+      contextMenuOrder: 1.01,
+      precondition: '!isCurrentBlockLockedByMe',
       run: (ed) => {
         const currentFileId = fileIdRef.current;
         if (!currentFileId) return;
@@ -341,37 +319,10 @@ export const MonacoEditor = ({ fileId, language, value, options, onChange, onMou
     editor.addAction({
       id: 'unlock-block-scope',
       label: 'Unlock Block/Function Scope',
-      keybindings: [
-        monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyMod.Shift | monacoInstance.KeyCode.KeyL
-      ],
       contextMenuGroupId: '1_modification',
-      contextMenuOrder: 1,
+      contextMenuOrder: 1.0,
       precondition: 'isCurrentBlockLockedByMe',
-      run: (ed) => {
-        const position = ed.getPosition();
-        const currentFileId = fileIdRef.current;
-        if (!position || !currentFileId) return;
-        const currentUser = useAuthStore.getState().user;
-        if (!currentUser) return;
-
-        const currentLocks = useLockStore.getState().getLocks(currentFileId);
-        const myLock = currentLocks.find(l => 
-          String(l.userId) === String(currentUser.id) &&
-          l.lockScope === 'function' &&
-          l.startLine !== undefined &&
-          l.endLine !== undefined &&
-          position.lineNumber >= l.startLine && position.lineNumber <= l.endLine
-        );
-
-        if (myLock) {
-          const sock = useFileStore.getState().socket;
-          if (myLock.groupId) {
-            sock?.emit('lock:release-group', { groupId: myLock.groupId });
-          } else {
-            sock?.emit('lock:release', { fileId: currentFileId, lockId: myLock.id });
-          }
-        }
-      }
+      run: (ed) => handleToggleLock(ed),
     });
 
     // Double-click on gutter lock icon to release
@@ -418,6 +369,19 @@ export const MonacoEditor = ({ fileId, language, value, options, onChange, onMou
 
     // Dynamically adjust and re-anchor lock line spans when lines are inserted/deleted
     editor.onDidChangeModelContent((e) => {
+      // On a flush event (tab switch / model.setValue), the model's decoration registry is wiped.
+      // Re-apply decorations from the store immediately after the content settles.
+      if (e.isFlush) {
+        // Use rAF so the model is fully rendered before we re-draw decorations
+        requestAnimationFrame(() => {
+          applyDecorationsRef.current();
+        });
+        return;
+      }
+
+      // Only process line shifts for local user editing actions
+      if (!editor.hasTextFocus() && !editor.hasWidgetFocus()) return;
+
       const currentFileId = fileIdRef.current;
       const model = editor.getModel();
       if (!currentFileId || !model) return;
@@ -508,40 +472,70 @@ export const MonacoEditor = ({ fileId, language, value, options, onChange, onMou
     }
   };
 
-  // Update decorations when locks change
+  // When the active fileId changes, reset stale dynamic read-only state from the previous file
   useEffect(() => {
-    if (!editorRef.current || !monacoRef.current || !decorationsCollection.current) return;
-    
-    const newDecorations: monaco.editor.IModelDeltaDecoration[] = [];
+    setDynamicReadOnly(false);
+    setDynamicReadOnlyReason(null);
+  }, [fileId]);
 
-    for (const lock of fileLocks) {
-      if (lock.lockScope === 'function' && lock.startLine && lock.endLine) {
-        const isMine = authUser && String(lock.userId) === String(authUser.id);
-        const isUsageSpan = lock.unitName?.endsWith('(usage)');
-        const displayName = isUsageSpan
-          ? lock.unitName?.replace(' (usage)', '')
-          : lock.unitName;
-        const unitNameText = displayName ? ` (${displayName}${isUsageSpan ? ' — usage' : ''})` : '';
-        const lineRangeText = `L${lock.startLine}-L${lock.endLine}`;
-        
-        newDecorations.push({
-          range: new monacoRef.current.Range(lock.startLine, 1, lock.endLine, 1),
-          options: {
-            isWholeLine: true,
-            className: isMine 
-              ? (isUsageSpan ? 'block-lock-mine-usage' : 'block-lock-mine')
-              : (isUsageSpan ? 'block-lock-other-usage' : 'block-lock-other'),
-            glyphMarginClassName: isMine ? 'block-lock-icon-mine' : 'block-lock-icon-other',
-            linesDecorationsClassName: isMine ? 'block-lock-icon-mine' : 'block-lock-icon-other',
-            glyphMarginHoverMessage: { value: isMine ? `Locked by you${unitNameText} [${lineRangeText}]${isUsageSpan ? ' — usage span' : ''} - double-click to release` : `Locked by ${lock.username}${unitNameText} [${lineRangeText}]${isUsageSpan ? ' — usage span' : ''}` },
-            hoverMessage: isMine ? undefined : { value: `Locked by ${lock.username}${unitNameText} [${lineRangeText}]` }
-          }
-        });
+  // Keep applyDecorationsRef up to date with the latest locks, fileId, and authUser.
+  // This ref is the single source of truth for drawing lock decorations. It reads directly
+  // from Zustand so it can be safely called from inside Monaco event listeners too.
+  useEffect(() => {
+    applyDecorationsRef.current = () => {
+      const editor = editorRef.current;
+      const monacoInstance = monacoRef.current;
+      if (!editor || !monacoInstance) return;
+
+      // Re-create the collection bound to the current model
+      if (decorationsCollection.current) {
+        decorationsCollection.current.clear();
       }
-    }
+      decorationsCollection.current = editor.createDecorationsCollection();
 
-    decorationsCollection.current.set(newDecorations);
-  }, [fileLocks, readOnly, authUser]);
+      // Read locks directly from Zustand (works both in React renders and Monaco listeners)
+      const currentFileId = fileIdRef.current;
+      const currentUser = useAuthStore.getState().user;
+      const locks = currentFileId ? useLockStore.getState().getLocks(currentFileId) : [];
+
+      const newDecorations: monaco.editor.IModelDeltaDecoration[] = [];
+
+      for (const lock of locks) {
+        if (lock.lockScope === 'function' && lock.startLine && lock.endLine) {
+          const isMine = currentUser && String(lock.userId) === String(currentUser.id);
+          const isUsageSpan = lock.unitName?.endsWith('(usage)');
+          const displayName = isUsageSpan
+            ? lock.unitName?.replace(' (usage)', '')
+            : lock.unitName;
+          const unitNameText = displayName ? ` (${displayName}${isUsageSpan ? ' — usage' : ''})` : '';
+          const lineRangeText = `L${lock.startLine}-L${lock.endLine}`;
+
+          newDecorations.push({
+            range: new monacoInstance.Range(lock.startLine, 1, lock.endLine, 1),
+            options: {
+              isWholeLine: true,
+              className: isMine
+                ? (isUsageSpan ? 'block-lock-mine-usage' : 'block-lock-mine')
+                : (isUsageSpan ? 'block-lock-other-usage' : 'block-lock-other'),
+              glyphMarginClassName: isMine ? 'block-lock-icon-mine' : 'block-lock-icon-other',
+              linesDecorationsClassName: isMine ? 'block-lock-icon-mine' : 'block-lock-icon-other',
+              glyphMarginHoverMessage: { value: isMine ? `Locked by you${unitNameText} [${lineRangeText}]${isUsageSpan ? ' — usage span' : ''} - double-click to release` : `Locked by ${lock.username}${unitNameText} [${lineRangeText}]${isUsageSpan ? ' — usage span' : ''}` },
+              hoverMessage: isMine ? undefined : { value: `Locked by ${lock.username}${unitNameText} [${lineRangeText}]` }
+            }
+          });
+        }
+      }
+
+      decorationsCollection.current.set(newDecorations);
+    };
+  });
+
+  // Trigger a decoration redraw whenever the lock state or active file changes.
+  // The useEffect above always updates applyDecorationsRef synchronously before this runs.
+  useEffect(() => {
+    applyDecorationsRef.current();
+  }, [fileLocks, fileId, readOnly, authUser]);
+
 
   // Update editor readOnly options when props or dynamic state changes
   useEffect(() => {

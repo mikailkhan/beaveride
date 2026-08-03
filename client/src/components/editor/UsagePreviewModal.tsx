@@ -1,3 +1,4 @@
+import React from 'react';
 import type { UsageScanResult } from '../../types';
 
 interface UsagePreviewModalProps {
@@ -9,117 +10,133 @@ interface UsagePreviewModalProps {
   isLoading: boolean;
 }
 
-export const UsagePreviewModal = ({
+export const UsagePreviewModal: React.FC<UsagePreviewModalProps> = ({
   isOpen,
   onClose,
   onConfirm,
   scanResult,
   unitName,
   isLoading,
-}: UsagePreviewModalProps) => {
+}) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-md animate-fade-in p-4"
+      onClick={onClose}
+    >
+      {/* Modal Dialog Card */}
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
-      />
-
-      {/* Modal */}
-      <div className="relative bg-surface border border-outline-variant rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[80vh] flex flex-col z-10">
+        className="w-[580px] max-w-[90vw] max-h-[85vh] bg-white rounded-2xl border border-[#e2bfb2]/70 shadow-2xl flex flex-col overflow-hidden select-none z-10"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-outline-variant">
-          <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary text-xl">
-              lock
-            </span>
-            <h2 className="text-lg font-title-lg text-on-surface">
-              Lock with Usages
-            </h2>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#eae8e7] bg-[#f5f3f3]">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+              <span className="material-symbols-outlined text-xl">lock</span>
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-[#1b1c1c]">
+                Lock with Usages
+              </h2>
+              <p className="text-xs text-[#5a4138]">
+                Atomically lock function definition and all call sites
+              </p>
+            </div>
           </div>
           <button
             onClick={onClose}
-            className="text-on-surface-variant hover:text-on-surface transition-colors"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-200/50 transition-colors"
           >
-            <span className="material-symbols-outlined">close</span>
+            <span className="material-symbols-outlined text-lg">close</span>
           </button>
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-4">
+        <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-white">
           {isLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-              <span className="ml-3 text-on-surface-variant">
-                Scanning workspace for usages of "{unitName}"...
+            <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
+              <div className="animate-spin rounded-full h-9 w-9 border-3 border-primary border-t-transparent" />
+              <span className="text-sm font-medium text-[#1b1c1c]">
+                Scanning workspace for usages of <code className="px-1.5 py-0.5 rounded bg-primary/10 text-primary font-mono text-xs">{unitName}</code>...
               </span>
+              <p className="text-xs text-neutral-500 max-w-xs">
+                Searching project files for all function calls and references.
+              </p>
             </div>
           ) : scanResult ? (
             <>
               {/* Warnings */}
               {scanResult.warnings.length > 0 && (
-                <div className="mb-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                  <div className="flex items-start gap-2">
-                    <span className="material-symbols-outlined text-amber-600 text-sm mt-0.5">
-                      warning
-                    </span>
-                    <div className="text-xs text-amber-700">
-                      {scanResult.warnings.map((w, i) => (
-                        <p key={i}>{w}</p>
-                      ))}
-                    </div>
+                <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-900 text-xs space-y-1">
+                  <div className="flex items-center gap-2 font-semibold text-amber-800">
+                    <span className="material-symbols-outlined text-base">warning</span>
+                    <span>Scan Disclaimer</span>
                   </div>
+                  {scanResult.warnings.map((w, i) => (
+                    <p key={i} className="pl-6 text-amber-800/90 leading-relaxed">{w}</p>
+                  ))}
                 </div>
               )}
 
-              {/* Definition info */}
-              <div className="mb-4">
-                <h3 className="text-sm font-label-lg text-on-surface mb-1">
-                  Definition
-                </h3>
-                <p className="text-xs text-on-surface-variant">
-                  Function "<span className="font-mono text-primary">{unitName}</span>" 
-                  in file #{scanResult.definitionFileId}
-                </p>
+              {/* Definition Info Box */}
+              <div className="p-4 rounded-xl bg-[#f5f3f3] border border-[#eae8e7] flex items-center justify-between">
+                <div>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 block mb-0.5">
+                    Target Definition
+                  </span>
+                  <span className="text-sm font-bold text-[#1b1c1c] font-mono">
+                    {unitName}
+                  </span>
+                </div>
+                <span className="px-2.5 py-1 rounded-lg bg-primary/10 text-primary text-xs font-semibold">
+                  Definition Span
+                </span>
               </div>
 
-              {/* Usages list */}
+              {/* Usages Section */}
               <div>
-                <h3 className="text-sm font-label-lg text-on-surface mb-2">
-                  Usages Found ({scanResult.usages.length})
-                </h3>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-500">
+                    Usages Found ({scanResult.usages.length})
+                  </h3>
+                  <span className="text-xs text-neutral-400">
+                    {scanResult.usages.length === 0 ? 'No external usages' : 'Across workspace'}
+                  </span>
+                </div>
 
                 {scanResult.usages.length === 0 ? (
-                  <p className="text-xs text-on-surface-variant italic">
-                    No usages found in other files. Only the definition will be locked.
-                  </p>
+                  <div className="p-6 rounded-xl bg-[#fbf9f8] border border-dashed border-[#e2bfb2] text-center">
+                    <p className="text-xs text-neutral-500 italic">
+                      No usages found in other workspace files. Locking will apply to the definition only.
+                    </p>
+                  </div>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-2.5 max-h-[260px] overflow-y-auto pr-1">
                     {scanResult.usages.map((usage, i) => (
                       <div
                         key={`${usage.fileId}-${usage.startLine}-${i}`}
-                        className="flex items-start gap-3 p-2 rounded-lg bg-surface-variant/50 border border-outline-variant/50"
+                        className="p-3 rounded-xl bg-[#fbf9f8] border border-[#e2bfb2]/60 hover:border-primary/50 transition-colors flex flex-col gap-1.5"
                       >
-                        <span className="material-symbols-outlined text-on-surface-variant text-sm mt-0.5">
-                          description
-                        </span>
-                        <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between text-xs">
                           <div className="flex items-center gap-2">
-                            <span className="text-xs font-label-md text-on-surface">
+                            <span className="material-symbols-outlined text-primary text-sm">description</span>
+                            <span className="font-semibold text-[#1b1c1c]">
                               {usage.fileName}
                             </span>
-                            <span className="text-xs text-on-surface-variant">
-                              L{usage.startLine}
+                            <span className="px-1.5 py-0.5 rounded bg-neutral-200 text-neutral-700 text-[11px] font-mono">
+                              Line {usage.startLine}
                             </span>
-                            {usage.confidence === 'medium' && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600">
-                                uncertain
-                              </span>
-                            )}
                           </div>
-                          <code className="text-xs text-on-surface-variant font-mono block mt-1 truncate">
+                          {usage.confidence === 'medium' && (
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 font-medium">
+                              Uncertain
+                            </span>
+                          )}
+                        </div>
+                        <div className="p-2 rounded-lg bg-white border border-[#eae8e7] overflow-x-auto">
+                          <code className="text-xs font-mono text-[#1b1c1c] block whitespace-pre">
                             {usage.lineContent}
                           </code>
                         </div>
@@ -133,21 +150,24 @@ export const UsagePreviewModal = ({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-outline-variant">
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#eae8e7] bg-[#f5f3f3]">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-label-lg text-on-surface-variant hover:text-on-surface transition-colors rounded-lg hover:bg-surface-variant"
+            className="px-4 py-2 text-xs font-semibold text-neutral-600 hover:text-neutral-900 rounded-xl hover:bg-neutral-200/50 transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
             disabled={isLoading || !scanResult}
-            className="px-4 py-2 text-sm font-label-lg text-on-primary bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors rounded-lg"
+            className="px-5 py-2.5 text-xs font-bold text-white bg-[#a53c00] hover:bg-[#f66317] disabled:opacity-50 disabled:cursor-not-allowed transition-all rounded-xl shadow-md flex items-center gap-2 cursor-pointer"
           >
-            {scanResult && scanResult.usages.length > 0
-              ? `Lock Definition + ${scanResult.usages.length} Usage${scanResult.usages.length > 1 ? 's' : ''}`
-              : 'Lock Definition Only'}
+            <span className="material-symbols-outlined text-sm">lock</span>
+            <span>
+              {scanResult && scanResult.usages.length > 0
+                ? `Lock Definition + ${scanResult.usages.length} Usage${scanResult.usages.length > 1 ? 's' : ''}`
+                : 'Lock Definition Only'}
+            </span>
           </button>
         </div>
       </div>
