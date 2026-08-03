@@ -3,7 +3,8 @@ import * as Y from 'yjs';
 import { UserRepository } from '../repositories/userRepository.js';
 import { AuthService } from '../services/authService.js';
 import { ChatRepository } from '../repositories/chatRepository.js';
-import { getOrCreateDoc, getDoc, updateDoc, decrementConnections, getOrCreateFileText, deleteFileText } from './docStore.js';
+import { getOrCreateDoc, getDoc, updateDoc, decrementConnections, getOrCreateFileText, deleteFileText, getFileContent } from './docStore.js';
+import { computeScopeHash } from '../utils/contentHash.js';
 import { ExecutorService } from '../services/executorService.js';
 import { FileService } from '../services/fileService.js';
 import { eventService } from '../services/eventService.js';
@@ -466,6 +467,10 @@ export function registerRoomNamespace(io: SocketServer): void {
       const result = acquireLock(roomId, data.fileId, userId, username, socket.id, scope, data.startLine, data.endLine, data.unitName);
 
       if (result.status === 'acquired') {
+        const fileContent = getFileContent(roomId, data.fileId);
+        if (fileContent !== null) {
+          result.lock.contentHash = computeScopeHash(fileContent, scope, data.startLine, data.endLine);
+        }
         lockCorrelations.set(result.lock.id, correlationId);
         roomNsp.to(roomChannel).emit('lock:acquired', result.lock);
 
@@ -563,6 +568,10 @@ export function registerRoomNamespace(io: SocketServer): void {
             const nextCorrelationId = eventService.generateCorrelationId();
             const grantResult = acquireLock(roomId, data.fileId, next.userId, next.username, next.socketId, next.lockScope, next.startLine, next.endLine, next.unitName);
             if (grantResult.status === 'acquired') {
+              const fileContent = getFileContent(roomId, data.fileId);
+              if (fileContent !== null) {
+                grantResult.lock.contentHash = computeScopeHash(fileContent, next.lockScope, next.startLine, next.endLine);
+              }
               lockCorrelations.set(grantResult.lock.id, nextCorrelationId);
 
               eventService.emit({
@@ -683,6 +692,10 @@ export function registerRoomNamespace(io: SocketServer): void {
 
       if (result.status === 'acquired') {
         for (const lock of result.locks) {
+          const fileContent = getFileContent(roomId, lock.fileId);
+          if (fileContent !== null) {
+            lock.contentHash = computeScopeHash(fileContent, lock.lockScope, lock.startLine, lock.endLine);
+          }
           lockCorrelations.set(lock.id, correlationId);
           roomNsp.to(roomChannel).emit('lock:acquired', lock);
         }

@@ -19,6 +19,7 @@ export interface FileLock {
   groupId?: string | undefined;
   acquiredAt: number;
   lastHeartbeat: number;
+  contentHash?: string | undefined;
 }
 
 export interface QueueEntry {

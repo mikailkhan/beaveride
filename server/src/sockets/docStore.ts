@@ -74,6 +74,15 @@ export function getDoc(roomId: number): Y.Doc | null {
   return cached ? cached.doc : null;
 }
 
+export function getFileContent(roomId: number, fileId: number): string | null {
+  const cached = cache.get(roomId);
+  if (!cached) return null;
+  const filesMap = cached.doc.getMap('files');
+  const key = `file:${fileId}`;
+  const yText = filesMap.get(key) as Y.Text | undefined;
+  return yText ? yText.toString() : null;
+}
+
 export function getOrCreateFileText(roomId: number, fileId: number): Y.Text {
   const cached = cache.get(roomId);
   if (!cached) {
