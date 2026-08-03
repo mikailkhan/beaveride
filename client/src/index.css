@@ -245,4 +245,37 @@
     margin-left: 4px;
     display: inline-block;
   }
+
+  /* Per-User Collaborator Lock Palette Variants (user-0 through user-7) */
+  .block-lock-user-0 { background-color: rgba(0, 178, 162, 0.15) !important; border-left: 3px solid rgba(0, 178, 162, 0.5); }
+  .block-lock-user-0-usage { background-color: rgba(0, 178, 162, 0.1) !important; border-left: 2px dashed rgba(0, 178, 162, 0.6); }
+  .block-lock-icon-user-0::after { content: '\e897'; font-family: 'Material Symbols Outlined'; color: #00b2a2; font-size: 14px; margin-left: 4px; display: inline-block; }
+
+  .block-lock-user-1 { background-color: rgba(139, 92, 246, 0.15) !important; border-left: 3px solid rgba(139, 92, 246, 0.5); }
+  .block-lock-user-1-usage { background-color: rgba(139, 92, 246, 0.1) !important; border-left: 2px dashed rgba(139, 92, 246, 0.6); }
+  .block-lock-icon-user-1::after { content: '\e897'; font-family: 'Material Symbols Outlined'; color: #8b5cf6; font-size: 14px; margin-left: 4px; display: inline-block; }
+
+  .block-lock-user-2 { background-color: rgba(234, 88, 12, 0.15) !important; border-left: 3px solid rgba(234, 88, 12, 0.5); }
+  .block-lock-user-2-usage { background-color: rgba(234, 88, 12, 0.1) !important; border-left: 2px dashed rgba(234, 88, 12, 0.6); }
+  .block-lock-icon-user-2::after { content: '\e897'; font-family: 'Material Symbols Outlined'; color: #ea580c; font-size: 14px; margin-left: 4px; display: inline-block; }
+
+  .block-lock-user-3 { background-color: rgba(22, 163, 74, 0.15) !important; border-left: 3px solid rgba(22, 163, 74, 0.5); }
+  .block-lock-user-3-usage { background-color: rgba(22, 163, 74, 0.1) !important; border-left: 2px dashed rgba(22, 163, 74, 0.6); }
+  .block-lock-icon-user-3::after { content: '\e897'; font-family: 'Material Symbols Outlined'; color: #16a34a; font-size: 14px; margin-left: 4px; display: inline-block; }
+
+  .block-lock-user-4 { background-color: rgba(219, 39, 119, 0.15) !important; border-left: 3px solid rgba(219, 39, 119, 0.5); }
+  .block-lock-user-4-usage { background-color: rgba(219, 39, 119, 0.1) !important; border-left: 2px dashed rgba(219, 39, 119, 0.6); }
+  .block-lock-icon-user-4::after { content: '\e897'; font-family: 'Material Symbols Outlined'; color: #db2777; font-size: 14px; margin-left: 4px; display: inline-block; }
+
+  .block-lock-user-5 { background-color: rgba(79, 70, 229, 0.15) !important; border-left: 3px solid rgba(79, 70, 229, 0.5); }
+  .block-lock-user-5-usage { background-color: rgba(79, 70, 229, 0.1) !important; border-left: 2px dashed rgba(79, 70, 229, 0.6); }
+  .block-lock-icon-user-5::after { content: '\e897'; font-family: 'Material Symbols Outlined'; color: #4f46e5; font-size: 14px; margin-left: 4px; display: inline-block; }
+
+  .block-lock-user-6 { background-color: rgba(217, 119, 6, 0.15) !important; border-left: 3px solid rgba(217, 119, 6, 0.5); }
+  .block-lock-user-6-usage { background-color: rgba(217, 119, 6, 0.1) !important; border-left: 2px dashed rgba(217, 119, 6, 0.6); }
+  .block-lock-icon-user-6::after { content: '\e897'; font-family: 'Material Symbols Outlined'; color: #d97706; font-size: 14px; margin-left: 4px; display: inline-block; }
+
+  .block-lock-user-7 { background-color: rgba(2, 132, 199, 0.15) !important; border-left: 3px solid rgba(2, 132, 199, 0.5); }
+  .block-lock-user-7-usage { background-color: rgba(2, 132, 199, 0.1) !important; border-left: 2px dashed rgba(2, 132, 199, 0.6); }
+  .block-lock-icon-user-7::after { content: '\e897'; font-family: 'Material Symbols Outlined'; color: #0284c7; font-size: 14px; margin-left: 4px; display: inline-block; }
 }
