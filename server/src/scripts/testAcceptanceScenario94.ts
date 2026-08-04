@@ -138,6 +138,12 @@ async function runAcceptanceScenario94() {
   console.log('\nSTEP 4: Alice releases lock and Agent-1 is promoted');
   const releaseRes = releaseLock(roomId, fileId, aliceUserId, aliceLock.id);
   console.assert(releaseRes.status === 'released', 'Alice lock should be released');
+
+  if (releaseRes.status !== 'released') {
+    console.error('FAILED Step 4: Alice lock release failed');
+    process.exit(1);
+  }
+
   console.assert(releaseRes.nextInQueue.length === 1, 'Agent-1 should be promoted from queue');
 
   eventService.emit({

@@ -14,6 +14,7 @@ export type SafeUser = Omit<User, 'passwordHash'>;
 export interface JwtPayload {
   sub: number;
   email: string;
+  isAgent?: boolean;
 }
 
 export interface AuthResult {
@@ -147,13 +148,21 @@ export class AuthService {
       throw new HttpError(401, 'Invalid token payload');
     }
 
-    return { sub: payload.sub as unknown as number, email: payload.email as string };
+    return {
+      sub: payload.sub as unknown as number,
+      email: payload.email as string,
+      isAgent: (payload as any).isAgent ?? false,
+    };
   }
 
   private signToken(user: SafeUser): string {
     // Cast through unknown: env.JWT_EXPIRES_IN is a plain `string` but @types/jsonwebtoken
     // uses a branded StringValue. The value is always a valid ms-compatible string (Zod default '7d').
     const signOptions = { expiresIn: env.JWT_EXPIRES_IN, algorithm: 'HS256' } as jwt.SignOptions;
-    return jwt.sign({ sub: user.id, email: user.email }, env.JWT_SECRET, signOptions);
+    return jwt.sign(
+      { sub: user.id, email: user.email, isAgent: user.isAgent ?? false },
+      env.JWT_SECRET,
+      signOptions
+    );
   }
 }

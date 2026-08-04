@@ -124,6 +124,7 @@ export const users = pgTable(
     lastName: varchar('last_name', { length: 120 }).notNull(),
     username: varchar('username', { length: 80 }).notNull(),
     passwordHash: varchar('password_hash', { length: 255 }).notNull(),
+    isAgent: boolean('is_agent').default(false).notNull(),
     ...timestamps,
   },
   (table) => ({

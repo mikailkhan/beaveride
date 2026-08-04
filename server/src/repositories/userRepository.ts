@@ -10,6 +10,7 @@ type CreateUserData = {
   firstName: string;
   lastName: string;
   passwordHash: string;
+  isAgent?: boolean;
 };
 
 export class UserRepository {
@@ -22,6 +23,12 @@ export class UserRepository {
   async findByUsername(username: string): Promise<User | undefined> {
     return db.query.users.findFirst({
       where: eq(users.username, username),
+    });
+  }
+
+  async findAgentUser(): Promise<User | undefined> {
+    return db.query.users.findFirst({
+      where: eq(users.isAgent, true),
     });
   }
 

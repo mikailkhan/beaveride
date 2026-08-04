@@ -4,6 +4,7 @@ export interface User {
   firstName: string;
   lastName: string;
   username: string;
+  isAgent?: boolean;
 }
 
 export type RoomStatus = 'active' | 'archived' | 'trash' | 'deleted';
@@ -25,6 +26,7 @@ export interface Room {
     role: 'owner' | 'editor' | 'viewer';
     canRun: boolean;
     joinedAt: string;
+    isAgent?: boolean;
   }>;
 }
 
@@ -198,6 +200,7 @@ export interface FileLockInfo {
   acquiredAt: number;
   lastHeartbeat: number;
   contentHash?: string;
+  isAgent?: boolean;
 }
 
 export interface QueueInfo {
@@ -208,6 +211,7 @@ export interface QueueInfo {
     unitName?: string;
     lockScope?: LockScope;
     includeUsages?: boolean;
+    isAgent?: boolean;
   };
 }
 
