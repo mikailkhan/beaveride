@@ -37,6 +37,7 @@ const roomService = new RoomService();
 const roomRepository = new RoomRepository();
 const globalRunLock = new Map<number, boolean>();
 const codeEditDebounce = new Map<string, number>(); // key: `${roomId}:${userId}`
+const writeAppliedDebounce = new Map<string, number>(); // key: `${roomId}:${userId}:${targetFileId}`
 const CODE_EDIT_DEBOUNCE_MS = 10_000;
 const lockCorrelations = new Map<string, string>(); // lockId -> correlationId
 
@@ -169,6 +170,7 @@ export function registerRoomNamespace(io: SocketServer): void {
             const updatedContent = getFileContent(roomId, targetFileId);
             if (updatedContent !== null) {
               for (const lock of userLocks) {
+                const previousHash = lock.contentHash || contentHash;
                 const newHash = computeScopeHash(updatedContent, lock.lockScope, lock.startLine, lock.endLine);
                 updateLockContentHash(roomId, targetFileId, lock.id, newHash);
                 socket.emit('write:accepted', {
@@ -176,6 +178,29 @@ export function registerRoomNamespace(io: SocketServer): void {
                   lockId: lock.id,
                   newContentHash: newHash,
                 });
+
+                // Emit write_applied activity event with a 10s debounce per lock/file
+                const writeDebounceKey = `${roomId}:${userId}:${targetFileId}:${lock.id}`;
+                const lastWrite = writeAppliedDebounce.get(writeDebounceKey) ?? 0;
+                const nowTime = Date.now();
+                if (nowTime - lastWrite > CODE_EDIT_DEBOUNCE_MS) {
+                  writeAppliedDebounce.set(writeDebounceKey, nowTime);
+                  eventService.emit({
+                    roomId,
+                    actorId: userId,
+                    actorName: username,
+                    actorType: 'human',
+                    eventType: 'write_applied',
+                    targetFileId,
+                    targetScope: lock.lockScope,
+                    targetUnitName: lock.unitName,
+                    outcome: 'applied',
+                    versionRef: previousHash,
+                    versionProduced: newHash,
+                    correlationId: lockCorrelations.get(lock.id),
+                  });
+                  await broadcastActivities(roomId);
+                }
               }
             }
           }
