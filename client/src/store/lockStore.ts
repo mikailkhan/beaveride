@@ -56,6 +56,15 @@ interface LockState {
   /** Get baseline content hash for user's lock on a file */
   getContentHashForFile: (fileId: number, userId: number | string) => string | undefined;
 
+  /** Map of fileId → stale write rejection info */
+  staleRejections: Map<number, { fileId: number; reason: string; currentHash: string; timestamp: number }>;
+
+  /** Add stale rejection notification for a file */
+  addStaleRejection: (fileId: number, data: { reason: string; currentHash: string }) => void;
+
+  /** Clear stale rejection notification for a file */
+  clearStaleRejection: (fileId: number) => void;
+
   /** Clear all lock state (on room leave) */
   clearLockStore: () => void;
 }
@@ -279,12 +288,36 @@ export const useLockStore = create<LockState>((set, get) => ({
     return myLock.contentHash || get().contentHashes.get(myLock.id);
   },
 
+  staleRejections: new Map(),
+
+  addStaleRejection: (fileId, data) => {
+    set((state) => {
+      const updated = new Map(state.staleRejections);
+      updated.set(fileId, {
+        fileId,
+        reason: data.reason,
+        currentHash: data.currentHash,
+        timestamp: Date.now(),
+      });
+      return { staleRejections: updated };
+    });
+  },
+
+  clearStaleRejection: (fileId) => {
+    set((state) => {
+      const updated = new Map(state.staleRejections);
+      updated.delete(fileId);
+      return { staleRejections: updated };
+    });
+  },
+
   clearLockStore: () => {
     set({
       fileLocks: new Map(),
       queuePositions: new Map(),
       usageGroups: new Map(),
       contentHashes: new Map(),
+      staleRejections: new Map(),
     });
   },
 }));

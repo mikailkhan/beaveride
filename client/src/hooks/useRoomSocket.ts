@@ -200,12 +200,17 @@ export function useRoomSocket({
       });
     };
 
+    const onWriteRejectedStale = (data: { fileId: number; reason: string; currentHash: string }) => {
+      useLockStore.getState().addStaleRejection(data.fileId, data);
+    };
+
     socket.on('lock:state', onLockState);
     socket.on('lock:acquired', onLockAcquired);
     socket.on('lock:released', onLockReleased);
     socket.on('lock:queued', onLockQueued);
     socket.on('lock:granted', onLockGranted);
     socket.on('write:accepted', onWriteAccepted);
+    socket.on('write:rejected_stale', onWriteRejectedStale);
     socket.on('lock:usage-acquired', onUsageAcquired);
     socket.on('lock:usage-queued', onUsageQueued);
 
@@ -216,6 +221,7 @@ export function useRoomSocket({
       socket.off('lock:queued', onLockQueued);
       socket.off('lock:granted', onLockGranted);
       socket.off('write:accepted', onWriteAccepted);
+      socket.off('write:rejected_stale', onWriteRejectedStale);
       socket.off('lock:usage-acquired', onUsageAcquired);
       socket.off('lock:usage-queued', onUsageQueued);
     };

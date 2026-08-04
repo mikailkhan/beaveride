@@ -820,6 +820,60 @@ export const EditorRoom = () => {
               );
             })()}
 
+            {/* Stale Write Rejection Notification Banner */}
+            {(() => {
+              if (!activeFile) return null;
+              const numericFileId = Number(activeFile.id);
+              const staleInfo = useLockStore.getState().staleRejections.get(numericFileId);
+              if (!staleInfo) return null;
+
+              const handleRefreshLock = () => {
+                const socket = useFileStore.getState().socket;
+                const myLocks = useLockStore.getState().getLocks(numericFileId).filter(l => String(l.userId) === String(authUser?.id));
+                for (const lock of myLocks) {
+                  socket?.emit('lock:release', { fileId: numericFileId, lockId: lock.id });
+                  socket?.emit('lock:acquire', {
+                    fileId: numericFileId,
+                    lockScope: lock.lockScope,
+                    startLine: lock.startLine,
+                    endLine: lock.endLine,
+                    unitName: lock.unitName,
+                  });
+                }
+                useLockStore.getState().clearStaleRejection(numericFileId);
+              };
+
+              return (
+                <div 
+                  role="alert"
+                  aria-live="assertive"
+                  className="flex items-center justify-between gap-3 px-4 py-2 bg-amber-500/15 text-amber-900 text-xs font-medium border-b border-amber-500/30 shrink-0 select-none shadow-sm"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="material-symbols-outlined text-base text-amber-600 shrink-0">warning</span>
+                    <span className="truncate">
+                      <strong>Edit Rejected</strong> — The file or function content was modified since you acquired the lock. Your local baseline is stale.
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={handleRefreshLock}
+                      className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded text-[11px] font-semibold transition-colors shadow-xs cursor-pointer"
+                    >
+                      Refresh Lock
+                    </button>
+                    <button
+                      onClick={() => useLockStore.getState().clearStaleRejection(numericFileId)}
+                      className="p-0.5 text-amber-700 hover:text-amber-950 transition-colors rounded cursor-pointer"
+                      title="Dismiss notification"
+                    >
+                      <span className="material-symbols-outlined text-sm">close</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Monaco-inspired Editor Container */}
             <div className="flex-1 relative min-h-0">
               {activeFile ? (() => {
