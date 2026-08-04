@@ -446,6 +446,18 @@ export function getLocksForUserInFile(roomId: number, fileId: number, userId: nu
   return fileLocks.filter(l => l.userId === userId);
 }
 
+export function updateLockContentHash(roomId: number, fileId: number, lockId: string, newHash: string): boolean {
+  const key = `${roomId}:${fileId}`;
+  const fileLocks = locks.get(key);
+  if (!fileLocks) return false;
+  const targetLock = fileLocks.find(l => l.id === lockId);
+  if (targetLock) {
+    targetLock.contentHash = newHash;
+    return true;
+  }
+  return false;
+}
+
 export function getQueueForFile(roomId: number, fileId: number): QueueEntry[] {
   const key = `${roomId}:${fileId}`;
   return queues.get(key) ?? [];

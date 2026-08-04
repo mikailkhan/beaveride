@@ -19,6 +19,7 @@ import {
   releaseAllLocksForSocket,
   getLocksForRoom,
   getLocksForUserInFile,
+  updateLockContentHash,
   getExpiredLocks,
   adjustLockSpansOnEdit,
   acquireUsageLock,
@@ -161,7 +162,24 @@ export function registerRoomNamespace(io: SocketServer): void {
         // Relay the update to all other users in the room
         socket.to(roomChannel).emit('sync:update', update);
 
-        const targetFileId = fileId ? Number(fileId) : undefined;
+        // Recompute contentHash after successful write application
+        if (targetFileId) {
+          const userLocks = getLocksForUserInFile(roomId, targetFileId, userId);
+          if (userLocks.length > 0) {
+            const updatedContent = getFileContent(roomId, targetFileId);
+            if (updatedContent !== null) {
+              for (const lock of userLocks) {
+                const newHash = computeScopeHash(updatedContent, lock.lockScope, lock.startLine, lock.endLine);
+                updateLockContentHash(roomId, targetFileId, lock.id, newHash);
+                socket.emit('write:accepted', {
+                  fileId: targetFileId,
+                  lockId: lock.id,
+                  newContentHash: newHash,
+                });
+              }
+            }
+          }
+        }
 
         // Record a code_edit activity with a 10s debounce per user
         const debounceKey = `${roomId}:${userId}`;
