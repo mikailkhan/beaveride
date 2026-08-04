@@ -1,6 +1,19 @@
 import { create } from 'zustand';
 import type { FileLockInfo, QueueInfo } from '../types';
 
+export const MAX_STALE_RETRIES = 3;
+
+export interface StaleWriteStateInfo {
+  fileId: number;
+  status: 'retrying' | 'failed_terminal' | 'none';
+  retryCount: number;
+  retriesRemaining: number;
+  lastReason?: string;
+  lastCurrentHash?: string;
+  totalAttempts?: number;
+  timestamp: number;
+}
+
 interface LockState {
   /** Map of fileId → FileLockInfo[] for all locks in the current room */
   fileLocks: Map<number, FileLockInfo[]>;
@@ -64,6 +77,18 @@ interface LockState {
 
   /** Clear stale rejection notification for a file */
   clearStaleRejection: (fileId: number) => void;
+
+  /** Map of fileId → detailed stale write state (retrying, terminal, or none) */
+  staleWriteState: Map<number, StaleWriteStateInfo>;
+
+  /** Set state to retrying on recoverable stale write */
+  setStaleWriteRetrying: (fileId: number, data: { retryCount: number; retriesRemaining: number; currentHash: string }) => void;
+
+  /** Set state to failed_terminal when max retries are exhausted */
+  setStaleWriteTerminal: (fileId: number, data: { totalAttempts: number; reason: string }) => void;
+
+  /** Clear stale write state for a file */
+  clearStaleWriteState: (fileId: number) => void;
 
   /** Clear all lock state (on room leave) */
   clearLockStore: () => void;
@@ -311,6 +336,67 @@ export const useLockStore = create<LockState>((set, get) => ({
     });
   },
 
+  staleWriteState: new Map(),
+
+  setStaleWriteRetrying: (fileId, data) => {
+    set((state) => {
+      const updated = new Map(state.staleWriteState);
+      updated.set(fileId, {
+        fileId,
+        status: 'retrying',
+        retryCount: data.retryCount,
+        retriesRemaining: data.retriesRemaining,
+        lastCurrentHash: data.currentHash,
+        timestamp: Date.now(),
+      });
+
+      const updatedRejections = new Map(state.staleRejections);
+      updatedRejections.set(fileId, {
+        fileId,
+        reason: 'stale_version',
+        currentHash: data.currentHash,
+        timestamp: Date.now(),
+      });
+
+      return { staleWriteState: updated, staleRejections: updatedRejections };
+    });
+  },
+
+  setStaleWriteTerminal: (fileId, data) => {
+    set((state) => {
+      const updated = new Map(state.staleWriteState);
+      updated.set(fileId, {
+        fileId,
+        status: 'failed_terminal',
+        retryCount: data.totalAttempts,
+        retriesRemaining: 0,
+        totalAttempts: data.totalAttempts,
+        lastReason: data.reason,
+        timestamp: Date.now(),
+      });
+
+      const updatedRejections = new Map(state.staleRejections);
+      updatedRejections.set(fileId, {
+        fileId,
+        reason: data.reason,
+        currentHash: '',
+        timestamp: Date.now(),
+      });
+
+      return { staleWriteState: updated, staleRejections: updatedRejections };
+    });
+  },
+
+  clearStaleWriteState: (fileId) => {
+    set((state) => {
+      const updatedState = new Map(state.staleWriteState);
+      updatedState.delete(fileId);
+      const updatedRejections = new Map(state.staleRejections);
+      updatedRejections.delete(fileId);
+      return { staleWriteState: updatedState, staleRejections: updatedRejections };
+    });
+  },
+
   clearLockStore: () => {
     set({
       fileLocks: new Map(),
@@ -318,6 +404,7 @@ export const useLockStore = create<LockState>((set, get) => ({
       usageGroups: new Map(),
       contentHashes: new Map(),
       staleRejections: new Map(),
+      staleWriteState: new Map(),
     });
   },
 }));

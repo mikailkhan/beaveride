@@ -48,9 +48,9 @@ export function computeScopeHash(
 
 export interface LockForFreshnessCheck {
   lockScope: 'file' | 'function';
-  startLine?: number;
-  endLine?: number;
-  contentHash?: string;
+  startLine?: number | undefined;
+  endLine?: number | undefined;
+  contentHash?: string | undefined;
 }
 
 export interface FreshnessResult {

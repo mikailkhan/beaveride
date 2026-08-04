@@ -20,6 +20,7 @@ export interface FileLock {
   acquiredAt: number;
   lastHeartbeat: number;
   contentHash?: string | undefined;
+  staleRetryCount?: number | undefined;
 }
 
 export interface QueueEntry {
@@ -48,7 +49,7 @@ export function generateId(): string {
 
 export type AcquireLockResult =
   | { status: 'acquired'; lock: FileLock }
-  | { status: 'queued'; position: number; heldBy: { userId: number; username: string } }
+  | { status: 'queued'; position: number; heldBy: { userId: number; username: string; unitName?: string | undefined; lockScope?: 'file' | 'function' | undefined; includeUsages?: boolean | undefined } }
   | { status: 'already_held' };
 
 function checkOverlap(a: FileLock | QueueEntry, b: FileLock | QueueEntry): boolean {
@@ -555,3 +556,34 @@ export function terminateLockOnUnitDeletion(
 
   return { status: 'terminated', lock: terminatedLock, clearedWaiters };
 }
+
+export function incrementStaleRetry(roomId: number, fileId: number, lockId: string): number {
+  const key = `${roomId}:${fileId}`;
+  const fileLocks = locks.get(key);
+  if (!fileLocks) return 0;
+  const targetLock = fileLocks.find(l => l.id === lockId);
+  if (targetLock) {
+    targetLock.staleRetryCount = (targetLock.staleRetryCount ?? 0) + 1;
+    return targetLock.staleRetryCount;
+  }
+  return 0;
+}
+
+export function resetStaleRetry(roomId: number, fileId: number, lockId: string): void {
+  const key = `${roomId}:${fileId}`;
+  const fileLocks = locks.get(key);
+  if (!fileLocks) return;
+  const targetLock = fileLocks.find(l => l.id === lockId);
+  if (targetLock) {
+    targetLock.staleRetryCount = 0;
+  }
+}
+
+export function getStaleRetryCount(roomId: number, fileId: number, lockId: string): number {
+  const key = `${roomId}:${fileId}`;
+  const fileLocks = locks.get(key);
+  if (!fileLocks) return 0;
+  const targetLock = fileLocks.find(l => l.id === lockId);
+  return targetLock?.staleRetryCount ?? 0;
+}
+

@@ -174,6 +174,7 @@ export function useRoomSocket({
       if (myLock) {
         setContentHash(myLock.id, data.newContentHash);
       }
+      useLockStore.getState().clearStaleWriteState(data.fileId);
     };
 
     const onUsageAcquired = (data: { groupId: string; locks: FileLockInfo[] }) => {
@@ -200,8 +201,55 @@ export function useRoomSocket({
       });
     };
 
-    const onWriteRejectedStale = (data: { fileId: number; reason: string; currentHash: string }) => {
-      useLockStore.getState().addStaleRejection(data.fileId, data);
+    const onWriteRejectedStale = (data: {
+      fileId: number;
+      reason: string;
+      currentHash: string;
+      retryCount?: number;
+      retriesRemaining?: number;
+      recoverable?: boolean;
+    }) => {
+      if (data.recoverable !== false && data.retryCount !== undefined) {
+        useLockStore.getState().setStaleWriteRetrying(data.fileId, {
+          retryCount: data.retryCount,
+          retriesRemaining: data.retriesRemaining ?? 0,
+          currentHash: data.currentHash,
+        });
+
+        const authUser = useAuthStore.getState().user;
+        if (authUser) {
+          const myLocks = useLockStore.getState().getLocks(data.fileId)
+            .filter(l => String(l.userId) === String(authUser.id));
+          for (const lock of myLocks) {
+            socket.emit('lock:refresh-baseline', {
+              fileId: data.fileId,
+              lockId: lock.id,
+            });
+          }
+        }
+      } else {
+        useLockStore.getState().addStaleRejection(data.fileId, data);
+      }
+    };
+
+    const onWriteFailedTerminal = (data: {
+      fileId: number;
+      reason: string;
+      totalAttempts: number;
+      message: string;
+    }) => {
+      useLockStore.getState().setStaleWriteTerminal(data.fileId, {
+        totalAttempts: data.totalAttempts,
+        reason: data.reason,
+      });
+    };
+
+    const onBaselineRefreshed = (data: {
+      fileId: number;
+      lockId: string;
+      freshHash: string;
+    }) => {
+      useLockStore.getState().setContentHash(data.lockId, data.freshHash);
     };
 
     socket.on('lock:state', onLockState);
@@ -211,6 +259,8 @@ export function useRoomSocket({
     socket.on('lock:granted', onLockGranted);
     socket.on('write:accepted', onWriteAccepted);
     socket.on('write:rejected_stale', onWriteRejectedStale);
+    socket.on('write:failed_terminal', onWriteFailedTerminal);
+    socket.on('baseline:refreshed', onBaselineRefreshed);
     socket.on('lock:usage-acquired', onUsageAcquired);
     socket.on('lock:usage-queued', onUsageQueued);
 
@@ -222,6 +272,8 @@ export function useRoomSocket({
       socket.off('lock:granted', onLockGranted);
       socket.off('write:accepted', onWriteAccepted);
       socket.off('write:rejected_stale', onWriteRejectedStale);
+      socket.off('write:failed_terminal', onWriteFailedTerminal);
+      socket.off('baseline:refreshed', onBaselineRefreshed);
       socket.off('lock:usage-acquired', onUsageAcquired);
       socket.off('lock:usage-queued', onUsageQueued);
     };

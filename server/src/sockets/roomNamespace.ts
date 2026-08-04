@@ -25,6 +25,9 @@ import {
   acquireUsageLock,
   releaseGroupLocks,
   generateId,
+  incrementStaleRetry,
+  resetStaleRetry,
+  getStaleRetryCount,
 } from './lockStore.js';
 import { scanUsages } from '../utils/usageScanner.js';
 
@@ -39,6 +42,7 @@ const globalRunLock = new Map<number, boolean>();
 const codeEditDebounce = new Map<string, number>(); // key: `${roomId}:${userId}`
 const writeAppliedDebounce = new Map<string, number>(); // key: `${roomId}:${userId}:${targetFileId}`
 const CODE_EDIT_DEBOUNCE_MS = 10_000;
+const MAX_STALE_RETRIES = 3;
 const lockCorrelations = new Map<string, string>(); // lockId -> correlationId
 
 export function registerRoomNamespace(io: SocketServer): void {
@@ -129,27 +133,69 @@ export function registerRoomNamespace(io: SocketServer): void {
                 if (lock.contentHash && contentHash) {
                   const freshness = validateWriteFreshness(currentFileContent, lock);
                   if (contentHash !== freshness.currentHash || freshness.status === 'stale') {
-                    // Stale write detected: REJECT write
-                    socket.emit('write:rejected_stale', {
-                      fileId: targetFileId,
-                      reason: 'stale_version',
-                      currentHash: freshness.currentHash,
-                    });
+                    // Stale write detected: Increment retry count and check threshold
+                    const retryCount = incrementStaleRetry(roomId, targetFileId, lock.id);
 
-                    eventService.emit({
-                      roomId,
-                      actorId: userId,
-                      actorName: username,
-                      actorType: 'human',
-                      eventType: 'write_rejected_stale',
-                      targetFileId,
-                      targetScope: lock.lockScope,
-                      targetUnitName: lock.unitName,
-                      outcome: 'rejected',
-                      reason: 'stale_version',
-                      versionRef: contentHash,
-                      metadata: { currentHash: freshness.currentHash },
-                    });
+                    if (retryCount <= MAX_STALE_RETRIES) {
+                      socket.emit('write:rejected_stale', {
+                        fileId: targetFileId,
+                        reason: 'stale_version',
+                        currentHash: freshness.currentHash,
+                        retryCount,
+                        retriesRemaining: MAX_STALE_RETRIES - retryCount,
+                        recoverable: true,
+                      });
+
+                      eventService.emit({
+                        roomId,
+                        actorId: userId,
+                        actorName: username,
+                        actorType: 'human',
+                        eventType: 'write_rejected_stale',
+                        targetFileId,
+                        targetScope: lock.lockScope,
+                        targetUnitName: lock.unitName,
+                        outcome: 'rejected',
+                        reason: 'stale_version',
+                        versionRef: contentHash,
+                        metadata: {
+                          currentHash: freshness.currentHash,
+                          retryCount,
+                          retriesRemaining: MAX_STALE_RETRIES - retryCount,
+                          recoverable: true,
+                        },
+                        correlationId: lockCorrelations.get(lock.id),
+                      });
+                    } else {
+                      socket.emit('write:failed_terminal', {
+                        fileId: targetFileId,
+                        reason: 'retry_exhausted',
+                        totalAttempts: retryCount,
+                        message: 'Maximum stale write retry attempts exceeded. The scope content has changed too many times.',
+                        recoverable: false,
+                      });
+
+                      eventService.emit({
+                        roomId,
+                        actorId: userId,
+                        actorName: username,
+                        actorType: 'human',
+                        eventType: 'write_failed',
+                        targetFileId,
+                        targetScope: lock.lockScope,
+                        targetUnitName: lock.unitName,
+                        outcome: 'failed',
+                        reason: 'retry_exhausted',
+                        versionRef: contentHash,
+                        metadata: {
+                          totalAttempts: retryCount,
+                          lastCurrentHash: freshness.currentHash,
+                          recoverable: false,
+                        },
+                        correlationId: lockCorrelations.get(lock.id),
+                      });
+                    }
+
                     await broadcastActivities(roomId);
                     return; // Do NOT apply updateDoc or broadcast sync:update
                   }
@@ -173,6 +219,7 @@ export function registerRoomNamespace(io: SocketServer): void {
                 const previousHash = lock.contentHash || contentHash;
                 const newHash = computeScopeHash(updatedContent, lock.lockScope, lock.startLine, lock.endLine);
                 updateLockContentHash(roomId, targetFileId, lock.id, newHash);
+                resetStaleRetry(roomId, targetFileId, lock.id);
                 socket.emit('write:accepted', {
                   fileId: targetFileId,
                   lockId: lock.id,
@@ -975,6 +1022,62 @@ export function registerRoomNamespace(io: SocketServer): void {
       }
 
       await broadcastActivities(roomId);
+    });
+
+    // Baseline refresh handler for stale write retry policy
+    socket.on('lock:refresh-baseline', async (data: { fileId: number; lockId: string }) => {
+      try {
+        const targetFileId = Number(data.fileId);
+        const lockId = data.lockId;
+
+        const userLocks = getLocksForUserInFile(roomId, targetFileId, userId);
+        const lock = userLocks.find(l => l.id === lockId);
+        if (!lock) {
+          socket.emit('lock:refresh-baseline-error', {
+            fileId: targetFileId,
+            error: 'Lock not found',
+          });
+          return;
+        }
+
+        const fileContent = getFileContent(roomId, targetFileId);
+        if (fileContent === null) {
+          socket.emit('lock:refresh-baseline-error', {
+            fileId: targetFileId,
+            error: 'File content unavailable',
+          });
+          return;
+        }
+
+        const freshHash = computeScopeHash(fileContent, lock.lockScope, lock.startLine, lock.endLine);
+        const previousHash = lock.contentHash;
+        updateLockContentHash(roomId, targetFileId, lock.id, freshHash);
+
+        socket.emit('baseline:refreshed', {
+          fileId: targetFileId,
+          lockId: lock.id,
+          freshHash,
+        });
+
+        eventService.emit({
+          roomId,
+          actorId: userId,
+          actorName: username,
+          actorType: 'human',
+          eventType: 'write_regenerated',
+          targetFileId,
+          targetScope: lock.lockScope,
+          targetUnitName: lock.unitName,
+          outcome: 'applied',
+          versionRef: previousHash,
+          versionProduced: freshHash,
+          metadata: { refreshType: 'baseline_reread' },
+          correlationId: lockCorrelations.get(lock.id),
+        });
+        await broadcastActivities(roomId);
+      } catch (err) {
+        console.error(`Failed to handle lock:refresh-baseline in room ${roomId}:`, err);
+      }
     });
 
     // Handle global code run requests with mutex locking

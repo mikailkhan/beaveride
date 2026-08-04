@@ -65,19 +65,21 @@ function beta() {
     yText.insert(0, initialCode);
 
     const liveContent = getFileContent(roomId, fileId)!;
-    const alphaBaselineHash = computeScopeHash(liveContent, 'function', 1, 3);
-    res1.status === 'acquired' && (res1.lock.contentHash = alphaBaselineHash);
+    if (res1.status === 'acquired') {
+      const alphaBaselineHash = computeScopeHash(liveContent, 'function', 1, 3);
+      res1.lock.contentHash = alphaBaselineHash;
 
-    // Mutate function beta() (lines 5 to 7), leaving function alpha() untouched
-    const mutatedBetaCode = `function alpha() {\n  return "A";\n}\n\nfunction beta() {\n  return "B_MODIFIED_EXTERNALLY";\n}`;
-    yText.delete(0, yText.length);
-    yText.insert(0, mutatedBetaCode);
+      // Mutate function beta() (lines 5 to 7), leaving function alpha() untouched
+      const mutatedBetaCode = `function alpha() {\n  return "A";\n}\n\nfunction beta() {\n  return "B_MODIFIED_EXTERNALLY";\n}`;
+      yText.delete(0, yText.length);
+      yText.insert(0, mutatedBetaCode);
 
-    const liveContentAfterBetaEdit = getFileContent(roomId, fileId)!;
-    const alphaFreshness = validateWriteFreshness(liveContentAfterBetaEdit, res1.lock);
+      const liveContentAfterBetaEdit = getFileContent(roomId, fileId)!;
+      const alphaFreshness = validateWriteFreshness(liveContentAfterBetaEdit, res1.lock);
 
-    console.assert(alphaFreshness.status === 'current', 'Edits to beta() should NOT invalidate alpha() baseline hash');
-    console.log('✓ Scope-level isolation verified: external edits to beta() left alpha() write valid!');
+      console.assert(alphaFreshness.status === 'current', 'Edits to beta() should NOT invalidate alpha() baseline hash');
+      console.log('✓ Scope-level isolation verified: external edits to beta() left alpha() write valid!');
+    }
   }
 
   // Scenario 4: Rolling Hash Continuity
