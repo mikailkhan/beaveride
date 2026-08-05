@@ -30,12 +30,104 @@ const steps = [
   },
 ];
 
+const stack = [
+  "JavaScript", "TypeScript", "Python", "Rust", "Go", "Java",
+  "Ruby", "C++", "Kotlin", "Swift", "PHP", "Elixir",
+];
+
+/* ---------- Small motion utilities ---------- */
+
+// Fires once when the element scrolls into view; used to drive the
+// "reveal" animations on each section as the user scrolls down the page.
+function useInView<T extends HTMLElement>(threshold = 0.15) {
+  const ref = useRef<T | null>(null);
+  const [isInView, setIsInView] = useState(false);
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    if (typeof IntersectionObserver === "undefined") {
+      setIsInView(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsInView(true);
+          observer.disconnect();
+        }
+      },
+      { threshold }
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [threshold]);
+
+  return { ref, isInView };
+}
+
+// Gentle magnetic pull toward the cursor for primary CTAs.
+function useMagnetic<T extends HTMLElement>(strength = 0.25) {
+  const ref = useRef<T | null>(null);
+
+  const onMouseMove = (e: React.MouseEvent) => {
+    const el = ref.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const x = e.clientX - rect.left - rect.width / 2;
+    const y = e.clientY - rect.top - rect.height / 2;
+    el.style.transform = `translate(${x * strength}px, ${y * strength}px)`;
+  };
+
+  const onMouseLeave = () => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.transform = "translate(0px, 0px)";
+  };
+
+  return { ref, onMouseMove, onMouseLeave };
+}
+
+// Subtle 3D tilt for the hero IDE mockup, following the cursor.
+function useTilt<T extends HTMLElement>(max = 5) {
+  const ref = useRef<T | null>(null);
+
+  const onMouseMove = (e: React.MouseEvent) => {
+    const el = ref.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const px = (e.clientX - rect.left) / rect.width - 0.5;
+    const py = (e.clientY - rect.top) / rect.height - 0.5;
+    el.style.transform = `perspective(1400px) rotateX(${-py * max}deg) rotateY(${px * max}deg) scale3d(1.01,1.01,1.01)`;
+  };
+
+  const onMouseLeave = () => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.transform = "perspective(1400px) rotateX(0deg) rotateY(0deg) scale3d(1,1,1)";
+  };
+
+  return { ref, onMouseMove, onMouseLeave };
+}
+
+// className helper for scroll-reveal blocks.
+const reveal = (isInView: boolean, extra = "") =>
+  `transition-all duration-700 ease-out will-change-transform ${
+    isInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
+  } ${extra}`;
+
 export const Home = () => {
   const [currentText, setCurrentText] = useState('');
   const typewriterRef = useRef<HTMLSpanElement>(null);
   const words = ["coding", "collaboration", "creation"];
   const [activeStep, setActiveStep] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
 
   useEffect(() => {
     if (!isAutoPlaying) return;
@@ -49,7 +141,7 @@ export const Home = () => {
     setActiveStep(index);
     setIsAutoPlaying(false);
   };
-  
+
   useEffect(() => {
     let i = 0;
     let j = 0;
@@ -58,7 +150,7 @@ export const Home = () => {
 
     const type = () => {
       const currentWord = words[i];
-      
+
       if (isDeleting) {
         setCurrentText(currentWord.substring(0, j - 1));
         j--;
@@ -96,31 +188,123 @@ export const Home = () => {
     }
   };
 
+  const stepsReveal = useInView<HTMLDivElement>(0.1);
+  const marqueeReveal = useInView<HTMLDivElement>(0.2);
+  const ctaReveal = useInView<HTMLDivElement>(0.2);
+  const faqReveal = useInView<HTMLDivElement>(0.1);
+
+  const primaryCta = useMagnetic<HTMLAnchorElement>(0.15);
+  const secondaryCta = useMagnetic<HTMLAnchorElement>(0.15);
+  const ctaPrimary = useMagnetic<HTMLAnchorElement>(0.12);
+  const ctaSecondary = useMagnetic<HTMLAnchorElement>(0.12);
+  const mockupTilt = useTilt<HTMLDivElement>(4);
+
   return (
-    <div className="bg-background text-on-background font-body-md min-h-screen antialiased flex flex-col selection:bg-primary-container/30">
+    <div className="bg-background text-on-background font-body-md min-h-screen antialiased flex flex-col selection:bg-primary-container/30 overflow-x-hidden">
+      {/* Local keyframes for effects not already defined in the design system */}
+      <style>{`
+        @keyframes blob-drift {
+          0%, 100% { transform: translate(0px, 0px) scale(1); }
+          33% { transform: translate(30px, -40px) scale(1.08); }
+          66% { transform: translate(-20px, 25px) scale(0.95); }
+        }
+        .animate-blob-drift { animation: blob-drift 14s ease-in-out infinite; }
+        .animate-blob-drift-slow { animation: blob-drift 20s ease-in-out infinite reverse; }
+
+        @keyframes marquee-scroll {
+          from { transform: translateX(0); }
+          to { transform: translateX(-50%); }
+        }
+        .animate-marquee { animation: marquee-scroll 28s linear infinite; }
+        .marquee-track:hover .animate-marquee { animation-play-state: paused; }
+
+        @keyframes cursor-blink-ring {
+          0%, 100% { opacity: 0.35; transform: scale(1); }
+          50% { opacity: 0.9; transform: scale(1.15); }
+        }
+        .animate-cursor-ring { animation: cursor-blink-ring 2.2s ease-in-out infinite; }
+
+        @media (prefers-reduced-motion: reduce) {
+          .animate-blob-drift, .animate-blob-drift-slow, .animate-marquee, .animate-cursor-ring {
+            animation: none !important;
+          }
+          * { transition-duration: 0.01ms !important; }
+        }
+      `}</style>
+
       {/* Hero Section */}
       <section className="relative px-gutter flex flex-col items-center justify-center min-h-[90vh] overflow-hidden">
+        {/* Ambient drifting gradient orbs, using only the existing theme colors */}
+        <div className="absolute inset-0 pointer-events-none -z-10">
+          <div className="absolute top-[8%] left-[8%] w-[320px] h-[320px] rounded-full bg-primary-container/20 blur-[110px] animate-blob-drift" />
+          <div className="absolute bottom-[10%] right-[10%] w-[280px] h-[280px] rounded-full bg-secondary/20 blur-[110px] animate-blob-drift-slow" />
+          <div className="absolute top-[40%] right-[25%] w-[200px] h-[200px] rounded-full bg-tertiary/15 blur-[100px] animate-blob-drift" style={{ animationDelay: "-6s" }} />
+        </div>
+
         <div className="max-w-4xl mx-auto text-center z-10 relative">
-          <h1 className="font-display-lg text-display-lg mb-6 text-on-background">
+          <h1
+            className={`font-display-lg text-display-lg mb-6 text-on-background transition-all duration-700 ease-out ${
+              mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
+            }`}
+          >
             The new way of <br /> <span className="text-primary-container typing-cursor" ref={typewriterRef}>{currentText}</span>
           </h1>
-          <p className="font-body-lg text-body-lg text-on-surface-variant mb-10 min-w-2xl mx-auto">
+          <p
+            className={`font-body-lg text-body-lg text-on-surface-variant mb-10 min-w-2xl mx-auto transition-all duration-700 ease-out ${
+              mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
+            }`}
+            style={{ transitionDelay: "120ms" }}
+          >
             The browser-based collaborative IDE for 2026. Code together, run together, build the future together.
           </p>
-          <div className="flex justify-center mb-8 transition-all duration-700 animate-in fade-in slide-in-from-bottom-4">
-            <img alt="BeaverIDE Hero Mascot" className="h-40 md:h-48 object-contain" src={BeaverMascotLogo} />
+          <div
+            className={`flex justify-center mb-8 transition-all duration-700 ease-out ${
+              mounted ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-6 scale-95"
+            }`}
+            style={{ transitionDelay: "220ms" }}
+          >
+            <img alt="BeaverIDE Hero Mascot" className="h-40 md:h-48 object-contain animate-float" src={BeaverMascotLogo} />
           </div>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-md">
-            <Link to="/register" className="w-full sm:w-auto font-label-md text-label-md bg-primary-container text-on-primary shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] px-8 py-3 rounded-lg hover:bg-surface-tint transition-all active:scale-95 text-lg">Start Coding Together</Link>
-            <button className="w-full sm:w-auto font-label-md text-label-md border border-outline-variant bg-surface-container-lowest text-on-surface px-8 py-3 rounded-lg hover:bg-surface-container-low transition-all active:scale-95 text-lg flex items-center justify-center gap-2">
+          <div
+            className={`flex flex-col sm:flex-row items-center justify-center gap-md transition-all duration-700 ease-out ${
+              mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
+            }`}
+            style={{ transitionDelay: "320ms" }}
+          >
+            <Link
+              ref={primaryCta.ref}
+              onMouseMove={primaryCta.onMouseMove}
+              onMouseLeave={primaryCta.onMouseLeave}
+              to="/register"
+              className="w-full sm:w-auto font-label-md text-label-md bg-primary-container text-on-primary shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] px-8 py-3 rounded-lg hover:bg-surface-tint transition-all duration-200 active:scale-95 text-lg"
+            >
+              Start Coding Together
+            </Link>
+            <button
+              ref={secondaryCta.ref as unknown as React.RefObject<HTMLButtonElement>}
+              onMouseMove={secondaryCta.onMouseMove as unknown as React.MouseEventHandler<HTMLButtonElement>}
+              onMouseLeave={secondaryCta.onMouseLeave}
+              className="w-full sm:w-auto font-label-md text-label-md border border-outline-variant bg-surface-container-lowest text-on-surface px-8 py-3 rounded-lg hover:bg-surface-container-low transition-all duration-200 active:scale-95 text-lg flex items-center justify-center gap-2"
+            >
               <span className="material-symbols-outlined" style={{ fontSize: "20px" }}>play_circle</span> Watch Demo
             </button>
           </div>
         </div>
 
         {/* IDE Mockup */}
-        <div className="mt-16 w-full max-w-5xl relative z-10 perspective-1000">
-          <div className="bg-surface-container-lowest/80 backdrop-blur-2xl rounded-xl border border-outline-variant/30 shadow-[0_20px_50px_rgba(0,0,0,0.05)] overflow-hidden transform rotate-x-2 hover:rotate-x-0 transition-transform duration-700">
+        <div
+          className={`mt-16 w-full max-w-5xl relative z-10 perspective-1000 transition-all duration-1000 ease-out ${
+            mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
+          }`}
+          style={{ transitionDelay: "420ms" }}
+        >
+          <div
+            ref={mockupTilt.ref}
+            onMouseMove={mockupTilt.onMouseMove}
+            onMouseLeave={mockupTilt.onMouseLeave}
+            className="bg-surface-container-lowest/80 backdrop-blur-2xl rounded-xl border border-outline-variant/30 shadow-[0_20px_50px_rgba(0,0,0,0.05)] overflow-hidden transition-transform duration-300 ease-out"
+            style={{ transform: "perspective(1400px) rotateX(2deg)" }}
+          >
             {/* Browser Bar */}
             <div className="h-10 border-b border-outline-variant/20 flex items-center px-4 gap-2 bg-surface-container/50">
               <div className="w-3 h-3 rounded-full bg-error-container border border-error/20"></div>
@@ -131,9 +315,9 @@ export const Home = () => {
             <div className="flex h-[400px]">
               {/* Sidebar Mock */}
               <div className="w-16 border-r border-outline-variant/20 flex flex-col items-center py-4 gap-6 bg-surface-container-lowest">
-                <span className="material-symbols-outlined text-on-surface-variant">folder</span>
-                <span className="material-symbols-outlined text-primary">search</span>
-                <span className="material-symbols-outlined text-on-surface-variant">account_tree</span>
+                <span className="material-symbols-outlined text-on-surface-variant transition-colors hover:text-primary-container cursor-pointer">folder</span>
+                <span className="material-symbols-outlined text-primary transition-colors cursor-pointer">search</span>
+                <span className="material-symbols-outlined text-on-surface-variant transition-colors hover:text-primary-container cursor-pointer">account_tree</span>
               </div>
               {/* Code Area */}
               <div className="flex-1 p-6 font-code-md text-code-md relative bg-surface-container-lowest overflow-hidden">
@@ -148,14 +332,14 @@ export const Home = () => {
                   {"}"}
                   {/* Collaborative Cursor 1 */}
                   <div className="absolute left-10 top-0 cursor-float flex flex-col z-20 pointer-events-none">
-                    <span className="material-symbols-outlined text-primary-container" style={{ fontVariationSettings: '"FILL" 1', fontSize: "16px", transform: "rotate(-45deg)", marginLeft: "-4px" }}>navigation</span>
+                    <span className="material-symbols-outlined text-primary-container animate-cursor-ring" style={{ fontVariationSettings: '"FILL" 1', fontSize: "16px", transform: "rotate(-45deg)", marginLeft: "-4px" }}>navigation</span>
                     <div className="bg-primary-container/10 text-primary-container border border-primary-container/20 px-2 py-0.5 rounded text-xs ml-2 mt-1">Beaver</div>
                   </div>
                 </div>
                 <div className="text-on-surface">{"}"});</div>
                 {/* Collaborative Cursor 2 */}
                 <div className="absolute left-1/2 top-1/3 cursor-float flex flex-col z-20 pointer-events-none" style={{ animationDelay: "-3s" }}>
-                  <span className="material-symbols-outlined text-secondary" style={{ fontVariationSettings: '"FILL" 1', fontSize: "16px", transform: "rotate(-45deg)", marginLeft: "-4px" }}>navigation</span>
+                  <span className="material-symbols-outlined text-secondary animate-cursor-ring" style={{ fontVariationSettings: '"FILL" 1', fontSize: "16px", transform: "rotate(-45deg)", marginLeft: "-4px", animationDelay: "-1s" }}>navigation</span>
                   <div className="bg-secondary/10 text-secondary border border-secondary/20 px-2 py-0.5 rounded text-xs ml-2 mt-1">Oak</div>
                 </div>
               </div>
@@ -166,9 +350,9 @@ export const Home = () => {
 
       {/* Steps Section */}
       <section className="py-2xl px-gutter bg-surface overflow-hidden relative">
-        <div className="max-w-7xl mx-auto relative">
+        <div ref={stepsReveal.ref} className="max-w-7xl mx-auto relative">
           {/* Header */}
-          <div className="text-center max-w-3xl mx-auto mb-16">
+          <div className={reveal(stepsReveal.isInView, "text-center max-w-3xl mx-auto mb-16")}>
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-primary-container/10 text-primary-container mb-4 font-mono uppercase tracking-wider">
               <span className="w-1.5 h-1.5 rounded-full bg-primary-container animate-pulse"></span>
               Workflow
@@ -184,29 +368,29 @@ export const Home = () => {
           {/* Desktop Layout (lg and above) */}
           <div className="hidden lg:grid lg:grid-cols-12 gap-xl items-start relative">
             {/* Stepper Side (Left) */}
-            <div className="lg:col-span-5 flex flex-col gap-4">
+            <div className={reveal(stepsReveal.isInView, "lg:col-span-5 flex flex-col gap-4")} style={{ transitionDelay: "120ms" }}>
               {steps.map((step, idx) => {
                 const isActive = activeStep === idx;
-                const activeColorClass = 
-                  step.themeColor === 'primary' 
-                    ? 'border-primary-container text-primary-container animate-in fade-in' 
-                    : step.themeColor === 'secondary' 
-                      ? 'border-secondary text-secondary animate-in fade-in' 
+                const activeColorClass =
+                  step.themeColor === 'primary'
+                    ? 'border-primary-container text-primary-container animate-in fade-in'
+                    : step.themeColor === 'secondary'
+                      ? 'border-secondary text-secondary animate-in fade-in'
                       : 'border-tertiary text-tertiary animate-in fade-in';
-                
+
                 return (
                   <button
                     key={idx}
                     onClick={() => handleStepClick(idx)}
-                    className={`group text-left p-6 rounded-xl border-l-4 transition-all duration-300 cursor-pointer ${
-                      isActive 
-                        ? `${activeColorClass} bg-surface-container-low shadow-sm` 
+                    className={`group text-left p-6 rounded-xl border-l-4 transition-all duration-300 cursor-pointer hover:-translate-y-0.5 ${
+                      isActive
+                        ? `${activeColorClass} bg-surface-container-low shadow-sm`
                         : 'border-transparent text-on-surface-variant hover:bg-surface-container-lowest/50 hover:border-outline-variant/30'
                     }`}
                   >
                     <div className="flex items-center gap-4">
                       <span className={`font-mono text-sm font-semibold px-2 py-0.5 rounded transition-colors ${
-                        isActive 
+                        isActive
                           ? step.themeColor === 'primary' ? 'bg-primary-container/10 text-primary-container' : step.themeColor === 'secondary' ? 'bg-secondary/10 text-secondary' : 'bg-tertiary/10 text-tertiary'
                           : 'bg-surface-container text-on-surface-variant group-hover:bg-surface-container-high'
                       }`}>
@@ -225,15 +409,15 @@ export const Home = () => {
                         <p className="font-body-md text-sm text-on-surface-variant leading-relaxed">
                           {step.description}
                         </p>
-                        
+
                         {/* Progress line */}
                         {isAutoPlaying && isActive && (
                           <div className="w-full h-[3px] bg-surface-container-high rounded-full overflow-hidden mt-4">
                             <div className={`h-full animate-step-progress rounded-full ${
-                              step.themeColor === 'primary' 
-                                ? 'bg-primary-container' 
-                                : step.themeColor === 'secondary' 
-                                  ? 'bg-secondary' 
+                              step.themeColor === 'primary'
+                                ? 'bg-primary-container'
+                                : step.themeColor === 'secondary'
+                                  ? 'bg-secondary'
                                   : 'bg-tertiary'
                             }`} />
                           </div>
@@ -246,15 +430,15 @@ export const Home = () => {
             </div>
 
             {/* Visualizer Side (Right) */}
-            <div className="lg:col-span-7 sticky top-24 select-none">
+            <div className={reveal(stepsReveal.isInView, "lg:col-span-7 sticky top-24 select-none")} style={{ transitionDelay: "240ms" }}>
               {/* Dynamic Accent Glow */}
               <div className="absolute inset-0 -z-10 flex items-center justify-center">
-                <div 
+                <div
                   className={`w-[450px] h-[450px] rounded-full blur-[100px] opacity-25 transition-all duration-1000 ${
-                    steps[activeStep].themeColor === 'primary' 
-                      ? 'bg-primary-container' 
-                      : steps[activeStep].themeColor === 'secondary' 
-                        ? 'bg-secondary' 
+                    steps[activeStep].themeColor === 'primary'
+                      ? 'bg-primary-container'
+                      : steps[activeStep].themeColor === 'secondary'
+                        ? 'bg-secondary'
                         : 'bg-tertiary'
                   }`}
                 />
@@ -312,21 +496,22 @@ export const Home = () => {
           <div className="lg:hidden flex flex-col gap-4">
             {steps.map((step, idx) => {
               const isActive = activeStep === idx;
-              const activeColorClass = 
-                step.themeColor === 'primary' 
-                  ? 'border-primary-container text-primary-container' 
-                  : step.themeColor === 'secondary' 
-                    ? 'border-secondary text-secondary' 
+              const activeColorClass =
+                step.themeColor === 'primary'
+                  ? 'border-primary-container text-primary-container'
+                  : step.themeColor === 'secondary'
+                    ? 'border-secondary text-secondary'
                     : 'border-tertiary text-tertiary';
 
               return (
                 <div
                   key={idx}
-                  className={`p-5 rounded-xl border-l-4 transition-all duration-300 ${
-                    isActive 
-                      ? `${activeColorClass} bg-surface-container-low shadow-sm` 
+                  className={`${reveal(stepsReveal.isInView)} p-5 rounded-xl border-l-4 ${
+                    isActive
+                      ? `${activeColorClass} bg-surface-container-low shadow-sm`
                       : 'border-transparent bg-surface-container-lowest/50 text-on-surface-variant'
                   }`}
+                  style={{ transitionDelay: `${idx * 100}ms` }}
                 >
                   {/* Header Button */}
                   <button
@@ -335,7 +520,7 @@ export const Home = () => {
                   >
                     <div className="flex items-center gap-3">
                       <span className={`font-mono text-xs font-semibold px-2 py-0.5 rounded ${
-                        isActive 
+                        isActive
                           ? step.themeColor === 'primary' ? 'bg-primary-container/10 text-primary-container' : step.themeColor === 'secondary' ? 'bg-secondary/10 text-secondary' : 'bg-tertiary/10 text-tertiary'
                           : 'bg-surface-container text-on-surface-variant'
                       }`}>
@@ -374,10 +559,10 @@ export const Home = () => {
                       {isAutoPlaying && isActive && (
                         <div className="w-full h-[3px] bg-surface-container-high rounded-full overflow-hidden">
                           <div className={`h-full animate-step-progress rounded-full ${
-                            step.themeColor === 'primary' 
-                              ? 'bg-primary-container' 
-                              : step.themeColor === 'secondary' 
-                                ? 'bg-secondary' 
+                            step.themeColor === 'primary'
+                              ? 'bg-primary-container'
+                              : step.themeColor === 'secondary'
+                                ? 'bg-secondary'
                                 : 'bg-tertiary'
                           }`} />
                         </div>
@@ -391,12 +576,36 @@ export const Home = () => {
         </div>
       </section>
 
+      {/* Stack Marquee */}
+      <section className="py-xl px-gutter bg-background border-y border-outline-variant/10 overflow-hidden">
+        <div ref={marqueeReveal.ref} className={reveal(marqueeReveal.isInView, "max-w-7xl mx-auto")}>
+          <p className="text-center font-mono text-xs uppercase tracking-widest text-on-surface-variant/60 mb-6">
+            Full LSP support for the languages you already use
+          </p>
+          <div className="marquee-track relative w-full overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_10%,black_90%,transparent)]">
+            <div className="flex w-max gap-10 animate-marquee">
+              {[...stack, ...stack].map((lang, idx) => (
+                <span
+                  key={`${lang}-${idx}`}
+                  className="font-mono text-lg md:text-xl font-semibold text-on-surface-variant/70 hover:text-primary-container transition-colors whitespace-nowrap"
+                >
+                  {lang}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Ready CTA */}
       <section className="py-2xl px-gutter bg-surface relative overflow-hidden">
-        <div className="max-w-6xl mx-auto relative rounded-3xl bg-neutral-950 border border-neutral-800 shadow-[0_30px_70px_rgba(0,0,0,0.18)] overflow-hidden bg-dot-grid p-8 md:p-16 lg:p-20">
+        <div
+          ref={ctaReveal.ref}
+          className={reveal(ctaReveal.isInView, "max-w-6xl mx-auto relative rounded-3xl bg-neutral-950 border border-neutral-800 shadow-[0_30px_70px_rgba(0,0,0,0.18)] overflow-hidden bg-dot-grid p-8 md:p-16 lg:p-20")}
+        >
           {/* Ambient Glows */}
-          <div className="absolute top-0 left-0 w-[350px] h-[350px] bg-primary-container/10 rounded-full blur-[120px] pointer-events-none -translate-x-1/4 -translate-y-1/4" />
-          <div className="absolute bottom-0 right-0 w-[350px] h-[350px] bg-tertiary/15 rounded-full blur-[120px] pointer-events-none translate-x-1/4 translate-y-1/4" />
+          <div className="absolute top-0 left-0 w-[350px] h-[350px] bg-primary-container/10 rounded-full blur-[120px] pointer-events-none -translate-x-1/4 -translate-y-1/4 animate-blob-drift" />
+          <div className="absolute bottom-0 right-0 w-[350px] h-[350px] bg-tertiary/15 rounded-full blur-[120px] pointer-events-none translate-x-1/4 translate-y-1/4 animate-blob-drift-slow" />
 
           <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
             {/* Left Content */}
@@ -411,18 +620,24 @@ export const Home = () => {
               <p className="font-body-lg text-lg text-neutral-400 mb-10 max-w-3xl leading-relaxed">
                 Join thousands of developers coding together in real-time. Spin up workspaces in seconds, invite your team, and build faster from anywhere.
               </p>
-              
+
               <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
-                <Link 
-                  to="/register" 
-                  className="group w-full sm:w-auto inline-flex items-center justify-center gap-2 font-label-md text-label-md bg-primary-container text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.3),_0_4px_20px_rgba(246,99,23,0.3)] px-8 py-4 rounded-xl hover:bg-primary-container/90 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.3),_0_8px_30px_rgba(246,99,23,0.5)] transition-all active:scale-95 text-lg font-semibold"
+                <Link
+                  ref={ctaPrimary.ref}
+                  onMouseMove={ctaPrimary.onMouseMove}
+                  onMouseLeave={ctaPrimary.onMouseLeave}
+                  to="/register"
+                  className="group w-full sm:w-auto inline-flex items-center justify-center gap-2 font-label-md text-label-md bg-primary-container text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.3),_0_4px_20px_rgba(246,99,23,0.3)] px-8 py-4 rounded-xl hover:bg-primary-container/90 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.3),_0_8px_30px_rgba(246,99,23,0.5)] transition-all duration-200 active:scale-95 text-lg font-semibold"
                 >
                   Start Coding Now
                   <span className="material-symbols-outlined transition-transform group-hover:translate-x-1" style={{ fontSize: '20px' }}>arrow_forward</span>
                 </Link>
-                <Link 
-                  to="/docs" 
-                  className="group w-full sm:w-auto inline-flex items-center justify-center gap-2 font-label-md text-label-md text-neutral-300 hover:text-white px-6 py-4 rounded-xl transition-all text-lg font-semibold hover:bg-white/5 border border-transparent hover:border-white/10"
+                <Link
+                  ref={ctaSecondary.ref}
+                  onMouseMove={ctaSecondary.onMouseMove}
+                  onMouseLeave={ctaSecondary.onMouseLeave}
+                  to="/docs"
+                  className="group w-full sm:w-auto inline-flex items-center justify-center gap-2 font-label-md text-label-md text-neutral-300 hover:text-white px-6 py-4 rounded-xl transition-all duration-200 text-lg font-semibold hover:bg-white/5 border border-transparent hover:border-white/10"
                 >
                   Read Documentation
                   <span className="material-symbols-outlined text-[20px] opacity-60 group-hover:opacity-100 transition-opacity">menu_book</span>
@@ -434,20 +649,20 @@ export const Home = () => {
             <div className="lg:col-span-5 flex justify-center relative select-none">
               {/* Outer Glow */}
               <div className="absolute inset-0 bg-gradient-to-tr from-primary-container/20 to-tertiary/10 rounded-full blur-[80px] opacity-50 scale-90" />
-              
+
               {/* Mockup Session Ring */}
               <div className="w-64 h-64 sm:w-72 sm:h-72 lg:w-80 lg:h-80 rounded-full relative flex items-center justify-center bg-gradient-to-b from-neutral-900 to-neutral-950 border border-neutral-800 shadow-2xl p-6">
-                
+
                 {/* Floating Beaver Mascot */}
-                <img 
-                  alt="BeaverIDE Mascot" 
-                  className="w-40 sm:w-48 h-auto object-contain drop-shadow-[0_10px_30px_rgba(246,99,23,0.25)] animate-float" 
-                  src={brandMascot} 
+                <img
+                  alt="BeaverIDE Mascot"
+                  className="w-40 sm:w-48 h-auto object-contain drop-shadow-[0_10px_30px_rgba(246,99,23,0.25)] animate-float"
+                  src={brandMascot}
                 />
 
                 {/* Overlapping Collaborator Avatars & Tags */}
                 {/* Avatar 1: Oak (React Developer) */}
-                <div className="absolute left-[-10px] top-[40%] flex items-center gap-2 bg-secondary/15 backdrop-blur-md border border-secondary/30 rounded-lg px-2.5 py-1 shadow-lg">
+                <div className="absolute left-[-10px] top-[40%] flex items-center gap-2 bg-secondary/15 backdrop-blur-md border border-secondary/30 rounded-lg px-2.5 py-1 shadow-lg animate-float" style={{ animationDelay: "-1.5s" }}>
                   <span className="w-2.5 h-2.5 rounded-full bg-secondary"></span>
                   <span className="font-mono text-xs font-semibold text-secondary-container">Oak</span>
                   {/* Miniature cursor */}
@@ -455,14 +670,14 @@ export const Home = () => {
                 </div>
 
                 {/* Avatar 2: Willow (Go Backend Developer) */}
-                <div className="absolute right-[-15px] top-[20%] flex items-center gap-2 bg-tertiary/15 backdrop-blur-md border border-tertiary/30 rounded-lg px-2.5 py-1 shadow-lg">
+                <div className="absolute right-[-15px] top-[20%] flex items-center gap-2 bg-tertiary/15 backdrop-blur-md border border-tertiary/30 rounded-lg px-2.5 py-1 shadow-lg animate-float" style={{ animationDelay: "-3s" }}>
                   <span className="w-2.5 h-2.5 rounded-full bg-tertiary-container"></span>
                   <span className="font-mono text-xs font-semibold text-tertiary-container">Willow</span>
                   <span className="material-symbols-outlined text-tertiary absolute left-[-10px] bottom-[-8px] text-xs pointer-events-none" style={{ fontVariationSettings: '"FILL" 1', transform: 'rotate(135deg)' }}>navigation</span>
                 </div>
 
                 {/* Avatar 3: Beaver (Owner) */}
-                <div className="absolute bottom-[20px] left-[30%] flex items-center gap-2 bg-primary-container/15 backdrop-blur-md border border-primary-container/30 rounded-lg px-2.5 py-1 shadow-lg">
+                <div className="absolute bottom-[20px] left-[30%] flex items-center gap-2 bg-primary-container/15 backdrop-blur-md border border-primary-container/30 rounded-lg px-2.5 py-1 shadow-lg animate-float" style={{ animationDelay: "-0.5s" }}>
                   <span className="w-2.5 h-2.5 rounded-full bg-primary-container"></span>
                   <span className="font-mono text-xs font-semibold text-primary">Beaver</span>
                 </div>
@@ -478,51 +693,50 @@ export const Home = () => {
 
       {/* FAQ */}
       <section className="py-2xl px-gutter bg-surface">
-        <div className="max-w-4xl mx-auto">
-          <h2 className="font-display-lg text-headline-lg md:text-display-lg text-center mb-16 text-on-background">Frequently Asked Questions</h2>
+        <div ref={faqReveal.ref} className="max-w-4xl mx-auto">
+          <h2 className={reveal(faqReveal.isInView, "font-display-lg text-headline-lg md:text-display-lg text-center mb-16 text-on-background")}>
+            Frequently Asked Questions
+          </h2>
           <div className="flex flex-col gap-4">
-            <details className="group border border-outline-variant/20 rounded-xl bg-surface-container-lowest overflow-hidden" onToggle={handleToggle}>
-              <summary className="flex justify-between items-center font-headline-md text-lg text-on-background p-6 cursor-pointer">
-                <span>Is it free for open source?</span>
-                <span className="material-symbols-outlined transition-transform duration-300 group-open:rotate-180">expand_more</span>
-              </summary>
-              <div className="px-6 pb-6 pt-0">
-                <p className="font-body-md text-on-surface-variant">Yes! BeaverIDE is committed to the open-source community. Public repositories are always free to host and collaborate on.</p>
-              </div>
-            </details>
-            <details className="group border border-outline-variant/20 rounded-xl bg-surface-container-lowest overflow-hidden" onToggle={handleToggle}>
-              <summary className="flex justify-between items-center font-headline-md text-lg text-on-background p-6 cursor-pointer">
-                <span>How secure is my code?</span>
-                <span className="material-symbols-outlined transition-transform duration-300 group-open:rotate-180">expand_more</span>
-              </summary>
-              <div className="px-6 pb-6 pt-0">
-                <p className="font-body-md text-on-surface-variant">We use industry-standard AES-256 encryption for data at rest and TLS 1.3 for data in transit. Your code is isolated in secure, ephemeral containers.</p>
-              </div>
-            </details>
-            <details className="group border border-outline-variant/20 rounded-xl bg-surface-container-lowest overflow-hidden" onToggle={handleToggle}>
-              <summary className="flex justify-between items-center font-headline-md text-lg text-on-background p-6 cursor-pointer">
-                <span>Does it support VS Code extensions?</span>
-                <span className="material-symbols-outlined transition-transform duration-300 group-open:rotate-180">expand_more</span>
-              </summary>
-              <div className="px-6 pb-6 pt-0">
-                <p className="font-body-md text-on-surface-variant">BeaverIDE is built on a custom engine that is fully compatible with the VS Code extension ecosystem. You can import your favorite themes and tools easily.</p>
-              </div>
-            </details>
-            <details className="group border border-outline-variant/20 rounded-xl bg-surface-container-lowest overflow-hidden" onToggle={handleToggle}>
-              <summary className="flex justify-between items-center font-headline-md text-lg text-on-background p-6 cursor-pointer">
-                <span>What languages are supported?</span>
-                <span className="material-symbols-outlined transition-transform duration-300 group-open:rotate-180">expand_more</span>
-              </summary>
-              <div className="px-6 pb-6 pt-0">
-                <p className="font-body-md text-on-surface-variant">We provide first-class support for JavaScript, TypeScript, Python, Rust, Go, and Java, with intelligent LSP support for over 50 other languages.</p>
-              </div>
-            </details>
+            {[
+              {
+                q: "Is it free for open source?",
+                a: "Yes! BeaverIDE is committed to the open-source community. Public repositories are always free to host and collaborate on.",
+              },
+              {
+                q: "How secure is my code?",
+                a: "We use industry-standard AES-256 encryption for data at rest and TLS 1.3 for data in transit. Your code is isolated in secure, ephemeral containers.",
+              },
+              {
+                q: "Does it support VS Code extensions?",
+                a: "BeaverIDE is built on a custom engine that is fully compatible with the VS Code extension ecosystem. You can import your favorite themes and tools easily.",
+              },
+              {
+                q: "What languages are supported?",
+                a: "We provide first-class support for JavaScript, TypeScript, Python, Rust, Go, and Java, with intelligent LSP support for over 50 other languages.",
+              },
+            ].map((item, idx) => (
+              <details
+                key={item.q}
+                className={`${reveal(faqReveal.isInView)} group border border-outline-variant/20 rounded-xl bg-surface-container-lowest overflow-hidden hover:border-primary-container/30`}
+                style={{ transitionDelay: `${idx * 90}ms` }}
+                onToggle={handleToggle}
+              >
+                <summary className="flex justify-between items-center font-headline-md text-lg text-on-background p-6 cursor-pointer">
+                  <span>{item.q}</span>
+                  <span className="material-symbols-outlined transition-transform duration-300 group-open:rotate-180">expand_more</span>
+                </summary>
+                <div className="px-6 pb-6 pt-0">
+                  <p className="font-body-md text-on-surface-variant">{item.a}</p>
+                </div>
+              </details>
+            ))}
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      
+
     </div>
   );
 };
