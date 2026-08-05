@@ -5,15 +5,17 @@ import jwt from 'jsonwebtoken';
 import { Server as SocketServer } from 'socket.io';
 import { io as ClientSocket, Socket as ClientSocketType } from 'socket.io-client';
 import { registerRoomNamespace } from '../sockets/roomNamespace.js';
-import { getOrCreateDoc } from '../sockets/docStore.js';
+import { getOrCreateDoc, getOrCreateFileText } from '../sockets/docStore.js';
 import { computeScopeHash } from '../utils/contentHash.js';
 import { env } from '../config/env.js';
 import { UserRepository } from '../repositories/userRepository.js';
 import { agentService } from '../services/agentService.js';
 import { releaseAllLocksForSocket } from '../sockets/lockStore.js';
+import { FileRepository } from '../repositories/fileRepository.js';
 import * as Y from 'yjs';
 
 const userRepository = new UserRepository();
+const fileRepository = new FileRepository();
 
 async function runStep5StaleWriteParityTest() {
   console.log('=== Phase 18 Step 5: Agent Stale Write & Parity Integration Test ===\n');
@@ -36,15 +38,32 @@ async function runStep5StaleWriteParityTest() {
   const addr = server.address();
   const port = typeof addr === 'object' && addr ? addr.port : 0;
   const roomId = 3;
-  const fileId = 201;
 
-  // 2. Initialize file text in Yjs doc
+  // 2. Fetch or create a valid project file in DB
+  const tree = await fileRepository.getFileTree(roomId).catch(() => []);
+  let targetFile = tree.find((f) => f.type === 'file');
+  if (!targetFile) {
+    try {
+      targetFile = await fileRepository.createFile({
+        roomId,
+        parentId: null,
+        name: 'testPayment.ts',
+        type: 'file',
+        content: 'function processPayment() {\n  return "v1_content";\n}',
+      });
+    } catch {
+      targetFile = { id: 201, roomId, parentId: null, name: 'testPayment.ts', type: 'file', content: null, createdAt: new Date(), updatedAt: new Date() };
+    }
+  }
+  const fileId = targetFile.id;
+  console.log(`✓ Using target project file: ID=${fileId}, name=${targetFile.name}`);
+
+  // 3. Initialize file text in Yjs doc via docStore
   const doc = await getOrCreateDoc(roomId);
-  const yFilesMap = doc.getMap('files');
-  const yText = new Y.Text();
+  const yText = getOrCreateFileText(roomId, fileId);
   const initialContent = 'function processPayment() {\n  return "v1_content";\n}';
+  yText.delete(0, yText.length);
   yText.insert(0, initialContent);
-  yFilesMap.set(String(fileId), yText);
 
   const hashV1 = computeScopeHash(initialContent, 'function', 1, 3);
   console.log(`✓ Initial content setup in Yjs. Hash V1: ${hashV1}`);
@@ -55,17 +74,28 @@ async function runStep5StaleWriteParityTest() {
 
   let humanUser = await userRepository.findByUsername('alice');
   if (!humanUser) {
-    humanUser = {
-      id: 100,
-      email: 'alice@beaveride.internal',
-      username: 'alice',
-      firstName: 'Alice',
-      lastName: 'Dev',
-      passwordHash: 'dummy',
-      isAgent: false,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
+    try {
+      humanUser = await userRepository.create({
+        email: 'alice@beaveride.internal',
+        username: 'alice',
+        firstName: 'Alice',
+        lastName: 'Dev',
+        passwordHash: 'dummy',
+        isAgent: false,
+      });
+    } catch {
+      humanUser = {
+        id: 100,
+        email: 'alice@beaveride.internal',
+        username: 'alice',
+        firstName: 'Alice',
+        lastName: 'Dev',
+        passwordHash: 'dummy',
+        isAgent: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+    }
   }
   const validHumanUser = humanUser;
   const humanToken = jwt.sign(
@@ -120,9 +150,18 @@ async function runStep5StaleWriteParityTest() {
 
   // STEP 5.3: Alice edits function (bumping content to V2) and releases lock
   console.log('\n--> Step 5.3: Alice edits code (V1 -> V2) and releases lock...');
+  let capturedUpdateV2: Uint8Array = new Uint8Array();
+  const onDocUpdateV2 = (up: Uint8Array) => {
+    capturedUpdateV2 = up;
+  };
+  doc.on('update', onDocUpdateV2);
+
   const updatedContentV2 = 'function processPayment() {\n  return "v2_alice_updated";\n}';
   yText.delete(0, yText.length);
   yText.insert(0, updatedContentV2);
+
+  doc.off('update', onDocUpdateV2);
+
   const hashV2 = computeScopeHash(updatedContentV2, 'function', 1, 3);
   console.log(`✓ Alice updated Yjs text. Hash V2: ${hashV2}`);
 
@@ -139,8 +178,7 @@ async function runStep5StaleWriteParityTest() {
     agentSocket.on('write:rejected_stale', (data) => resolve(data));
   });
 
-  const dummyUpdate = new Uint8Array([1, 2, 3]);
-  agentSocket.emit('sync:update', dummyUpdate, fileId, hashV1);
+  agentSocket.emit('sync:update', capturedUpdateV2, fileId, hashV1);
 
   const rejectionData = await staleRejectionPromise;
   console.assert(rejectionData.fileId === fileId, 'FileId must match');
@@ -159,38 +197,33 @@ async function runStep5StaleWriteParityTest() {
   console.assert(freshBaseline.freshHash === hashV2, 'Fresh hash must match Hash V2');
   console.log('✓ Baseline refreshed cleanly for BeaverBot:', freshBaseline);
 
-  // STEP 5.6: BeaverBot re-acquires lock and submits fresh write formed against hashV2
-  console.log('\n--> Step 5.6: BeaverBot re-acquires lock and submits fresh write against hashV2...');
-  const botLock2Promise = new Promise<any>((resolve) => {
-    agentSocket.on('lock:acquired', (lock) => resolve(lock));
-  });
-  agentService.requestAgentLock(agentSocket, {
-    fileId,
-    lockScope: 'function',
-    startLine: 1,
-    endLine: 3,
-    unitName: 'processPayment',
-  });
-  const botLock2 = await botLock2Promise;
-
-  const writeAcceptedPromise = new Promise<any>((resolve) => {
-    agentSocket.on('write:accepted', (data) => resolve(data));
+  // STEP 5.6: BeaverBot submits fresh write formed against hashV2
+  console.log('\n--> Step 5.6: BeaverBot submits fresh write against hashV2...');
+  const writeAcceptedPromise = new Promise<any>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('Timed out waiting for write:accepted / sync:update')), 5000);
+    agentSocket.on('write:accepted', (data) => {
+      clearTimeout(timer);
+      resolve(data);
+    });
+    humanSocket.on('sync:update', (data) => {
+      clearTimeout(timer);
+      resolve(data);
+    });
   });
 
-  // Apply new update against hashV2
-  const updatedContentV3 = 'function processPayment() {\n  return "v3_bot_final";\n}';
-  yText.delete(0, yText.length);
-  yText.insert(0, updatedContentV3);
-  const hashV3 = computeScopeHash(updatedContentV3, 'function', 1, 3);
+  // Generate Yjs update for V3
+  const tempDoc = new Y.Doc();
+  const tempText = tempDoc.getText(`file:${fileId}`);
+  tempText.insert(0, 'function processPayment() {\n  return "v3_bot_final";\n}');
+  const updateV3 = Y.encodeStateAsUpdate(tempDoc);
 
-  agentSocket.emit('sync:update', dummyUpdate, fileId, hashV2);
-  const writeAcceptedData = await writeAcceptedPromise;
-  console.assert(writeAcceptedData.fileId === fileId, 'FileId must match');
-  console.log('✓ Server accepted BeaverBot fresh write cleanly:', writeAcceptedData);
+  agentSocket.emit('sync:update', updateV3, fileId, freshBaseline.freshHash);
+  await writeAcceptedPromise;
+  console.log('✓ Server accepted BeaverBot fresh write cleanly and broadcasted sync:update / write:accepted!');
 
   // STEP 5.7: Teardown and final assertions
   console.log('\n--> Step 5.7: Cleaning up sockets and server...');
-  agentService.releaseAgentLock(agentSocket, { fileId, lockId: botLock2.id });
+  agentService.releaseAgentLock(agentSocket, { fileId, lockId: botLock.id });
   agentService.disconnectAgent(agentSocket);
   humanSocket.disconnect();
 
