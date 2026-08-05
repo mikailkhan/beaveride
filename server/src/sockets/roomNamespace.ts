@@ -31,6 +31,10 @@ import {
 } from './lockStore.js';
 import { scanUsages } from '../utils/usageScanner.js';
 
+import { taskRepository } from '../repositories/taskRepository.js';
+import { agentService } from '../services/agentService.js';
+import { parseBeaverBotMention } from '../utils/mentionParser.js';
+
 const userRepository = new UserRepository();
 const authService = new AuthService();
 const chatRepository = new ChatRepository();
@@ -591,6 +595,70 @@ export function registerRoomNamespace(io: SocketServer): void {
         const chatMsg = await chatRepository.insertMessage(roomId, userId, messageText);
         // Broadcast to all clients in the room including the sender
         roomNsp.to(roomChannel).emit('chat:message', chatMsg);
+
+        // Parse @BeaverBot mention
+        const mentionResult = parseBeaverBotMention(messageText);
+        if (mentionResult.isBotMention) {
+          if (!mentionResult.instruction) {
+            socket.emit('agent:task_error', {
+              reason: 'empty_instruction',
+              message: 'Please provide an instruction for @BeaverBot',
+            });
+            return;
+          }
+
+          // Check if an active task is already running in the room
+          const activeTask = await taskRepository.getActiveTaskForRoom(roomId);
+          if (activeTask) {
+            socket.emit('agent:task_error', {
+              reason: 'task_already_active',
+              message: 'An agent task is already active in this room',
+              taskId: activeTask.taskId,
+            });
+            return;
+          }
+
+          // Ensure BeaverBot exists and is added to the room as an editor
+          const beaverBot = await agentService.ensureAgentUser();
+          await roomRepository.addMember(roomId, beaverBot.id, 'editor', true);
+
+          // Create new task in database
+          const newTask = await taskRepository.createTask({
+            roomId,
+            assignedBy: userId,
+            agentUserId: beaverBot.id,
+            instruction: mentionResult.instruction,
+            status: 'assigned',
+            currentStage: 'assigned',
+          });
+
+          // Broadcast agent:task_created to room
+          roomNsp.to(roomChannel).emit('agent:task_created', {
+            taskId: newTask.taskId,
+            roomId: newTask.roomId,
+            instruction: newTask.instruction,
+            status: newTask.status,
+            currentStage: newTask.currentStage,
+            assignedBy: username,
+            createdAt: newTask.createdAt,
+          });
+
+          // Log activity event
+          eventService.emit({
+            roomId,
+            actorId: userId,
+            actorName: username,
+            actorType,
+            eventType: 'agent_task_assigned',
+            targetUnitName: newTask.instruction,
+            outcome: 'applied',
+            metadata: {
+              taskId: newTask.taskId,
+              instruction: newTask.instruction,
+              agentUserId: beaverBot.id,
+            },
+          });
+        }
       } catch (err) {
         console.error(`Failed to save chat message in room ${roomId}:`, err);
       }

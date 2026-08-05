@@ -19,6 +19,16 @@ import { relations } from 'drizzle-orm';
 export const userRoomRoleEnum = pgEnum('user_room_role', ['owner', 'editor', 'viewer']);
 export const runStatusEnum = pgEnum('run_status', ['queued', 'running', 'success', 'error', 'cancelled']);
 export const fileNodeTypeEnum = pgEnum('file_node_type', ['file', 'directory']);
+export const agentTaskStatusEnum = pgEnum('agent_task_status', [
+  'assigned',
+  'planning',
+  'waiting',
+  'writing',
+  'verifying',
+  'completed',
+  'failed',
+  'cancelled',
+]);
 
 export const activityActorTypeEnum = pgEnum('activity_actor_type', ['human', 'agent', 'system']);
 export const activityLockScopeEnum = pgEnum('activity_lock_scope', ['file', 'function']);
@@ -256,6 +266,8 @@ export const usersRelations = relations(users, ({ many }) => ({
   chatMessages: many(chatMessages),
   codeSnapshots: many(codeSnapshots),
   runSnapshots: many(runSnapshots),
+  assignedAgentTasks: many(agentTasks, { relationName: 'assignedByTasks' }),
+  agentUserTasks: many(agentTasks, { relationName: 'agentUserTasks' }),
 }));
 
 export const roomsRelations = relations(rooms, ({ one, many }) => ({
@@ -273,6 +285,7 @@ export const roomsRelations = relations(rooms, ({ one, many }) => ({
   runSnapshots: many(runSnapshots),
   projectFiles: many(projectFiles),
   activityEvents: many(activityEvents),
+  agentTasks: many(agentTasks),
 }));
 
 export const userRoomsRelations = relations(userRooms, ({ one }) => ({
@@ -364,6 +377,59 @@ export const activityEventsRelations = relations(activityEvents, ({ one }) => ({
   }),
   targetFile: one(projectFiles, {
     fields: [activityEvents.targetFileId],
+    references: [projectFiles.id],
+  }),
+}));
+
+export const agentTasks = pgTable(
+  'agent_tasks',
+  {
+    id: serial('id').primaryKey(),
+    taskId: uuid('task_id').notNull(),
+    roomId: integer('room_id')
+      .notNull()
+      .references(() => rooms.id, { onDelete: 'cascade' }),
+    assignedBy: integer('assigned_by')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    agentUserId: integer('agent_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    targetFileId: integer('target_file_id').references(() => projectFiles.id, { onDelete: 'set null' }),
+    instruction: text('instruction').notNull(),
+    status: agentTaskStatusEnum('status').notNull().default('assigned'),
+    currentStage: varchar('current_stage', { length: 40 }).notNull().default('assigned'),
+    planSummary: text('plan_summary'),
+    generatedCode: text('generated_code'),
+    failureReason: text('failure_reason'),
+    metadata: jsonb('metadata'),
+    ...timestamps,
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+  },
+  (table) => ({
+    taskIdIdx: uniqueIndex('agent_tasks_task_id_idx').on(table.taskId),
+    roomStatusIdx: index('agent_tasks_room_status_idx').on(table.roomId, table.status),
+    roomCreatedIdx: index('agent_tasks_room_created_idx').on(table.roomId, table.createdAt),
+  }),
+);
+
+export const agentTasksRelations = relations(agentTasks, ({ one }) => ({
+  room: one(rooms, {
+    fields: [agentTasks.roomId],
+    references: [rooms.id],
+  }),
+  assignedByUser: one(users, {
+    fields: [agentTasks.assignedBy],
+    references: [users.id],
+    relationName: 'assignedByTasks',
+  }),
+  agentUser: one(users, {
+    fields: [agentTasks.agentUserId],
+    references: [users.id],
+    relationName: 'agentUserTasks',
+  }),
+  targetFile: one(projectFiles, {
+    fields: [agentTasks.targetFileId],
     references: [projectFiles.id],
   }),
 }));
