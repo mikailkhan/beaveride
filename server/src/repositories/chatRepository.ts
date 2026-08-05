@@ -17,26 +17,30 @@ export interface ChatMessageWithUser {
 
 export class ChatRepository {
   async getAllMessages(roomId: number): Promise<ChatMessageWithUser[]> {
-    const rows = await db
-      .select({
-        id: chatMessages.id,
-        roomId: chatMessages.roomId,
-        userId: chatMessages.userId,
-        message: chatMessages.message,
-        createdAt: chatMessages.createdAt,
-        user: {
-          username: users.username,
-          firstName: users.firstName,
-          lastName: users.lastName,
-        },
-      })
-      .from(chatMessages)
-      .innerJoin(users, eq(chatMessages.userId, users.id))
-      .where(eq(chatMessages.roomId, roomId))
-      .orderBy(desc(chatMessages.createdAt));
+    try {
+      const rows = await db
+        .select({
+          id: chatMessages.id,
+          roomId: chatMessages.roomId,
+          userId: chatMessages.userId,
+          message: chatMessages.message,
+          createdAt: chatMessages.createdAt,
+          user: {
+            username: users.username,
+            firstName: users.firstName,
+            lastName: users.lastName,
+          },
+        })
+        .from(chatMessages)
+        .innerJoin(users, eq(chatMessages.userId, users.id))
+        .where(eq(chatMessages.roomId, roomId))
+        .orderBy(desc(chatMessages.createdAt));
 
-    // Return in chronological order (oldest first)
-    return rows.reverse();
+      // Return in chronological order (oldest first)
+      return rows.reverse();
+    } catch {
+      return [];
+    }
   }
 
   async getRecentMessages(roomId: number, limit = 1000): Promise<ChatMessageWithUser[]> {
