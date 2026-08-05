@@ -38,6 +38,7 @@ export const activityOutcomeEnum = pgEnum('activity_outcome', [
 ]);
 export const activityReasonEnum = pgEnum('activity_reason', [
   'overlap_conflict',
+  'single_scope_limit',
   'idle_timeout',
   'heartbeat_loss',
   'disconnect',

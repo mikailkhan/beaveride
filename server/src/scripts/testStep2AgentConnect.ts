@@ -110,7 +110,9 @@ async function runStep2AgentConnectTest() {
 
   // Teardown HTTP server
   server.close();
-  releaseAllLocksForSocket(agentSocket.id);
+  if (agentSocket.id) {
+    releaseAllLocksForSocket(agentSocket.id);
+  }
 
   console.log('\n=== Phase 18 Step 2 Agent Runner & Socket Client Test PASSED! ===');
   process.exit(0);

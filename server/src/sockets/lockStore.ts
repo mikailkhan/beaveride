@@ -10,6 +10,7 @@ export interface FileLock {
   userId: number;
   username: string;
   socketId: string;
+  isAgent?: boolean | undefined;
   lockScope: 'file' | 'function';
   unitName?: string | undefined;
   startLine?: number | undefined;
@@ -27,6 +28,7 @@ export interface QueueEntry {
   userId: number;
   username: string;
   socketId: string;
+  isAgent?: boolean | undefined;
   requestedAt: number;
   lockScope: 'file' | 'function';
   unitName?: string | undefined;
@@ -50,12 +52,24 @@ export function generateId(): string {
 export type AcquireLockResult =
   | { status: 'acquired'; lock: FileLock }
   | { status: 'queued'; position: number; heldBy: { userId: number; username: string; unitName?: string | undefined; lockScope?: 'file' | 'function' | undefined; includeUsages?: boolean | undefined } }
-  | { status: 'already_held' };
+  | { status: 'already_held' }
+  | { status: 'already_holding_scope' };
 
 function checkOverlap(a: FileLock | QueueEntry, b: FileLock | QueueEntry): boolean {
   if (a.lockScope === 'file' || b.lockScope === 'file') return true;
   if (a.startLine === undefined || a.endLine === undefined || b.startLine === undefined || b.endLine === undefined) return true;
   return a.startLine <= b.endLine && a.endLine >= b.startLine;
+}
+
+export function getLocksForUserInRoom(roomId: number, userId: number): FileLock[] {
+  const result: FileLock[] = [];
+  const prefix = `${roomId}:`;
+  for (const [key, fileLocks] of locks.entries()) {
+    if (key.startsWith(prefix)) {
+      result.push(...fileLocks.filter(l => l.userId === userId));
+    }
+  }
+  return result;
 }
 
 export function acquireLock(
@@ -70,8 +84,16 @@ export function acquireLock(
   unitName?: string,
   includeUsages: boolean = false,
   usageSpans: LockSpan[] = [],
-  groupId?: string
+  groupId?: string,
+  isAgent: boolean = false
 ): AcquireLockResult {
+  if (isAgent) {
+    const existingUserLocks = getLocksForUserInRoom(roomId, userId);
+    if (existingUserLocks.length > 0) {
+      return { status: 'already_holding_scope' };
+    }
+  }
+
   const key = `${roomId}:${fileId}`;
   let fileLocks = locks.get(key) ?? [];
 
@@ -97,6 +119,7 @@ export function acquireLock(
       userId,
       username,
       socketId,
+      isAgent,
       lockScope,
       unitName,
       startLine,
@@ -123,6 +146,7 @@ export function acquireLock(
       userId,
       username,
       socketId,
+      isAgent,
       requestedAt: Date.now(),
       lockScope,
       unitName,
@@ -152,7 +176,8 @@ export function acquireLock(
 export type AcquireUsageLockResult =
   | { status: 'acquired'; locks: FileLock[] }
   | { status: 'queued'; position: number; blockedBy: { fileId: number; userId: number; username: string }[] }
-  | { status: 'already_held' };
+  | { status: 'already_held' }
+  | { status: 'already_holding_scope' };
 
 /**
  * Atomically acquires a function lock + all usage span locks.
@@ -168,8 +193,16 @@ export function acquireUsageLock(
   defStartLine: number,
   defEndLine: number,
   usageSpans: LockSpan[],
-  groupId: string
+  groupId: string,
+  isAgent: boolean = false
 ): AcquireUsageLockResult {
+  if (isAgent) {
+    const existingUserLocks = getLocksForUserInRoom(roomId, userId);
+    if (existingUserLocks.length > 0) {
+      return { status: 'already_holding_scope' };
+    }
+  }
+
   const defKey = `${roomId}:${definitionFileId}`;
   const defLocks = locks.get(defKey) ?? [];
 
@@ -210,6 +243,7 @@ export function acquireUsageLock(
         userId,
         username,
         socketId,
+        isAgent,
         requestedAt: Date.now(),
         lockScope: 'function',
         unitName,
@@ -234,6 +268,7 @@ export function acquireUsageLock(
     userId,
     username,
     socketId,
+    isAgent,
     lockScope: 'function',
     unitName,
     startLine: defStartLine,
@@ -255,6 +290,7 @@ export function acquireUsageLock(
       userId,
       username,
       socketId,
+      isAgent,
       lockScope: 'function',
       unitName: `${unitName} (usage)`,
       startLine: span.startLine,

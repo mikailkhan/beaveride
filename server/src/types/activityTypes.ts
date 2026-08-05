@@ -18,6 +18,7 @@ export type ActivityOutcome =
 
 export type ActivityReason =
   | 'overlap_conflict'
+  | 'single_scope_limit'
   | 'idle_timeout'
   | 'heartbeat_loss'
   | 'disconnect'

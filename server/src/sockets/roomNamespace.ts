@@ -88,6 +88,7 @@ export function registerRoomNamespace(io: SocketServer): void {
       socket.data.userId = user.id;
       socket.data.username = user.username;
       socket.data.roomId = roomId;
+      socket.data.isAgent = user.isAgent ?? false;
 
       next();
     } catch (err) {
@@ -97,7 +98,9 @@ export function registerRoomNamespace(io: SocketServer): void {
 
   roomNsp.on('connection', async (socket) => {
     const { userId, username, roomId } = socket.data;
-    console.info(`Socket ${socket.id} connected to room namespace (user: ${username}, id: ${userId})`);
+    const isAgent = socket.data.isAgent ?? false;
+    const actorType: 'human' | 'agent' = isAgent ? 'agent' : 'human';
+    console.info(`Socket ${socket.id} connected to room namespace (user: ${username}, id: ${userId}, agent: ${isAgent})`);
 
     const roomChannel = `room:${roomId}`;
     socket.join(roomChannel);
@@ -150,7 +153,7 @@ export function registerRoomNamespace(io: SocketServer): void {
                         roomId,
                         actorId: userId,
                         actorName: username,
-                        actorType: 'human',
+                        actorType,
                         eventType: 'write_rejected_stale',
                         targetFileId,
                         targetScope: lock.lockScope,
@@ -179,7 +182,7 @@ export function registerRoomNamespace(io: SocketServer): void {
                         roomId,
                         actorId: userId,
                         actorName: username,
-                        actorType: 'human',
+                        actorType,
                         eventType: 'write_failed',
                         targetFileId,
                         targetScope: lock.lockScope,
@@ -236,7 +239,7 @@ export function registerRoomNamespace(io: SocketServer): void {
                     roomId,
                     actorId: userId,
                     actorName: username,
-                    actorType: 'human',
+                    actorType,
                     eventType: 'write_applied',
                     targetFileId,
                     targetScope: lock.lockScope,
@@ -263,7 +266,7 @@ export function registerRoomNamespace(io: SocketServer): void {
             roomId,
             actorId: userId,
             actorName: username,
-            actorType: 'human',
+            actorType,
             eventType: 'code_edited',
             targetFileId,
             outcome: 'completed',
@@ -295,7 +298,7 @@ export function registerRoomNamespace(io: SocketServer): void {
           roomId,
           actorId: userId,
           actorName: username,
-          actorType: 'human',
+          actorType,
           eventType: 'participant_joined',
           outcome: 'completed',
         });
@@ -367,7 +370,7 @@ export function registerRoomNamespace(io: SocketServer): void {
           roomId,
           actorId: userId,
           actorName: username,
-          actorType: 'human',
+          actorType,
           eventType: 'file_created',
           targetFileId: node.id,
           outcome: 'completed',
@@ -396,7 +399,7 @@ export function registerRoomNamespace(io: SocketServer): void {
           roomId,
           actorId: userId,
           actorName: username,
-          actorType: 'human',
+          actorType,
           eventType: 'file_renamed',
           targetFileId: fileIdNum,
           outcome: 'completed',
@@ -483,7 +486,7 @@ export function registerRoomNamespace(io: SocketServer): void {
           roomId,
           actorId: userId,
           actorName: username,
-          actorType: 'human',
+          actorType,
           eventType: 'file_deleted',
           targetFileId: fileIdNum,
           outcome: 'completed',
@@ -511,7 +514,7 @@ export function registerRoomNamespace(io: SocketServer): void {
           roomId,
           actorId: userId,
           actorName: username,
-          actorType: 'human',
+          actorType,
           eventType: 'member_role_changed',
           outcome: 'completed',
           metadata: { targetUserId: data.targetUserId, role: data.role, targetUsername: targetName, detail: `changed ${targetName}'s role to ${roleTitle}` },
@@ -534,7 +537,7 @@ export function registerRoomNamespace(io: SocketServer): void {
           roomId,
           actorId: userId,
           actorName: username,
-          actorType: 'human',
+          actorType,
           eventType: 'member_run_toggled',
           outcome: 'completed',
           metadata: { targetUserId: data.targetUserId, canRun: data.canRun, targetUsername: targetName, detail: `${actionText} Global Run for ${targetName}` },
@@ -556,7 +559,7 @@ export function registerRoomNamespace(io: SocketServer): void {
           roomId,
           actorId: userId,
           actorName: username,
-          actorType: 'human',
+          actorType,
           eventType: 'member_kicked',
           outcome: 'completed',
           metadata: { targetUserId: data.targetUserId, targetUsername: targetName, detail: `kicked ${targetName} from room` },
@@ -597,7 +600,7 @@ export function registerRoomNamespace(io: SocketServer): void {
     socket.on('lock:acquire', async (data: { fileId: number; lockScope?: 'file' | 'function'; startLine?: number; endLine?: number; unitName?: string }) => {
       const scope = data.lockScope === 'function' ? 'function' : 'file';
       const correlationId = eventService.generateCorrelationId();
-      const result = acquireLock(roomId, data.fileId, userId, username, socket.id, scope, data.startLine, data.endLine, data.unitName);
+      const result = acquireLock(roomId, data.fileId, userId, username, socket.id, scope, data.startLine, data.endLine, data.unitName, false, [], undefined, isAgent);
 
       if (result.status === 'acquired') {
         const fileContent = getFileContent(roomId, data.fileId);
@@ -611,7 +614,7 @@ export function registerRoomNamespace(io: SocketServer): void {
           roomId,
           actorId: userId,
           actorName: username,
-          actorType: 'human',
+          actorType,
           eventType: 'lock_granted',
           targetFileId: data.fileId,
           targetScope: scope,
@@ -626,7 +629,7 @@ export function registerRoomNamespace(io: SocketServer): void {
           roomId,
           actorId: userId,
           actorName: username,
-          actorType: 'human',
+          actorType,
           eventType: 'lock_requested',
           targetFileId: data.fileId,
           targetScope: scope,
@@ -638,7 +641,7 @@ export function registerRoomNamespace(io: SocketServer): void {
           roomId,
           actorId: userId,
           actorName: username,
-          actorType: 'human',
+          actorType,
           eventType: 'lock_queued',
           targetFileId: data.fileId,
           targetScope: scope,
@@ -659,7 +662,7 @@ export function registerRoomNamespace(io: SocketServer): void {
           roomId,
           actorId: userId,
           actorName: username,
-          actorType: 'human',
+          actorType,
           eventType: 'lock_denied',
           targetFileId: data.fileId,
           targetScope: scope,
@@ -671,6 +674,23 @@ export function registerRoomNamespace(io: SocketServer): void {
         await broadcastActivities(roomId);
 
         socket.emit('lock:already_held', { fileId: data.fileId });
+      } else if (result.status === 'already_holding_scope') {
+        eventService.emit({
+          roomId,
+          actorId: userId,
+          actorName: username,
+          actorType,
+          eventType: 'lock_denied',
+          targetFileId: data.fileId,
+          targetScope: scope,
+          targetUnitName: data.unitName,
+          outcome: 'denied',
+          reason: 'single_scope_limit',
+          correlationId,
+        });
+        await broadcastActivities(roomId);
+
+        socket.emit('lock:already_held', { fileId: data.fileId, reason: 'single_scope_limit' });
       }
     });
 
@@ -686,7 +706,7 @@ export function registerRoomNamespace(io: SocketServer): void {
           roomId,
           actorId: userId,
           actorName: username,
-          actorType: 'human',
+          actorType,
           eventType: 'lock_released_explicit',
           targetFileId: data.fileId,
           targetScope: result.lock.lockScope,
@@ -699,7 +719,8 @@ export function registerRoomNamespace(io: SocketServer): void {
         if (result.nextInQueue && result.nextInQueue.length > 0) {
           for (const next of result.nextInQueue) {
             const nextCorrelationId = eventService.generateCorrelationId();
-            const grantResult = acquireLock(roomId, data.fileId, next.userId, next.username, next.socketId, next.lockScope, next.startLine, next.endLine, next.unitName);
+            const nextActorType: 'human' | 'agent' = next.isAgent ? 'agent' : 'human';
+            const grantResult = acquireLock(roomId, data.fileId, next.userId, next.username, next.socketId, next.lockScope, next.startLine, next.endLine, next.unitName, false, [], undefined, next.isAgent ?? false);
             if (grantResult.status === 'acquired') {
               const fileContent = getFileContent(roomId, data.fileId);
               if (fileContent !== null) {
@@ -711,7 +732,7 @@ export function registerRoomNamespace(io: SocketServer): void {
                 roomId,
                 actorId: next.userId,
                 actorName: next.username,
-                actorType: 'human',
+                actorType: nextActorType,
                 eventType: 'lock_queue_promoted',
                 targetFileId: data.fileId,
                 targetScope: next.lockScope,
@@ -724,7 +745,7 @@ export function registerRoomNamespace(io: SocketServer): void {
                 roomId,
                 actorId: next.userId,
                 actorName: next.username,
-                actorType: 'human',
+                actorType: nextActorType,
                 eventType: 'lock_granted',
                 targetFileId: data.fileId,
                 targetScope: next.lockScope,
@@ -820,7 +841,8 @@ export function registerRoomNamespace(io: SocketServer): void {
         data.startLine,
         data.endLine,
         data.usageSpans,
-        groupId
+        groupId,
+        isAgent
       );
 
       if (result.status === 'acquired') {
@@ -837,7 +859,7 @@ export function registerRoomNamespace(io: SocketServer): void {
           roomId,
           actorId: userId,
           actorName: username,
-          actorType: 'human',
+          actorType,
           eventType: 'lock_granted',
           targetFileId: data.fileId,
           targetScope: 'function',
@@ -863,7 +885,7 @@ export function registerRoomNamespace(io: SocketServer): void {
           roomId,
           actorId: userId,
           actorName: username,
-          actorType: 'human',
+          actorType,
           eventType: 'lock_requested',
           targetFileId: data.fileId,
           targetScope: 'function',
@@ -876,7 +898,7 @@ export function registerRoomNamespace(io: SocketServer): void {
           roomId,
           actorId: userId,
           actorName: username,
-          actorType: 'human',
+          actorType,
           eventType: 'lock_queued',
           targetFileId: data.fileId,
           targetScope: 'function',
@@ -900,6 +922,23 @@ export function registerRoomNamespace(io: SocketServer): void {
         });
       } else if (result.status === 'already_held') {
         socket.emit('lock:already_held', { fileId: data.fileId });
+      } else if (result.status === 'already_holding_scope') {
+        eventService.emit({
+          roomId,
+          actorId: userId,
+          actorName: username,
+          actorType,
+          eventType: 'lock_denied',
+          targetFileId: data.fileId,
+          targetScope: 'function',
+          targetUnitName: data.unitName,
+          outcome: 'denied',
+          reason: 'single_scope_limit',
+          correlationId,
+        });
+        await broadcastActivities(roomId);
+
+        socket.emit('lock:already_held', { fileId: data.fileId, reason: 'single_scope_limit' });
       }
     });
 
@@ -921,7 +960,7 @@ export function registerRoomNamespace(io: SocketServer): void {
           roomId,
           actorId: userId,
           actorName: username,
-          actorType: 'human',
+          actorType,
           eventType: 'lock_released_explicit',
           targetFileId: released.fileId,
           targetScope: released.lock.lockScope,
@@ -934,6 +973,7 @@ export function registerRoomNamespace(io: SocketServer): void {
         if (released.nextInQueue && released.nextInQueue.length > 0) {
           for (const next of released.nextInQueue) {
             const nextCorrelationId = eventService.generateCorrelationId();
+            const nextActorType: 'human' | 'agent' = next.isAgent ? 'agent' : 'human';
 
             if (next.includeUsages && next.usageSpans && next.usageSpans.length > 0 && next.groupId) {
               const grantResult = acquireUsageLock(
@@ -946,7 +986,8 @@ export function registerRoomNamespace(io: SocketServer): void {
                 next.startLine ?? 0,
                 next.endLine ?? 0,
                 next.usageSpans,
-                next.groupId
+                next.groupId,
+                next.isAgent ?? false
               );
               if (grantResult.status === 'acquired') {
                 for (const lock of grantResult.locks) {
@@ -957,7 +998,7 @@ export function registerRoomNamespace(io: SocketServer): void {
                   roomId,
                   actorId: next.userId,
                   actorName: next.username,
-                  actorType: 'human',
+                  actorType: nextActorType,
                   eventType: 'lock_queue_promoted',
                   targetFileId: released.fileId,
                   targetScope: 'function',
@@ -981,7 +1022,11 @@ export function registerRoomNamespace(io: SocketServer): void {
                 next.lockScope,
                 next.startLine,
                 next.endLine,
-                next.unitName
+                next.unitName,
+                false,
+                [],
+                undefined,
+                next.isAgent ?? false
               );
               if (grantResult.status === 'acquired') {
                 lockCorrelations.set(grantResult.lock.id, nextCorrelationId);
@@ -989,7 +1034,7 @@ export function registerRoomNamespace(io: SocketServer): void {
                   roomId,
                   actorId: next.userId,
                   actorName: next.username,
-                  actorType: 'human',
+                  actorType: nextActorType,
                   eventType: 'lock_queue_promoted',
                   targetFileId: released.fileId,
                   targetScope: next.lockScope,
@@ -1001,7 +1046,7 @@ export function registerRoomNamespace(io: SocketServer): void {
                   roomId,
                   actorId: next.userId,
                   actorName: next.username,
-                  actorType: 'human',
+                  actorType: nextActorType,
                   eventType: 'lock_granted',
                   targetFileId: released.fileId,
                   targetScope: next.lockScope,
@@ -1063,7 +1108,7 @@ export function registerRoomNamespace(io: SocketServer): void {
           roomId,
           actorId: userId,
           actorName: username,
-          actorType: 'human',
+          actorType,
           eventType: 'write_regenerated',
           targetFileId,
           targetScope: lock.lockScope,
@@ -1116,7 +1161,7 @@ export function registerRoomNamespace(io: SocketServer): void {
         roomId,
         actorId: userId,
         actorName: username,
-        actorType: 'human',
+        actorType,
         eventType: 'global_run_started',
         outcome: 'completed',
       });
@@ -1143,7 +1188,7 @@ export function registerRoomNamespace(io: SocketServer): void {
           roomId,
           actorId: userId,
           actorName: username,
-          actorType: 'human',
+          actorType,
           eventType: 'global_run_ended',
           outcome: 'completed',
         });
@@ -1158,7 +1203,7 @@ export function registerRoomNamespace(io: SocketServer): void {
           roomId,
           actorId: userId,
           actorName: username,
-          actorType: 'human',
+          actorType,
           eventType: 'global_run_ended',
           outcome: 'failed',
           reason: 'execution_error',
@@ -1186,11 +1231,12 @@ export function registerRoomNamespace(io: SocketServer): void {
             reason: 'disconnect',
           });
 
+          const releasedActorType: 'human' | 'agent' = released.lock.isAgent ? 'agent' : 'human';
           eventService.emit({
             roomId: released.roomId,
             actorId: released.lock.userId,
             actorName: released.lock.username,
-            actorType: 'human',
+            actorType: releasedActorType,
             eventType: 'lock_released_disconnect',
             targetFileId: released.fileId,
             targetScope: released.lock.lockScope,
@@ -1204,7 +1250,8 @@ export function registerRoomNamespace(io: SocketServer): void {
           if (released.nextInQueue && released.nextInQueue.length > 0) {
             for (const next of released.nextInQueue) {
               const nextCorrelationId = eventService.generateCorrelationId();
-              const grantResult = acquireLock(released.roomId, released.fileId, next.userId, next.username, next.socketId, next.lockScope, next.startLine, next.endLine);
+              const nextActorType: 'human' | 'agent' = next.isAgent ? 'agent' : 'human';
+              const grantResult = acquireLock(released.roomId, released.fileId, next.userId, next.username, next.socketId, next.lockScope, next.startLine, next.endLine, next.unitName, false, [], undefined, next.isAgent ?? false);
               if (grantResult.status === 'acquired') {
                 lockCorrelations.set(grantResult.lock.id, nextCorrelationId);
 
@@ -1212,7 +1259,7 @@ export function registerRoomNamespace(io: SocketServer): void {
                   roomId: released.roomId,
                   actorId: next.userId,
                   actorName: next.username,
-                  actorType: 'human',
+                  actorType: nextActorType,
                   eventType: 'lock_queue_promoted',
                   targetFileId: released.fileId,
                   targetScope: next.lockScope,
@@ -1224,7 +1271,7 @@ export function registerRoomNamespace(io: SocketServer): void {
                   roomId: released.roomId,
                   actorId: next.userId,
                   actorName: next.username,
-                  actorType: 'human',
+                  actorType: nextActorType,
                   eventType: 'lock_granted',
                   targetFileId: released.fileId,
                   targetScope: next.lockScope,
@@ -1249,7 +1296,7 @@ export function registerRoomNamespace(io: SocketServer): void {
           roomId,
           actorId: userId,
           actorName: username,
-          actorType: 'human',
+          actorType,
           eventType: 'participant_left',
           outcome: 'completed',
         });
@@ -1279,11 +1326,12 @@ export function registerRoomNamespace(io: SocketServer): void {
           reason: 'timeout',
         });
 
+        const expiredActorType: 'human' | 'agent' = lock.isAgent ? 'agent' : 'human';
         eventService.emit({
           roomId: eRoomId,
           actorId: lock.userId,
           actorName: lock.username,
-          actorType: 'human',
+          actorType: expiredActorType,
           eventType: 'lock_released_idle_timeout',
           targetFileId: eFileId,
           targetScope: lock.lockScope,
@@ -1297,7 +1345,8 @@ export function registerRoomNamespace(io: SocketServer): void {
         if (result.nextInQueue && result.nextInQueue.length > 0) {
           for (const next of result.nextInQueue) {
             const nextCorrelationId = eventService.generateCorrelationId();
-            const grantResult = acquireLock(eRoomId, eFileId, next.userId, next.username, next.socketId, next.lockScope, next.startLine, next.endLine);
+            const nextActorType: 'human' | 'agent' = next.isAgent ? 'agent' : 'human';
+            const grantResult = acquireLock(eRoomId, eFileId, next.userId, next.username, next.socketId, next.lockScope, next.startLine, next.endLine, next.unitName, false, [], undefined, next.isAgent ?? false);
             if (grantResult.status === 'acquired') {
               lockCorrelations.set(grantResult.lock.id, nextCorrelationId);
 
@@ -1305,7 +1354,7 @@ export function registerRoomNamespace(io: SocketServer): void {
                 roomId: eRoomId,
                 actorId: next.userId,
                 actorName: next.username,
-                actorType: 'human',
+                actorType: nextActorType,
                 eventType: 'lock_queue_promoted',
                 targetFileId: eFileId,
                 targetScope: next.lockScope,
@@ -1317,7 +1366,7 @@ export function registerRoomNamespace(io: SocketServer): void {
                 roomId: eRoomId,
                 actorId: next.userId,
                 actorName: next.username,
-                actorType: 'human',
+                actorType: nextActorType,
                 eventType: 'lock_granted',
                 targetFileId: eFileId,
                 targetScope: next.lockScope,
