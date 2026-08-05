@@ -25,11 +25,23 @@ const MINE_COLOR: UserColorInfo = {
   classIndex: -1,
 };
 
+const AGENT_COLOR: UserColorInfo = {
+  bg: 'rgba(99, 102, 241, 0.2)',
+  border: 'rgba(99, 102, 241, 0.6)',
+  icon: '#6366f1',
+  label: 'Indigo (BOT)',
+  classIndex: -2,
+};
+
 /**
  * Deterministically maps a collaborator userId to a stable HSL palette color.
+ * Agent users always return a dedicated agent indigo color.
  * Current user's own locks always return the standard primary blue color.
  */
-export function getUserColor(userId: number, currentUserId?: number): UserColorInfo {
+export function getUserColor(userId: number, currentUserId?: number, isAgent?: boolean): UserColorInfo {
+  if (isAgent || Number(userId) === 901) {
+    return AGENT_COLOR;
+  }
   if (currentUserId !== undefined && Number(userId) === Number(currentUserId)) {
     return MINE_COLOR;
   }

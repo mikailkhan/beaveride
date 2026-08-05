@@ -1,3 +1,4 @@
+import './setupTestEnv.js';
 import http from 'http';
 import express from 'express';
 import jwt from 'jsonwebtoken';
@@ -34,7 +35,7 @@ async function runStep3Test() {
 
   const addr = server.address();
   const port = typeof addr === 'object' && addr ? addr.port : 0;
-  const roomId = 999;
+  const roomId = 3;
 
   // 2. Fetch/seed BeaverBot user and Human Alice user
   const agentUser = await agentService.ensureAgentUser();
@@ -42,19 +43,23 @@ async function runStep3Test() {
 
   let humanUser = await userRepository.findByUsername('alice');
   if (!humanUser) {
-    humanUser = await userRepository.createUser({
+    humanUser = {
+      id: 100,
       email: 'alice@beaveride.internal',
       username: 'alice',
       firstName: 'Alice',
       lastName: 'Dev',
       passwordHash: 'dummy',
       isAgent: false,
-    });
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
   }
-  console.log(`✓ Human user loaded: ID=${humanUser.id}, username=${humanUser.username}, isAgent=${humanUser.isAgent}`);
+  const validHumanUser = humanUser;
+  console.log(`✓ Human user loaded: ID=${validHumanUser.id}, username=${validHumanUser.username}, isAgent=${validHumanUser.isAgent}`);
 
   const humanToken = jwt.sign(
-    { sub: humanUser.id, email: humanUser.email, isAgent: humanUser.isAgent },
+    { sub: validHumanUser.id, email: validHumanUser.email, isAgent: validHumanUser.isAgent },
     env.JWT_SECRET,
     { expiresIn: '7d' }
   );
@@ -99,7 +104,7 @@ async function runStep3Test() {
   await agentService.requestAgentLock(agentSocket, { fileId, lockScope: 'file' });
   const queueData = await agentQueuedPromise;
   console.assert(queueData.position === 1, 'Agent must be queued at position 1');
-  console.assert(queueData.heldBy.userId === humanUser.id, 'HeldBy must match Human user ID');
+  console.assert(queueData.heldBy.userId === validHumanUser.id, 'HeldBy must match Human user ID');
   console.log('✓ Agent correctly queued at position 1 behind Human (FIFO parity proven)');
 
   // 7. Human releases Lock A -> Agent promoted to acquire Lock A

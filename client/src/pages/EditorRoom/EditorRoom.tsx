@@ -703,28 +703,36 @@ export const EditorRoom = () => {
           <div className="flex items-center gap-sm">
             {/* Active Collaborators */}
             <div className="flex -space-x-2 mr-md">
-              {collaborators.map((member) => (
-                <div 
-                  key={member.clientId} 
-                  style={{ borderColor: member.color }}
-                  className="w-8 h-8 rounded-full border-2 bg-surface-container-high flex items-center justify-center relative cursor-pointer group"
-                >
-                  <span className="text-label-md font-bold text-on-surface-variant text-xs">
-                    {member.username.charAt(0).toUpperCase()}
-                  </span>
-                  <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 glass-panel rounded-lg px-3 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                    <div className="font-label-md text-label-md text-on-surface font-bold">
-                      {member.firstName} {member.lastName}
-                    </div>
-                    <div className="text-[12px] text-on-surface-variant">
-                      @{member.username} (Online)
-                    </div>
-                    <div className="text-[10px] text-primary font-semibold mt-0.5">
-                      Editing: {getFileName(member.activeFileId)}
+              {collaborators.map((member) => {
+                const isAgentMember = member.isAgent || member.username === 'BeaverBot' || Number(member.userId) === 901;
+                return (
+                  <div 
+                    key={member.clientId} 
+                    style={{ borderColor: isAgentMember ? '#6366f1' : member.color }}
+                    className="w-8 h-8 rounded-full border-2 bg-surface-container-high flex items-center justify-center relative cursor-pointer group shrink-0"
+                  >
+                    <span className="text-label-md font-bold text-on-surface-variant text-xs">
+                      {isAgentMember ? '🤖' : member.username.charAt(0).toUpperCase()}
+                    </span>
+                    <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 glass-panel rounded-lg px-3 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                      <div className="font-label-md text-label-md text-on-surface font-bold flex items-center gap-1">
+                        <span>{member.firstName} {member.lastName}</span>
+                        {isAgentMember && (
+                          <span className="px-1 rounded bg-indigo-100 text-indigo-700 text-[9px] font-bold">
+                            BOT
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[12px] text-on-surface-variant">
+                        @{member.username} (Online)
+                      </div>
+                      <div className="text-[10px] text-primary font-semibold mt-0.5">
+                        Editing: {getFileName(member.activeFileId)}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <button 
@@ -802,6 +810,7 @@ export const EditorRoom = () => {
               if (!queueInfo) return null;
 
               const blockerName = queueInfo.heldBy?.username;
+              const isAgentBlocker = queueInfo.heldBy?.isAgent || blockerName === 'BeaverBot' || Number(queueInfo.heldBy?.userId) === 901;
               const unitName = queueInfo.heldBy?.unitName;
               const scopeText = queueInfo.heldBy?.lockScope === 'file' ? 'entire file' : (unitName ? `function "${unitName}"` : 'code unit');
 
@@ -814,7 +823,9 @@ export const EditorRoom = () => {
                   <span className="material-symbols-outlined text-sm animate-pulse text-amber-600">hourglass_top</span>
                   <span>
                     <strong>Queue Position #{queueInfo.position}</strong> — Waiting for{' '}
-                    <strong className="text-amber-900">{blockerName || 'another user'}</strong> to release {scopeText}. You will automatically receive the lock when it becomes available.
+                    <strong className="text-amber-900">
+                      {isAgentBlocker ? '🤖 BeaverBot (BOT)' : blockerName || 'another user'}
+                    </strong> to release {scopeText}. You will automatically receive the lock when it becomes available.
                   </span>
                 </div>
               );
@@ -957,6 +968,7 @@ export const EditorRoom = () => {
                       {collaborators.map((member) => {
                         const isMemberOwner = member.role === 'owner';
                         const isMemberViewer = member.role === 'viewer';
+                        const isAgentMember = member.isAgent || member.username === 'BeaverBot' || Number(member.userId) === 901;
                         const isMe = authUser?.id !== undefined && String(authUser.id) === String(member.userId);
                         const isMenuOpen = openRoleMenuUserId === member.userId;
 
@@ -967,16 +979,21 @@ export const EditorRoom = () => {
                           >
                             {/* Avatar */}
                             <div 
-                              style={{ borderColor: member.color }}
+                              style={{ borderColor: isAgentMember ? '#6366f1' : member.color }}
                               className="w-6 h-6 rounded-full border-2 bg-surface-container-high flex items-center justify-center text-[10px] font-bold shrink-0"
                             >
-                              {member.username.charAt(0).toUpperCase()}
+                              {isAgentMember ? '🤖' : member.username.charAt(0).toUpperCase()}
                             </div>
 
                             {/* User details */}
                             <div className="flex-1 min-w-0">
                               <div className="font-label-md text-[12px] font-bold text-on-surface truncate flex items-center gap-1">
                                 <span>{member.firstName} {member.lastName}</span>
+                                {isAgentMember && (
+                                  <span className="px-1 rounded bg-indigo-100 text-indigo-700 text-[9px] font-bold uppercase">
+                                    BOT
+                                  </span>
+                                )}
                                 {isMe && <span className="text-[10px] text-outline font-normal">(You)</span>}
                               </div>
                               <div className="text-[10px] text-on-surface-variant truncate">

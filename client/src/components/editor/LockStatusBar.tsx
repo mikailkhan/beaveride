@@ -44,7 +44,8 @@ export const LockStatusBar: React.FC<LockStatusBarProps> = ({ fileId, editor, on
       <div className="flex items-center gap-1.5 shrink-0">
         {fileLocks.map((lock) => {
           const isMine = currentUser && String(lock.userId) === String(currentUser.id);
-          const colorInfo = getUserColor(lock.userId, currentUser ? Number(currentUser.id) : undefined);
+          const isAgentLock = lock.isAgent || lock.username === 'BeaverBot' || Number(lock.userId) === 901;
+          const colorInfo = getUserColor(lock.userId, currentUser ? Number(currentUser.id) : undefined, isAgentLock);
           const isUsageSpan = lock.unitName?.endsWith('(usage)');
           const cleanUnitName = isUsageSpan
             ? lock.unitName?.replace(' (usage)', '')
@@ -59,7 +60,7 @@ export const LockStatusBar: React.FC<LockStatusBarProps> = ({ fileId, editor, on
               key={lock.id}
               tabIndex={0}
               role="button"
-              aria-label={`Lock on ${isFileLock ? 'entire file' : cleanUnitName || 'code block'} by ${isMine ? 'you' : lock.username}`}
+              aria-label={`Lock on ${isFileLock ? 'entire file' : cleanUnitName || 'code block'} by ${isMine ? 'you' : lock.username}${isAgentLock ? ' (BOT)' : ''}`}
               onClick={() => handleScrollToLock(lock.startLine)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
@@ -70,7 +71,7 @@ export const LockStatusBar: React.FC<LockStatusBarProps> = ({ fileId, editor, on
                   onReleaseLock(lock);
                 }
               }}
-              title={isFileLock ? `Locked by ${lock.username}` : `Click to jump to line ${lock.startLine}`}
+              title={isFileLock ? `Locked by ${lock.username}${isAgentLock ? ' (BOT)' : ''}` : `Click to jump to line ${lock.startLine}`}
               className="h-5.5 inline-flex items-center gap-1.5 px-2.5 rounded-full text-[11px] font-medium bg-white/90 border border-black/5 hover:border-black/15 shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-all cursor-pointer shrink-0 group relative focus:outline-hidden focus:ring-1 focus:ring-primary/50"
             >
               {/* Color Indicator Dot */}
@@ -90,8 +91,14 @@ export const LockStatusBar: React.FC<LockStatusBarProps> = ({ fileId, editor, on
               </span>
 
               {/* Username pill */}
-              <span className="text-neutral-500 text-[10px] font-medium leading-none pl-1 border-l border-neutral-200/80">
+              <span className="text-neutral-500 text-[10px] font-medium leading-none pl-1 border-l border-neutral-200/80 inline-flex items-center gap-1">
+                {isAgentLock && <span className="text-[11px]">🤖</span>}
                 {isMine ? 'you' : lock.username}
+                {isAgentLock && (
+                  <span className="ml-0.5 px-1 rounded bg-indigo-100 text-indigo-700 text-[8px] font-bold tracking-wider uppercase">
+                    BOT
+                  </span>
+                )}
               </span>
 
               {/* Usage Count Pill */}
