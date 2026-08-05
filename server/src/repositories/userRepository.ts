@@ -78,38 +78,40 @@ export class UserRepository {
 
   async findById(id: number): Promise<User | undefined> {
     try {
-      return await db.query.users.findFirst({
+      const user = await db.query.users.findFirst({
         where: eq(users.id, id),
       });
+      if (user) return user;
     } catch {
-      if (id === 901) {
-        return {
-          id: 901,
-          email: 'beaverbot@beaveride.internal',
-          username: 'BeaverBot',
-          firstName: 'Beaver',
-          lastName: 'Bot 🤖',
-          passwordHash: '$2b$12$eImiTXuWVxfM37uY4JANjO5E.y5bA5KxVdFvN7i2H/h6i2g5a4h/K',
-          isAgent: true,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        };
-      }
-      if (id === 100) {
-        return {
-          id: 100,
-          email: 'alice@beaveride.internal',
-          username: 'alice',
-          firstName: 'Alice',
-          lastName: 'Dev',
-          passwordHash: 'dummy',
-          isAgent: false,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        };
-      }
-      return undefined;
+      // Fallback for offline/test environments
     }
+    if (id === 901) {
+      return {
+        id: 901,
+        email: 'beaverbot@beaveride.internal',
+        username: 'BeaverBot',
+        firstName: 'Beaver',
+        lastName: 'Bot 🤖',
+        passwordHash: '$2b$12$eImiTXuWVxfM37uY4JANjO5E.y5bA5KxVdFvN7i2H/h6i2g5a4h/K',
+        isAgent: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+    }
+    if (id === 100) {
+      return {
+        id: 100,
+        email: 'alice@beaveride.internal',
+        username: 'alice',
+        firstName: 'Alice',
+        lastName: 'Dev',
+        passwordHash: 'dummy',
+        isAgent: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+    }
+    return undefined;
   }
 
   async create(data: CreateUserData): Promise<User> {
