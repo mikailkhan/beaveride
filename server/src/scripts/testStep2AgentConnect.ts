@@ -1,3 +1,4 @@
+import './setupTestEnv.js';
 import http from 'http';
 import express from 'express';
 import { Server as SocketIOServer } from 'socket.io';
