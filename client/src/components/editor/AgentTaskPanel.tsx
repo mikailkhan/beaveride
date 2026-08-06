@@ -78,14 +78,21 @@ export const AgentTaskPanel: React.FC<AgentTaskPanelProps> = ({ socket }) => {
             🤖
           </div>
           <span className="font-bold text-xs text-neutral-200 shrink-0">BeaverBot Task:</span>
-          <span className="text-xs text-neutral-300 font-medium truncate max-w-[320px]" title={task.instruction}>
+          <span className="text-xs text-neutral-300 font-medium truncate max-w-[260px]" title={task.instruction}>
             "{task.instruction}"
           </span>
+
+          {/* Target File Badge */}
+          {((task.metadata as any)?.targetFileName || (task as any).targetFileName) && (
+            <span className="px-2 py-0.5 rounded bg-neutral-800 border border-neutral-700 text-neutral-300 text-[10px] font-mono shrink-0">
+              📄 {(task.metadata as any)?.targetFileName || (task as any).targetFileName}
+            </span>
+          )}
 
           {/* Status Badge */}
           {currentStage === 'completed' && (
             <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold flex items-center gap-1 shrink-0">
-              <span className="material-symbols-outlined text-[12px]">check_circle</span> Completed
+              <span className="material-symbols-outlined text-[12px]">check_circle</span> Verified & Done
             </span>
           )}
           {currentStage === 'failed' && (

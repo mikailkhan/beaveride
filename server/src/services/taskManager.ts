@@ -5,10 +5,10 @@ import { taskRepository } from '../repositories/taskRepository.js';
 import { FileRepository } from '../repositories/fileRepository.js';
 import { eventService } from './eventService.js';
 import { agentService } from './agentService.js';
-import { generateMockCode } from '../utils/mockCodeGenerator.js';
+import { llmService } from './llmService.js';
 import { computeScopeHash } from '../utils/contentHash.js';
 import { updateLockContentHash } from '../sockets/lockStore.js';
-import { getDoc, getOrCreateDoc, getOrCreateFileText, getFileContent } from '../sockets/docStore.js';
+import { getDoc, getOrCreateDoc, getOrCreateFileText, getFileContent, updateDoc } from '../sockets/docStore.js';
 import { AgentTask } from '../types/taskTypes.js';
 
 const fileRepository = new FileRepository();
@@ -71,7 +71,12 @@ export class TaskManager {
         targetFileId = targetFile.id;
       }
 
-      const planSummary = `Plan: BeaverBot will acquire lock on file ID ${targetFileId} and implement instruction: "${task.instruction}"`;
+      const targetFileRow = await fileRepository.getFileById(targetFileId);
+      const targetFileName = targetFileRow?.name || 'untitled.ts';
+      const initialYText = getOrCreateFileText(roomId, targetFileId);
+      const existingContentAtPlan = initialYText.toString();
+
+      const planSummary = await llmService.generatePlan(task.instruction, existingContentAtPlan, targetFileName);
       await taskRepository.updateTaskStatus(taskId, 'planning', 'planning', {
         targetFileId,
         planSummary,
@@ -82,6 +87,7 @@ export class TaskManager {
         status: 'planning',
         currentStage: 'planning',
         targetFileId,
+        targetFileName,
         planSummary,
       });
 
@@ -187,15 +193,35 @@ export class TaskManager {
       const doc = await getOrCreateDoc(roomId);
       const yText = getOrCreateFileText(roomId, targetFileId);
       const existingContent = yText.toString();
-      const generatedCode = generateMockCode(task.instruction, existingContent);
+      const targetFileRowForWrite = await fileRepository.getFileById(targetFileId);
+      const targetFileNameForWrite = targetFileRowForWrite?.name || 'untitled.ts';
+      const currentPlanSummary = task.planSummary || `Plan: Implement instruction "${task.instruction}"`;
+
+      const generatedCode = await llmService.generateCode(
+        task.instruction,
+        existingContent,
+        targetFileNameForWrite,
+        currentPlanSummary
+      );
 
       checkAborted();
 
-      // Apply update directly to Yjs text document
+      // Apply update directly to Yjs text document and capture the sync update
+      let serverUpdate: Uint8Array | null = null;
+      const onUpdate = (update: Uint8Array) => {
+        serverUpdate = update;
+      };
+      doc.on('update', onUpdate);
       doc.transact(() => {
         yText.delete(0, yText.length);
         yText.insert(0, generatedCode);
       });
+      doc.off('update', onUpdate);
+
+      if (serverUpdate) {
+        io.of('/room').to(`room:${roomId}`).emit('sync:update', serverUpdate);
+        updateDoc(roomId, serverUpdate, task.agentUserId);
+      }
 
       // Compute updated content hash and sync lockStore
       const newHash = computeScopeHash(generatedCode, 'file');
@@ -238,10 +264,14 @@ export class TaskManager {
         metadata: { taskId },
       });
 
-      // Read back final Yjs content and assert generated snippet exists
+      // Read back final Yjs content and perform LLM verification
       const finalContent = getFileContent(roomId, targetFileId) || '';
-      if (!finalContent.includes('BeaverBot Task:')) {
-        throw new Error('Verification failed: Generated BeaverBot code is missing from final Yjs document');
+      const targetFileRowForVerify = await fileRepository.getFileById(targetFileId);
+      const targetFileNameForVerify = targetFileRowForVerify?.name || 'untitled.ts';
+
+      const verification = await llmService.verifyCode(task.instruction, finalContent, targetFileNameForVerify);
+      if (!verification.isValid) {
+        throw new Error(`Verification failed: ${verification.issues.join(', ')}`);
       }
 
       checkAborted();
@@ -266,10 +296,16 @@ export class TaskManager {
         completedAt,
       });
 
+      const targetFileRowCompleted = await fileRepository.getFileById(targetFileId);
+      const targetFileNameCompleted = targetFileRowCompleted?.name || 'untitled.ts';
+
       this.broadcastTaskUpdate(roomId, io, {
         taskId,
         status: 'completed',
         currentStage: 'completed',
+        targetFileId,
+        targetFileName: targetFileNameCompleted,
+        planSummary: task.planSummary,
         completedAt: completedAt.toISOString(),
       });
 

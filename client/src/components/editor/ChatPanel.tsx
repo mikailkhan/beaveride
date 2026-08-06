@@ -69,11 +69,21 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ socket, onClose }) => {
     };
 
     // Listen for agent task completion/failure synthetic messages
-    const onAgentTaskUpdate = (data: { taskId: string; stage: string; failureReason?: string; metadata?: any }) => {
+    const onAgentTaskUpdate = (data: {
+      taskId: string;
+      stage: string;
+      targetFileName?: string;
+      planSummary?: string;
+      failureReason?: string;
+      metadata?: any;
+    }) => {
       let text = '';
       if (data.stage === 'completed') {
-        const fileRef = data.metadata?.targetFileName ? ` in ${data.metadata.targetFileName}` : '';
-        text = `🤖 BeaverBot completed the task! Check the code${fileRef}.`;
+        const fileName = data.targetFileName || data.metadata?.targetFileName;
+        const fileRef = fileName ? ` in ${fileName}` : '';
+        const planText = data.planSummary || data.metadata?.planSummary;
+        const planRef = planText ? ` Plan: "${planText}"` : '';
+        text = `🤖 BeaverBot completed the task${fileRef}!${planRef}`;
       } else if (data.stage === 'failed') {
         text = `🤖 BeaverBot failed: ${data.failureReason || 'Internal error'}`;
       } else if (data.stage === 'cancelled') {
