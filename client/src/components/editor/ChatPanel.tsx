@@ -51,14 +51,64 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ socket, onClose }) => {
       setTimeout(() => setSuggestionError(null), 4000);
     };
 
+    // Listen for agent task creation synthetic messages
+    const onAgentTaskCreated = (data: { taskId: string; instruction: string }) => {
+      const syntheticMsg: ChatMessage = {
+        id: -Date.now(),
+        roomId: 0,
+        userId: 901,
+        message: `🤖 BeaverBot accepted the task: "${data.instruction}"`,
+        createdAt: new Date().toISOString(),
+        user: {
+          username: 'BeaverBot',
+          firstName: 'BeaverBot',
+          lastName: '🤖',
+        },
+      };
+      setMessages((prev) => [...prev, syntheticMsg]);
+    };
+
+    // Listen for agent task completion/failure synthetic messages
+    const onAgentTaskUpdate = (data: { taskId: string; stage: string; failureReason?: string; metadata?: any }) => {
+      let text = '';
+      if (data.stage === 'completed') {
+        const fileRef = data.metadata?.targetFileName ? ` in ${data.metadata.targetFileName}` : '';
+        text = `🤖 BeaverBot completed the task! Check the code${fileRef}.`;
+      } else if (data.stage === 'failed') {
+        text = `🤖 BeaverBot failed: ${data.failureReason || 'Internal error'}`;
+      } else if (data.stage === 'cancelled') {
+        text = `🤖 BeaverBot task was cancelled by user.`;
+      }
+
+      if (text) {
+        const syntheticMsg: ChatMessage = {
+          id: -Date.now() - Math.floor(Math.random() * 1000),
+          roomId: 0,
+          userId: 901,
+          message: text,
+          createdAt: new Date().toISOString(),
+          user: {
+            username: 'BeaverBot',
+            firstName: 'BeaverBot',
+            lastName: '🤖',
+          },
+        };
+        setMessages((prev) => [...prev, syntheticMsg]);
+      }
+    };
+
     socket.on('chat:history', onChatHistory);
     socket.on('chat:message', onChatMessage);
     socket.on('agent:task_error', onAgentTaskError);
+    socket.on('agent:task_created', onAgentTaskCreated);
+    socket.on('agent:task_update', onAgentTaskUpdate);
 
     return () => {
       socket.off('chat:history', onChatHistory);
       socket.off('chat:message', onChatMessage);
       socket.off('agent:task_error', onAgentTaskError);
+      socket.off('agent:task_created', onAgentTaskCreated);
+      socket.off('agent:task_update', onAgentTaskUpdate);
     };
   }, [socket]);
 
@@ -202,6 +252,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ socket, onClose }) => {
         ) : (
           messages.map((msg) => {
             const isMe = currentUser?.id !== undefined && String(msg.userId) === String(currentUser.id);
+            const isBot = msg.userId === 901 || msg.user?.username === 'BeaverBot';
             const isBotMention = msg.message.toLowerCase().startsWith('@beaverbot');
 
             return (
@@ -211,9 +262,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ socket, onClose }) => {
               >
                 {/* Username / Name */}
                 {!isMe && (
-                  <span className="text-[11px] text-neutral-400 font-semibold mb-1 px-1 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-orange-400/80"></span>
-                    {msg.user.firstName || msg.user.username}
+                  <span className="text-[11px] font-semibold mb-1 px-1 flex items-center gap-1 text-neutral-400">
+                    <span className={`w-1.5 h-1.5 rounded-full ${isBot ? 'bg-indigo-400' : 'bg-orange-400/80'}`}></span>
+                    {isBot ? '🤖 BeaverBot' : (msg.user.firstName || msg.user.username)}
                   </span>
                 )}
                 {/* Bubble */}
@@ -221,6 +272,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ socket, onClose }) => {
                   className={`px-3.5 py-2.5 rounded-2xl text-[13px] leading-relaxed ${
                     isMe
                       ? 'bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-tr-xs shadow-[0_4px_15px_rgba(246,99,23,0.25)] border border-orange-400/30'
+                      : isBot
+                      ? 'bg-gradient-to-r from-indigo-900/90 to-purple-900/90 text-indigo-100 rounded-2xl rounded-tl-xs border border-indigo-500/40 shadow-[0_4px_20px_rgba(99,102,241,0.3)] border-l-4 border-l-indigo-400 backdrop-blur-md'
                       : isBotMention
                       ? 'bg-gradient-to-r from-indigo-950/80 via-indigo-900/70 to-purple-950/80 text-neutral-100 rounded-2xl rounded-tl-xs border border-indigo-500/40 shadow-[0_4px_20px_rgba(99,102,241,0.25)] border-l-4 border-l-indigo-400 backdrop-blur-md'
                       : 'bg-neutral-900/80 text-neutral-100 rounded-2xl rounded-tl-xs border border-white/10 shadow-sm backdrop-blur-md'

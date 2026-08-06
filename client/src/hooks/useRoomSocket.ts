@@ -4,6 +4,7 @@ import type { ActivityEvent, User } from '../types';
 import { useFileStore } from '../store/fileStore';
 import { useLockStore } from '../store/lockStore';
 import { useAuthStore } from '../store/authStore';
+import { useTaskStore } from '../store/taskStore';
 import type { FileLockInfo } from '../types';
 
 interface UseRoomSocketProps {
@@ -252,6 +253,14 @@ export function useRoomSocket({
       useLockStore.getState().setContentHash(data.lockId, data.freshHash);
     };
 
+    const onAgentTaskCreated = (data: any) => {
+      useTaskStore.getState().setActiveTask(data);
+    };
+
+    const onAgentTaskUpdate = (data: any) => {
+      useTaskStore.getState().updateTaskStage(data.taskId, data.stage, data);
+    };
+
     socket.on('lock:state', onLockState);
     socket.on('lock:acquired', onLockAcquired);
     socket.on('lock:released', onLockReleased);
@@ -263,6 +272,8 @@ export function useRoomSocket({
     socket.on('baseline:refreshed', onBaselineRefreshed);
     socket.on('lock:usage-acquired', onUsageAcquired);
     socket.on('lock:usage-queued', onUsageQueued);
+    socket.on('agent:task_created', onAgentTaskCreated);
+    socket.on('agent:task_update', onAgentTaskUpdate);
 
     return () => {
       socket.off('lock:state', onLockState);
@@ -276,6 +287,8 @@ export function useRoomSocket({
       socket.off('baseline:refreshed', onBaselineRefreshed);
       socket.off('lock:usage-acquired', onUsageAcquired);
       socket.off('lock:usage-queued', onUsageQueued);
+      socket.off('agent:task_created', onAgentTaskCreated);
+      socket.off('agent:task_update', onAgentTaskUpdate);
     };
   }, [socket]);
 

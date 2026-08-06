@@ -17,6 +17,7 @@ import { GlobalSearchModal } from '../../components/editor/GlobalSearchModal';
 import { UsagePreviewModal } from '../../components/editor/UsagePreviewModal';
 import { LockStatusBar } from '../../components/editor/LockStatusBar';
 import { LockScopePopover } from '../../components/editor/LockScopePopover';
+import { AgentTaskPanel } from '../../components/editor/AgentTaskPanel';
 import type { ActivityEvent, ProjectFile, UsageScanResult, FileLockInfo } from '../../types';
 
 
@@ -861,6 +862,9 @@ export const EditorRoom = () => {
               editor={editor} 
               onReleaseLock={handleReleaseLock}
             />
+
+            {/* Agent Task Progress Panel */}
+            <AgentTaskPanel socket={socket} />
 
             {/* Queue position notification banner */}
             {(() => {

@@ -30,13 +30,14 @@ export class EventRepository {
     return await db.transaction(async (tx) => {
       // Calculate next monotonic sequence number for the room
       const [seqResult] = await tx
-        .select({
-          maxSeq: sql<number>`COALESCE(MAX(${activityEvents.seq}), 0) + 1`,
-        })
+        .select({ seq: activityEvents.seq })
         .from(activityEvents)
-        .where(eq(activityEvents.roomId, event.roomId));
+        .where(eq(activityEvents.roomId, event.roomId))
+        .orderBy(desc(activityEvents.seq))
+        .limit(1)
+        .for('update');
 
-      const nextSeq = Number(seqResult?.maxSeq ?? 1);
+      const nextSeq = (seqResult?.seq ?? 0) + 1;
 
       const [inserted] = await tx
         .insert(activityEvents)
