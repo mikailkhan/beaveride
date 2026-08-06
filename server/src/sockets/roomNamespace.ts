@@ -33,6 +33,7 @@ import { scanUsages } from '../utils/usageScanner.js';
 
 import { taskRepository } from '../repositories/taskRepository.js';
 import { agentService } from '../services/agentService.js';
+import { taskManager } from '../services/taskManager.js';
 import { parseBeaverBotMention } from '../utils/mentionParser.js';
 
 const userRepository = new UserRepository();
@@ -618,9 +619,12 @@ export function registerRoomNamespace(io: SocketServer): void {
             return;
           }
 
-          // Ensure BeaverBot exists and is added to the room as an editor
+          // Ensure BeaverBot exists and is added to the room as an editor (idempotent)
           const beaverBot = await agentService.ensureAgentUser();
-          await roomRepository.addMember(roomId, beaverBot.id, 'editor', true);
+          const existingMember = await roomRepository.findMembership(roomId, beaverBot.id);
+          if (!existingMember) {
+            await roomRepository.addMember(roomId, beaverBot.id, 'editor', true);
+          }
 
           // Create new task in database
           const newTask = await taskRepository.createTask({
@@ -658,9 +662,42 @@ export function registerRoomNamespace(io: SocketServer): void {
               agentUserId: beaverBot.id,
             },
           });
+          await broadcastActivities(roomId);
+
+          // Launch TaskManager state machine in background
+          taskManager.executeTask(newTask.taskId, roomId, io).catch((err) => {
+            console.error(`[TaskManager] Background execution error for task ${newTask.taskId}:`, err);
+          });
         }
       } catch (err) {
         console.error(`Failed to save chat message in room ${roomId}:`, err);
+      }
+    });
+
+    // Handle agent task cancellation
+    socket.on('agent:task_cancel', async () => {
+      try {
+        const activeTask = await taskRepository.getActiveTaskForRoom(roomId);
+        if (!activeTask) {
+          socket.emit('agent:task_error', {
+            reason: 'no_active_task',
+            message: 'No active agent task found to cancel',
+          });
+          return;
+        }
+
+        const cancelled = taskManager.cancelTask(activeTask.taskId);
+        if (!cancelled) {
+          await taskRepository.updateTaskStatus(activeTask.taskId, 'cancelled', 'cancelled');
+          roomNsp.to(roomChannel).emit('agent:task_update', {
+            taskId: activeTask.taskId,
+            status: 'cancelled',
+            currentStage: 'cancelled',
+            completedAt: new Date().toISOString(),
+          });
+        }
+      } catch (err) {
+        console.error(`Failed to cancel agent task in room ${roomId}:`, err);
       }
     });
 

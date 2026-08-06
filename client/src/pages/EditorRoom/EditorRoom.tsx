@@ -305,6 +305,17 @@ export const EditorRoom = () => {
     setGlobalOutput,
   });
 
+  // Auto-expand activity panel when an agent task event arrives
+  useEffect(() => {
+    if (activities.length > 0) {
+      const latest = activities[0];
+      if (latest && latest.eventType && latest.eventType.startsWith('agent_')) {
+        setShowActivityPanel(true);
+        setIsActivityExpanded(true);
+      }
+    }
+  }, [activities]);
+
   const isRunnableFile = (file?: ProjectFile | null): boolean => {
     if (!file || file.type !== 'file') return false;
     const ext = file.name.split('.').pop()?.toLowerCase() || '';
@@ -379,7 +390,7 @@ export const EditorRoom = () => {
     const detail = (entry.metadata?.detail as string) || (entry as any).detail;
 
     const fileIdStr = entry.targetFileId ? String(entry.targetFileId) : null;
-    const targetFile = fileIdStr ? files.find((f) => f.id === fileIdStr) : null;
+    const targetFile = fileIdStr ? files.find((f) => String(f.id) === fileIdStr) : null;
     const fileName = targetFile ? targetFile.name : (fileIdStr ? `file #${fileIdStr}` : null);
 
     let icon = 'info';
@@ -388,6 +399,54 @@ export const EditorRoom = () => {
     let colorClass = 'text-primary';
 
     switch (entry.eventType || (entry as any).event) {
+      case 'agent_task_assigned':
+        icon = 'smart_toy';
+        actionPrefix = `${nameLabel} assigned task to 🤖 BeaverBot`;
+        targetFileName = (entry.metadata?.instruction as string) || entry.targetUnitName || null;
+        colorClass = 'text-indigo-400 font-semibold';
+        break;
+      case 'agent_stage_planning':
+        icon = 'psychology';
+        actionPrefix = `🤖 BeaverBot planning task`;
+        targetFileName = (entry.metadata?.planSummary as string) || fileName;
+        colorClass = 'text-indigo-400';
+        break;
+      case 'agent_stage_waiting':
+        icon = 'hourglass_empty';
+        actionPrefix = `🤖 BeaverBot waiting for lock`;
+        targetFileName = fileName;
+        colorClass = 'text-amber-400';
+        break;
+      case 'agent_stage_writing':
+        icon = 'edit_note';
+        actionPrefix = `🤖 BeaverBot writing code in`;
+        targetFileName = fileName || 'code';
+        colorClass = 'text-indigo-400';
+        break;
+      case 'agent_stage_verifying':
+        icon = 'verified';
+        actionPrefix = `🤖 BeaverBot verifying code in`;
+        targetFileName = fileName || 'code';
+        colorClass = 'text-indigo-400';
+        break;
+      case 'agent_task_completed':
+        icon = 'task_alt';
+        actionPrefix = `🤖 BeaverBot completed task`;
+        targetFileName = fileName;
+        colorClass = 'text-emerald-400 font-bold';
+        break;
+      case 'agent_task_failed':
+        icon = 'error';
+        actionPrefix = `🤖 BeaverBot task failed`;
+        targetFileName = (entry.metadata?.failureReason as string) || null;
+        colorClass = 'text-red-400 font-bold';
+        break;
+      case 'agent_task_cancelled':
+        icon = 'cancel';
+        actionPrefix = `🤖 BeaverBot task cancelled`;
+        targetFileName = null;
+        colorClass = 'text-amber-400';
+        break;
       case 'lock_granted':
       case 'file_locked':
         icon = 'lock';
