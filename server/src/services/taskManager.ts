@@ -79,9 +79,44 @@ export class TaskManager {
       
       targetFileIds = [];
       for (const reqFileName of planResult.targetFiles) {
-        let matchedFile = tree.find(f => f.type === 'file' && f.name.endsWith(reqFileName.split('/').pop() || reqFileName));
+        const normalizedPath = reqFileName.replace(/\\/g, '/');
+        const parts = normalizedPath.split('/').filter(Boolean);
+        const fileName = parts.pop();
+        if (!fileName) continue;
+
+        let matchedFile = tree.find(f => f.type === 'file' && f.name === fileName);
         if (matchedFile) {
            targetFileIds.push(matchedFile.id);
+        } else {
+           // Dynamically create missing folders
+           let currentParentId: number | null = null;
+           for (const dirName of parts) {
+              let matchedDir = tree.find(f => f.type === 'directory' && f.name === dirName && f.parentId === currentParentId);
+              if (!matchedDir) {
+                 matchedDir = await fileRepository.createFile({
+                    roomId,
+                    parentId: currentParentId,
+                    name: dirName,
+                    type: 'directory'
+                 });
+                 tree.push(matchedDir);
+              }
+              currentParentId = matchedDir.id;
+           }
+           
+           // Dynamically create missing file
+           const newFile = await fileRepository.createFile({
+              roomId,
+              parentId: currentParentId,
+              name: fileName,
+              type: 'file',
+              content: ''
+           });
+           tree.push(newFile);
+           targetFileIds.push(newFile.id);
+           
+           // Broadcast to UI so the file tree re-renders
+           io.of('/room').to(`room:${roomId}`).emit('project:file_tree_updated');
         }
       }
       
