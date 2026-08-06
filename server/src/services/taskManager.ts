@@ -50,8 +50,8 @@ export class TaskManager {
     };
 
     let agentSocket: ClientSocketType | null = null;
-    let heldLockId: string | null = null;
-    let targetFileId: number | null = task.targetFileId ?? null;
+    let heldGroupId: string | null = null;
+    let targetFileIds: number[] = task.targetFileId ? [task.targetFileId] : [];
 
     try {
       checkAborted();
@@ -62,33 +62,42 @@ export class TaskManager {
       checkAborted();
       console.log(`[TaskManager] Task ${taskId} entering PLANNING stage...`);
 
-      // Find a target file in the room if not already set
-      if (!targetFileId) {
-        const tree = await fileRepository.getFileTree(roomId).catch(() => []);
-        const targetFile = tree.find((f) => f.type === 'file');
-        if (!targetFile) {
-          throw new Error('No target project file found in room for BeaverBot task execution');
-        }
-        targetFileId = targetFile.id;
+      // Determine initial file for context
+      const tree = await fileRepository.getFileTree(roomId).catch(() => []);
+      let initialFileId = targetFileIds[0] || tree.find((f) => f.type === 'file')?.id;
+      if (!initialFileId) {
+        throw new Error('No target project file found in room for BeaverBot task execution');
       }
 
-      const targetFileRow = await fileRepository.getFileById(targetFileId);
-      const targetFileName = targetFileRow?.name || 'untitled.ts';
-      const initialYText = getOrCreateFileText(roomId, targetFileId);
+      const initialTargetRow = await fileRepository.getFileById(initialFileId);
+      const initialFileName = initialTargetRow?.name || 'untitled.ts';
+      const initialYText = getOrCreateFileText(roomId, initialFileId);
       const existingContentAtPlan = initialYText.toString();
 
-      const planSummary = await llmService.generatePlan(task.instruction, existingContentAtPlan, targetFileName);
+      const planResult = await llmService.generatePlan(task.instruction, existingContentAtPlan, initialFileName);
+      const planSummary = planResult.planSummary;
+      
+      targetFileIds = [];
+      for (const reqFileName of planResult.targetFiles) {
+        let matchedFile = tree.find(f => f.type === 'file' && f.name.endsWith(reqFileName.split('/').pop() || reqFileName));
+        if (matchedFile) {
+           targetFileIds.push(matchedFile.id);
+        }
+      }
+      
+      if (targetFileIds.length === 0) {
+         targetFileIds.push(initialFileId);
+      }
+
       await taskRepository.updateTaskStatus(taskId, 'planning', 'planning', {
-        targetFileId,
         planSummary,
+        metadata: { targetFileIds },
       });
 
       this.broadcastTaskUpdate(roomId, io, {
         taskId,
         status: 'planning',
         currentStage: 'planning',
-        targetFileId,
-        targetFileName,
         planSummary,
       });
 
@@ -98,10 +107,10 @@ export class TaskManager {
         actorName: 'BeaverBot',
         actorType: 'agent',
         eventType: 'agent_stage_planning',
-        targetFileId,
+        targetFileId: targetFileIds[0],
         targetScope: 'file',
         outcome: 'applied',
-        metadata: { taskId, planSummary },
+        metadata: { taskId, planSummary, targetFileIds },
       });
 
       // ----------------------------------------------------------------------
@@ -109,7 +118,7 @@ export class TaskManager {
       // ----------------------------------------------------------------------
       await sleep(1500);
       checkAborted();
-      console.log(`[TaskManager] Task ${taskId} entering WAITING stage...`);
+      console.log(`[TaskManager] Task ${taskId} entering WAITING stage for usage lock...`);
 
       await taskRepository.updateTaskStatus(taskId, 'waiting', 'waiting');
       this.broadcastTaskUpdate(roomId, io, {
@@ -124,48 +133,39 @@ export class TaskManager {
         actorName: 'BeaverBot',
         actorType: 'agent',
         eventType: 'agent_stage_waiting',
-        targetFileId,
+        targetFileId: targetFileIds[0],
         targetScope: 'file',
         outcome: 'queued',
-        metadata: { taskId },
+        metadata: { taskId, targetFileIds },
       });
 
-      // Connect BeaverBot over Socket.IO
       const { socket } = await agentService.connectAgentToRoom(roomId, port);
       agentSocket = socket as unknown as ClientSocketType;
       checkAborted();
 
-      // Request lock and wait for lock:acquired or lock:granted
       const lockAcquiredPromise = new Promise<any>((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error('Timed out waiting for lock acquisition')), 15000);
+        const timer = setTimeout(() => reject(new Error('Timed out waiting for usage lock acquisition')), 30000);
 
-        const onAcquired = (data: any) => {
+        const onUsageAcquired = (data: any) => {
           clearTimeout(timer);
-          agentSocket?.off('lock:acquired', onAcquired);
-          agentSocket?.off('lock:granted', onGranted);
-          resolve(data.lock || data);
+          agentSocket?.off('lock:usage-acquired', onUsageAcquired);
+          resolve(data.metadata?.groupId || data.groupId || 'agent-group');
         };
 
-        const onGranted = (data: any) => {
-          clearTimeout(timer);
-          agentSocket?.off('lock:acquired', onAcquired);
-          agentSocket?.off('lock:granted', onGranted);
-          resolve(data.lock || data);
-        };
-
-        agentSocket?.on('lock:acquired', onAcquired);
-        agentSocket?.on('lock:granted', onGranted);
+        agentSocket?.on('lock:usage-acquired', onUsageAcquired);
       });
 
       const queueStartTime = Date.now();
-      agentService.requestAgentLock(agentSocket as any, { fileId: targetFileId, lockScope: 'file' });
-      const lockInfo = await lockAcquiredPromise;
+      const usageSpans = targetFileIds.map(fId => ({ fileId: fId, startLine: 1, endLine: 999999 }));
+      const groupId = `agent-task-${taskId}`;
+      agentService.requestAgentUsageLock(agentSocket as any, { groupId, usageSpans });
+      
+      heldGroupId = await lockAcquiredPromise;
       const waitTime = Date.now() - queueStartTime;
       metricsService.recordQueueWaitTime(taskId, waitTime);
-      heldLockId = lockInfo.id;
       checkAborted();
 
-      console.log(`[TaskManager] BeaverBot acquired lock ${heldLockId} on file ${targetFileId}`);
+      console.log(`[TaskManager] BeaverBot acquired usage lock group ${heldGroupId} for files ${targetFileIds.join(',')}`);
 
       // ----------------------------------------------------------------------
       // STAGE 3: WRITING (Code Generation & Yjs Sync)
@@ -181,65 +181,64 @@ export class TaskManager {
         currentStage: 'writing',
       });
 
-      eventService.emit({
-        roomId,
-        actorId: task.agentUserId,
-        actorName: 'BeaverBot',
-        actorType: 'agent',
-        eventType: 'agent_stage_writing',
-        targetFileId,
-        targetScope: 'file',
-        outcome: 'applied',
-        metadata: { taskId, lockId: heldLockId },
-      });
-
-      // Get existing content and doc from Yjs store
       const doc = await getOrCreateDoc(roomId);
-      const yText = getOrCreateFileText(roomId, targetFileId);
-      const existingContent = yText.toString();
-      const targetFileRowForWrite = await fileRepository.getFileById(targetFileId);
-      const targetFileNameForWrite = targetFileRowForWrite?.name || 'untitled.ts';
-      const currentPlanSummary = task.planSummary || `Plan: Implement instruction "${task.instruction}"`;
+      
+      let allGeneratedCode = '';
 
-      const generatedCode = await llmService.generateCode(
-        task.instruction,
-        existingContent,
-        targetFileNameForWrite,
-        currentPlanSummary
-      );
+      for (const fileId of targetFileIds) {
+        eventService.emit({
+          roomId,
+          actorId: task.agentUserId,
+          actorName: 'BeaverBot',
+          actorType: 'agent',
+          eventType: 'agent_stage_writing',
+          targetFileId: fileId,
+          targetScope: 'file',
+          outcome: 'applied',
+          metadata: { taskId, groupId: heldGroupId },
+        });
 
-      checkAborted();
+        const yText = getOrCreateFileText(roomId, fileId);
+        const existingContent = yText.toString();
+        const targetFileRow = await fileRepository.getFileById(fileId);
+        const targetFileName = targetFileRow?.name || 'untitled.ts';
 
-      // Apply update directly to Yjs text document and capture the sync update
-      let serverUpdate: Uint8Array | null = null;
-      const onUpdate = (update: Uint8Array) => {
-        serverUpdate = update;
-      };
-      doc.on('update', onUpdate);
-      doc.transact(() => {
-        yText.delete(0, yText.length);
-        yText.insert(0, generatedCode);
-      });
-      doc.off('update', onUpdate);
+        const generatedCode = await llmService.generateCode(
+          task.instruction,
+          existingContent,
+          targetFileName,
+          planSummary
+        );
+        allGeneratedCode += `\n// File: ${targetFileName}\n${generatedCode}`;
 
-      if (serverUpdate) {
-        io.of('/room').to(`room:${roomId}`).emit('sync:update', serverUpdate);
-        updateDoc(roomId, serverUpdate, task.agentUserId);
-      }
+        checkAborted();
 
-      // Compute updated content hash and sync lockStore
-      const newHash = computeScopeHash(generatedCode, 'file');
-      if (heldLockId) {
-        updateLockContentHash(roomId, targetFileId, heldLockId, newHash);
-      }
+        let serverUpdate: Uint8Array | null = null;
+        const onUpdate = (update: Uint8Array) => {
+          serverUpdate = update;
+        };
+        doc.on('update', onUpdate);
+        doc.transact(() => {
+          yText.delete(0, yText.length);
+          yText.insert(0, generatedCode);
+        });
+        doc.off('update', onUpdate);
 
-      // Emit write:accepted back to BeaverBot agent socket
-      if (agentSocket && agentSocket.connected) {
-        agentSocket.emit('write:accepted', { fileId: targetFileId, contentHash: newHash });
+        if (serverUpdate) {
+          io.of('/room').to(`room:${roomId}`).emit('sync:update', serverUpdate);
+          updateDoc(roomId, serverUpdate, task.agentUserId);
+        }
+
+        const newHash = computeScopeHash(generatedCode, 'file');
+        
+        // Let the client know the write is accepted
+        if (agentSocket && agentSocket.connected) {
+          agentSocket.emit('write:accepted', { fileId, contentHash: newHash });
+        }
       }
 
       await taskRepository.updateTaskStatus(taskId, 'writing', 'writing', {
-        generatedCode,
+        generatedCode: allGeneratedCode,
       });
 
       // ----------------------------------------------------------------------
@@ -256,26 +255,27 @@ export class TaskManager {
         currentStage: 'verifying',
       });
 
-      eventService.emit({
-        roomId,
-        actorId: task.agentUserId,
-        actorName: 'BeaverBot',
-        actorType: 'agent',
-        eventType: 'agent_stage_verifying',
-        targetFileId,
-        targetScope: 'file',
-        outcome: 'applied',
-        metadata: { taskId },
-      });
+      for (const fileId of targetFileIds) {
+        eventService.emit({
+          roomId,
+          actorId: task.agentUserId,
+          actorName: 'BeaverBot',
+          actorType: 'agent',
+          eventType: 'agent_stage_verifying',
+          targetFileId: fileId,
+          targetScope: 'file',
+          outcome: 'applied',
+          metadata: { taskId },
+        });
 
-      // Read back final Yjs content and perform LLM verification
-      const finalContent = getFileContent(roomId, targetFileId) || '';
-      const targetFileRowForVerify = await fileRepository.getFileById(targetFileId);
-      const targetFileNameForVerify = targetFileRowForVerify?.name || 'untitled.ts';
+        const finalContent = getFileContent(roomId, fileId) || '';
+        const targetFileRow = await fileRepository.getFileById(fileId);
+        const targetFileName = targetFileRow?.name || 'untitled.ts';
 
-      const verification = await llmService.verifyCode(task.instruction, finalContent, targetFileNameForVerify);
-      if (!verification.isValid) {
-        throw new Error(`Verification failed: ${verification.issues.join(', ')}`);
+        const verification = await llmService.verifyCode(task.instruction, finalContent, targetFileName);
+        if (!verification.isValid) {
+          throw new Error(`Verification failed for ${targetFileName}: ${verification.issues.join(', ')}`);
+        }
       }
 
       checkAborted();
@@ -286,9 +286,9 @@ export class TaskManager {
       console.log(`[TaskManager] Task ${taskId} COMPLETED cleanly!`);
       const completedAt = new Date();
 
-      if (heldLockId) {
-        agentService.releaseAgentLock(agentSocket as any, { fileId: targetFileId, lockId: heldLockId });
-        heldLockId = null;
+      if (heldGroupId) {
+        agentService.releaseAgentUsageLock(agentSocket as any, { groupId: heldGroupId });
+        heldGroupId = null;
       }
 
       if (agentSocket) {
@@ -300,14 +300,14 @@ export class TaskManager {
         completedAt,
       });
 
-      const targetFileRowCompleted = await fileRepository.getFileById(targetFileId);
+      const targetFileRowCompleted = await fileRepository.getFileById(targetFileIds[0]);
       const targetFileNameCompleted = targetFileRowCompleted?.name || 'untitled.ts';
 
       this.broadcastTaskUpdate(roomId, io, {
         taskId,
         status: 'completed',
         currentStage: 'completed',
-        targetFileId,
+        targetFileId: targetFileIds[0],
         targetFileName: targetFileNameCompleted,
         planSummary: task.planSummary,
         completedAt: completedAt.toISOString(),
@@ -319,17 +319,17 @@ export class TaskManager {
         actorName: 'BeaverBot',
         actorType: 'agent',
         eventType: 'agent_task_completed',
-        targetFileId,
+        targetFileId: targetFileIds[0],
         targetScope: 'file',
         outcome: 'completed',
-        metadata: { taskId },
+        metadata: { taskId, targetFileIds },
       });
       
       metricsService.recordAgentTaskOutcome('completed');
     } catch (err: any) {
-      if (agentSocket && heldLockId && targetFileId) {
+      if (heldGroupId && agentSocket && agentSocket.connected) {
         try {
-          agentService.releaseAgentLock(agentSocket as any, { fileId: targetFileId, lockId: heldLockId });
+          agentService.releaseAgentUsageLock(agentSocket as any, { groupId: heldGroupId });
         } catch {}
       }
 
@@ -361,10 +361,10 @@ export class TaskManager {
           actorName: 'Human',
           actorType: 'human',
           eventType: 'agent_task_cancelled',
-          targetFileId: targetFileId ?? undefined,
+          targetFileId: targetFileIds[0] ?? undefined,
           outcome: 'cancelled',
           reason: 'cancelled_by_participant',
-          metadata: { taskId },
+          metadata: { taskId, targetFileIds },
         });
 
         metricsService.recordAgentTaskOutcome('cancelled');
@@ -391,10 +391,10 @@ export class TaskManager {
           actorName: 'BeaverBot',
           actorType: 'agent',
           eventType: 'agent_task_failed',
-          targetFileId: targetFileId ?? undefined,
+          targetFileId: targetFileIds[0] ?? undefined,
           outcome: 'failed',
           reason: 'execution_error',
-          metadata: { taskId, failureReason },
+          metadata: { taskId, failureReason, targetFileIds },
         });
 
         metricsService.recordAgentTaskOutcome('failed');

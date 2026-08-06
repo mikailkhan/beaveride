@@ -23,6 +23,15 @@ export interface AgentReleaseLockPayload {
   lockId: string;
 }
 
+export interface AgentUsageLockPayload {
+  groupId: string;
+  usageSpans: Array<{ fileId: number; startLine: number; endLine: number }>;
+}
+
+export interface AgentReleaseUsageLockPayload {
+  groupId: string;
+}
+
 export interface AgentRefreshBaselinePayload {
   fileId: number;
   lockId: string;
@@ -135,6 +144,20 @@ export class AgentService {
    */
   releaseAgentLock(socket: Socket, payload: AgentReleaseLockPayload): void {
     socket.emit('lock:release', payload);
+  }
+
+  /**
+   * Emits lock:acquire-usage for atomic multi-file locks.
+   */
+  requestAgentUsageLock(socket: Socket, payload: AgentUsageLockPayload): void {
+    socket.emit('lock:acquire-usage', payload);
+  }
+
+  /**
+   * Emits lock:release-usage to release atomic multi-file locks.
+   */
+  releaseAgentUsageLock(socket: Socket, payload: AgentReleaseUsageLockPayload): void {
+    socket.emit('lock:release-usage', payload);
   }
 
   /**

@@ -1,5 +1,5 @@
 import { OllamaProvider } from './llm/OllamaProvider.js';
-import type { LLMProvider, LLMVerificationResult } from './llm/LLMProvider.js';
+import type { LLMProvider, LLMVerificationResult, AgentPlanResult } from './llm/LLMProvider.js';
 
 export class LLMService {
   private provider: LLMProvider;
@@ -25,8 +25,20 @@ export class LLMService {
   /**
    * Generates a 1-3 sentence plan for fulfilling an instruction on a target file.
    */
-  public async generatePlan(instruction: string, existingContent: string, fileName: string): Promise<string> {
-    return this.provider.generatePlan(instruction, existingContent, fileName);
+  public async generatePlan(instruction: string, existingContent: string, fileName: string): Promise<AgentPlanResult> {
+    let graphifyContext = '';
+    try {
+      const res = await fetch(`http://graphify:8000/query?q=${encodeURIComponent(instruction)}`);
+      if (res.ok) {
+        const data = await res.json() as { results: any };
+        graphifyContext = `\n\n--- Graphify Repository Context ---\n${JSON.stringify(data.results)}\n---------------------------------\n`;
+      }
+    } catch (e) {
+      console.warn('[Graphify] Failed to fetch context:', e);
+    }
+    
+    const enrichedInstruction = `${instruction}${graphifyContext}`;
+    return this.provider.generatePlan(enrichedInstruction, existingContent, fileName);
   }
 
   /**

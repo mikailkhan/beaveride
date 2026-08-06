@@ -34,6 +34,16 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      graphify:
+        condition: service_started
+
+  graphify:
+    build:
+      context: ./graphify
+    volumes:
+      - .:/workspace:ro
+    ports:
+      - 127.0.0.1:8000:8000
 
 
 

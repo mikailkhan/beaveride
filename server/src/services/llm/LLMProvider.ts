@@ -3,11 +3,16 @@ export interface LLMVerificationResult {
   issues: string[];
 }
 
+export interface AgentPlanResult {
+  planSummary: string;
+  targetFiles: string[];
+}
+
 export interface LLMProvider {
   /**
-   * Generates a brief 1-3 sentence plan for fulfilling the instruction on the target file.
+   * Generates a brief 1-3 sentence plan for fulfilling the instruction and identifies target files.
    */
-  generatePlan(instruction: string, existingContent: string, fileName: string): Promise<string>;
+  generatePlan(instruction: string, existingContent: string, fileName: string): Promise<AgentPlanResult>;
 
   /**
    * Generates complete updated file content based on the instruction and plan.

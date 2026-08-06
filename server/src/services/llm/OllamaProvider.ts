@@ -1,7 +1,7 @@
 import { env } from '../../config/env.js';
 import { generateMockCode } from '../../utils/mockCodeGenerator.js';
 import { buildPlanPrompt, buildCodePrompt, buildVerifyPrompt } from '../../utils/promptTemplates.js';
-import type { LLMProvider, LLMVerificationResult } from './LLMProvider.js';
+import type { LLMProvider, LLMVerificationResult, AgentPlanResult } from './LLMProvider.js';
 
 export class OllamaProvider implements LLMProvider {
   private baseUrl: string;
@@ -62,14 +62,34 @@ export class OllamaProvider implements LLMProvider {
     }
   }
 
-  async generatePlan(instruction: string, existingContent: string, fileName: string): Promise<string> {
+  async generatePlan(instruction: string, existingContent: string, fileName: string): Promise<AgentPlanResult> {
     try {
       const prompt = buildPlanPrompt(instruction, existingContent, fileName);
       const rawPlan = await this.callOllama(prompt, 0.3);
-      return this.stripCodeFences(rawPlan) || `Plan: Add requested changes for "${instruction}" to ${fileName}.`;
+      const cleaned = this.stripCodeFences(rawPlan);
+      
+      try {
+        const parsed = JSON.parse(cleaned);
+        if (parsed.planSummary && Array.isArray(parsed.targetFiles)) {
+          return {
+            planSummary: parsed.planSummary,
+            targetFiles: parsed.targetFiles,
+          };
+        }
+      } catch (parseError) {
+        console.warn('[OllamaProvider] Failed to parse JSON plan output. Using raw text as summary.');
+      }
+      
+      return {
+        planSummary: cleaned || `Plan: Add requested changes for "${instruction}".`,
+        targetFiles: [fileName],
+      };
     } catch (err: any) {
       console.warn(`[OllamaProvider] Failed to generate plan via Ollama (${err?.message || err}). Falling back to mock plan.`);
-      return `[Mock Plan] Fulfill instruction: "${instruction}" on file ${fileName}.`;
+      return {
+        planSummary: `[Mock Plan] Fulfill instruction: "${instruction}".`,
+        targetFiles: [fileName],
+      };
     }
   }
 

@@ -11,7 +11,14 @@ Current file content:
 ${existingContent}
 \`\`\`
 
-Provide a brief, concise 1-3 sentence plan describing what modifications or additions you will make to fulfill this instruction. Do NOT write code yet, just provide the clear plan summary.`;
+Provide a brief, concise 1-3 sentence plan describing what modifications or additions you will make to fulfill this instruction. Do NOT write code yet.
+Based on the instruction and your knowledge, identify all file names that you need to modify.
+
+Respond ONLY with a valid JSON object strictly matching this schema (no markdown, no code fences):
+{
+  "planSummary": "Your 1-3 sentence plan",
+  "targetFiles": ["src/app.ts", "src/routes/auth.ts"]
+}`;
 }
 
 /**
