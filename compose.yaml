@@ -24,6 +24,8 @@ services:
       PORT: 3000
       DATABASE_URL: postgresql://beaveride:beaveride_dev_password@postgres:5432/beaveride
       CLIENT_ORIGIN: http://localhost:5173
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-gemma}
     ports:
       - 127.0.0.1:3000:3000
     volumes:
