@@ -9,6 +9,7 @@ import { roomRoutes } from './routes/roomRoutes.js';
 import { fileRoutes } from './routes/fileRoutes.js';
 import { activityRoutes } from './routes/activityRoutes.js';
 import { taskRoutes } from './routes/taskRoutes.js';
+import { adminRoutes } from './routes/adminRoutes.js';
 import { apiRateLimiter } from './middleware/rateLimitMiddleware.js';
 
 export const createApp = () => {
@@ -48,6 +49,7 @@ export const createApp = () => {
   app.use('/api', apiRateLimiter);
   app.use('/api', healthRoutes);
   app.use('/api', taskRoutes);
+  app.use('/api', adminRoutes);
   app.use('/api/auth', authRoutes);
   app.use('/api/rooms', fileRoutes);
   app.use('/api/rooms', activityRoutes);

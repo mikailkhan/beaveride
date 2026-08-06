@@ -10,6 +10,7 @@ import { computeScopeHash } from '../utils/contentHash.js';
 import { updateLockContentHash } from '../sockets/lockStore.js';
 import { getDoc, getOrCreateDoc, getOrCreateFileText, getFileContent, updateDoc } from '../sockets/docStore.js';
 import { AgentTask } from '../types/taskTypes.js';
+import { metricsService } from '../utils/metricsService.js';
 
 const fileRepository = new FileRepository();
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -156,8 +157,11 @@ export class TaskManager {
         agentSocket?.on('lock:granted', onGranted);
       });
 
+      const queueStartTime = Date.now();
       agentService.requestAgentLock(agentSocket as any, { fileId: targetFileId, lockScope: 'file' });
       const lockInfo = await lockAcquiredPromise;
+      const waitTime = Date.now() - queueStartTime;
+      metricsService.recordQueueWaitTime(taskId, waitTime);
       heldLockId = lockInfo.id;
       checkAborted();
 
@@ -320,6 +324,8 @@ export class TaskManager {
         outcome: 'completed',
         metadata: { taskId },
       });
+      
+      metricsService.recordAgentTaskOutcome('completed');
     } catch (err: any) {
       if (agentSocket && heldLockId && targetFileId) {
         try {
@@ -360,6 +366,8 @@ export class TaskManager {
           reason: 'cancelled_by_participant',
           metadata: { taskId },
         });
+
+        metricsService.recordAgentTaskOutcome('cancelled');
       } else {
         console.error(`[TaskManager] Task ${taskId} failed:`, err);
         const failureReason = err instanceof Error ? err.message : 'Unknown task execution error';
@@ -388,6 +396,8 @@ export class TaskManager {
           reason: 'execution_error',
           metadata: { taskId, failureReason },
         });
+
+        metricsService.recordAgentTaskOutcome('failed');
       }
     } finally {
       this.activeTaskControllers.delete(taskId);

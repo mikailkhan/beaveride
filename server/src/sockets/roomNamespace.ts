@@ -8,6 +8,7 @@ import { computeScopeHash, validateWriteFreshness } from '../utils/contentHash.j
 import { ExecutorService } from '../services/executorService.js';
 import { FileService } from '../services/fileService.js';
 import { eventService } from '../services/eventService.js';
+import { metricsService } from '../utils/metricsService.js';
 import { buildProjectPayload } from '../utils/filePathUtils.js';
 
 import { RoomService } from '../services/roomService.js';
@@ -143,6 +144,7 @@ export function registerRoomNamespace(io: SocketServer): void {
                   if (contentHash !== freshness.currentHash || freshness.status === 'stale') {
                     // Stale write detected: Increment retry count and check threshold
                     const retryCount = incrementStaleRetry(roomId, targetFileId, lock.id);
+                    metricsService.recordStaleWrite();
 
                     if (retryCount <= MAX_STALE_RETRIES) {
                       socket.emit('write:rejected_stale', {
@@ -1430,6 +1432,8 @@ export function registerRoomNamespace(io: SocketServer): void {
           releasedBy: lock.userId,
           reason: 'timeout',
         });
+
+        metricsService.recordLockRelease('timeout');
 
         const expiredActorType: 'human' | 'agent' = lock.isAgent ? 'agent' : 'human';
         eventService.emit({
