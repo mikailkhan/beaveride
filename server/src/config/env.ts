@@ -12,7 +12,7 @@ const envSchema = z.object({
     .regex(/\S{32,}/, 'JWT_SECRET must contain at least 32 non-whitespace characters'),
   JWT_EXPIRES_IN: z.string().default('7d'),
   OLLAMA_BASE_URL: z.string().url().default('http://127.0.0.1:11434'),
-  OLLAMA_MODEL: z.string().default('gemma'),
+  OLLAMA_MODEL: z.string().default('gemma4'),
 });
 
 export const env = envSchema.parse(process.env);
