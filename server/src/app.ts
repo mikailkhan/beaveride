@@ -8,6 +8,7 @@ import { healthRoutes, rootHealthRoutes } from './routes/healthRoutes.js';
 import { roomRoutes } from './routes/roomRoutes.js';
 import { fileRoutes } from './routes/fileRoutes.js';
 import { activityRoutes } from './routes/activityRoutes.js';
+import { taskRoutes } from './routes/taskRoutes.js';
 import { apiRateLimiter } from './middleware/rateLimitMiddleware.js';
 
 export const createApp = () => {
@@ -18,13 +19,14 @@ export const createApp = () => {
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ["'self'"],
-          scriptSrc: ["'self'"],
+          scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
           styleSrc: ["'self'", "'unsafe-inline'"],
-          imgSrc: ["'self'", 'data:'],
-          connectSrc: ["'self'", env.CLIENT_ORIGIN],
-          fontSrc: ["'self'"],
+          imgSrc: ["'self'", 'data:', 'blob:'],
+          connectSrc: ["'self'", 'ws:', 'wss:', 'http:', 'https:'],
+          fontSrc: ["'self'", 'https:', 'data:'],
           objectSrc: ["'none'"],
-          frameAncestors: ["'none'"],
+          mediaSrc: ["'self'"],
+          frameSrc: ["'none'"],
         },
       },
       crossOriginEmbedderPolicy: false,
@@ -45,6 +47,7 @@ export const createApp = () => {
   app.use(rootHealthRoutes);
   app.use('/api', apiRateLimiter);
   app.use('/api', healthRoutes);
+  app.use('/api', taskRoutes);
   app.use('/api/auth', authRoutes);
   app.use('/api/rooms', fileRoutes);
   app.use('/api/rooms', activityRoutes);

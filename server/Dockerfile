@@ -24,4 +24,4 @@ EXPOSE 3000
 #   2. Run seed script.
 #   3. If both succeed, start the server.
 #   4. If any fail, the container exits.
-CMD ["sh", "-c", "npm run db:migrate && npm run db:seed && npm run dev"]
+CMD ["sh", "-c", "npm install && npm run db:migrate && npm run db:seed && npm run dev"]

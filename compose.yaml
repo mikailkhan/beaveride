@@ -28,7 +28,6 @@ services:
       - 127.0.0.1:3000:3000
     volumes:
       - ./server:/app
-      - server-node-modules:/app/node_modules
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       postgres:
@@ -43,11 +42,8 @@ services:
       - 127.0.0.1:5173:5173
     volumes:
       - ./client:/app
-      - client-node-modules:/app/node_modules
     depends_on:
       - server
 
 volumes:
   postgres-data:
-  server-node-modules:
-  client-node-modules:

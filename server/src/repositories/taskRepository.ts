@@ -45,13 +45,14 @@ export class TaskRepository {
   /**
    * Retrieves recent tasks for a room ordered by createdAt descending.
    */
-  async getTasksForRoom(roomId: number, limit = 50): Promise<AgentTask[]> {
+  async getTasksForRoom(roomId: number, limit = 50, offset = 0): Promise<AgentTask[]> {
     const rows = await db
       .select()
       .from(agentTasks)
       .where(eq(agentTasks.roomId, roomId))
       .orderBy(desc(agentTasks.createdAt))
-      .limit(limit);
+      .limit(limit)
+      .offset(offset);
 
     return rows as AgentTask[];
   }
