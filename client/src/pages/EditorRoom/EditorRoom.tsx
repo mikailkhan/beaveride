@@ -813,7 +813,7 @@ export const EditorRoom = () => {
                 className="px-md py-sm rounded-lg bg-primary-container text-white font-label-md text-label-md hover:bg-primary transition-colors flex items-center gap-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none"
                 title={!myCanRun ? "Global Run disabled by owner" : !isRunnable ? "Execution is only supported for JS, Python, and Go files" : "Execute code globally"}
               >
-                <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>play_arrow</span> Global Run
+                <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>play_arrow</span>
               </button>
               {(!isRunnable || !myCanRun) && (
                 <div className="absolute top-full mt-2 right-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap bg-surface-container-highest/95 backdrop-blur-md text-on-surface text-[11px] font-medium px-sm py-xs rounded-md shadow-lg border border-outline-variant/30 flex items-center gap-xs">
@@ -835,7 +835,7 @@ export const EditorRoom = () => {
                 className="px-md py-sm rounded-lg bg-secondary-container text-on-secondary-container font-label-md text-label-md hover:bg-secondary hover:text-on-secondary transition-colors flex items-center gap-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none"
                 title={!isRunnable ? "Execution is only supported for JS, Python, and Go files" : "Execute code locally"}
               >
-                <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>play_circle</span> Local Run
+                <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>play_circle</span>
               </button>
               {!isRunnable && (
                 <div className="absolute top-full mt-2 right-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap bg-surface-container-highest/95 backdrop-blur-md text-on-surface text-[11px] font-medium px-sm py-xs rounded-md shadow-lg border border-outline-variant/30 flex items-center gap-xs">
