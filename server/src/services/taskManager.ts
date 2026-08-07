@@ -100,6 +100,7 @@ export class TaskManager {
                     type: 'directory'
                  });
                  tree.push(matchedDir);
+                 io.of('/room').to(`room:${roomId}`).emit('filetree:mutate', { type: 'create', node: matchedDir });
               }
               currentParentId = matchedDir.id;
            }
@@ -114,9 +115,7 @@ export class TaskManager {
            });
            tree.push(newFile);
            targetFileIds.push(newFile.id);
-           
-           // Broadcast to UI so the file tree re-renders
-           io.of('/room').to(`room:${roomId}`).emit('project:file_tree_updated');
+           io.of('/room').to(`room:${roomId}`).emit('filetree:mutate', { type: 'create', node: newFile });
         }
       }
       
@@ -193,7 +192,14 @@ export class TaskManager {
       const queueStartTime = Date.now();
       const usageSpans = targetFileIds.map(fId => ({ fileId: fId, startLine: 1, endLine: 999999 }));
       const groupId = `agent-task-${taskId}`;
-      agentService.requestAgentUsageLock(agentSocket as any, { groupId, usageSpans });
+      agentService.requestAgentUsageLock(agentSocket as any, { 
+        groupId,
+        fileId: targetFileIds[0],
+        unitName: `Agent Task ${taskId}`,
+        startLine: 1,
+        endLine: 999999,
+        usageSpans 
+      });
       
       heldGroupId = await lockAcquiredPromise;
       const waitTime = Date.now() - queueStartTime;
@@ -233,8 +239,7 @@ export class TaskManager {
           metadata: { taskId, groupId: heldGroupId },
         });
 
-        const yText = getOrCreateFileText(roomId, fileId);
-        const existingContent = yText.toString();
+        const existingContent = getFileContent(roomId, fileId) || '';
         const targetFileRow = await fileRepository.getFileById(fileId);
         const targetFileName = targetFileRow?.name || 'untitled.ts';
 
@@ -248,18 +253,19 @@ export class TaskManager {
 
         checkAborted();
 
-        let serverUpdate: Uint8Array | null = null;
+        let serverUpdates: Uint8Array[] = [];
         const onUpdate = (update: Uint8Array) => {
-          serverUpdate = update;
+          serverUpdates.push(update);
         };
         doc.on('update', onUpdate);
         doc.transact(() => {
+          const yText = getOrCreateFileText(roomId, fileId);
           yText.delete(0, yText.length);
           yText.insert(0, generatedCode);
         });
         doc.off('update', onUpdate);
 
-        if (serverUpdate) {
+        for (const serverUpdate of serverUpdates) {
           io.of('/room').to(`room:${roomId}`).emit('sync:update', serverUpdate);
           updateDoc(roomId, serverUpdate, task.agentUserId);
         }
@@ -307,7 +313,7 @@ export class TaskManager {
         const targetFileRow = await fileRepository.getFileById(fileId);
         const targetFileName = targetFileRow?.name || 'untitled.ts';
 
-        const verification = await llmService.verifyCode(task.instruction, finalContent, targetFileName);
+        const verification = await llmService.verifyCode(task.instruction, finalContent, targetFileName, planSummary);
         if (!verification.isValid) {
           throw new Error(`Verification failed for ${targetFileName}: ${verification.issues.join(', ')}`);
         }

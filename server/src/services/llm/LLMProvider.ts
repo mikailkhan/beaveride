@@ -32,6 +32,7 @@ export interface LLMProvider {
   verifyCode(
     instruction: string,
     generatedCode: string,
-    fileName: string
+    fileName: string,
+    planSummary: string
   ): Promise<LLMVerificationResult>;
 }

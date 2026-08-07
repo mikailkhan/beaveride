@@ -25,6 +25,10 @@ export interface AgentReleaseLockPayload {
 
 export interface AgentUsageLockPayload {
   groupId: string;
+  fileId: number;
+  unitName: string;
+  startLine: number;
+  endLine: number;
   usageSpans: Array<{ fileId: number; startLine: number; endLine: number }>;
 }
 

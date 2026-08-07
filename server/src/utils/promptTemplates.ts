@@ -52,18 +52,21 @@ CRITICAL INSTRUCTIONS:
 /**
  * Builds the verification prompt asking the LLM to review generated code against instruction.
  */
-export function buildVerifyPrompt(instruction: string, generatedCode: string, fileName: string): string {
+export function buildVerifyPrompt(instruction: string, generatedCode: string, fileName: string, planSummary: string = ''): string {
   return `You are BeaverBot 🤖, acting as a automated code reviewer.
-Review the following generated code for file "${fileName}" against the user instruction.
+Review the following generated code for file "${fileName}" against the user instruction and the execution plan.
 
 User Instruction: "${instruction}"
+Execution Plan: "${planSummary}"
 
 Generated Code:
 \`\`\`
 ${generatedCode}
 \`\`\`
 
-Evaluate if the code correctly and safely satisfies the user instruction without introducing critical errors.
+Evaluate if the code correctly and safely satisfies its responsibilities for the user instruction. 
+CRITICAL NOTE: This task may involve multiple files. Do NOT fail the verification just because other files are missing. Evaluate ONLY if THIS specific file ("${fileName}") is implemented correctly according to the instruction and plan.
+
 Respond ONLY with a valid JSON object strictly matching this schema (no markdown, no code fences):
 {
   "isValid": true,

@@ -54,14 +54,15 @@ export class LLMService {
   }
 
   /**
-   * Verifies generated code against user instruction.
+   * Evaluates the generated code against the user instruction and execution plan.
    */
   public async verifyCode(
     instruction: string,
     generatedCode: string,
-    fileName: string
+    fileName: string,
+    planSummary: string
   ): Promise<LLMVerificationResult> {
-    return this.provider.verifyCode(instruction, generatedCode, fileName);
+    return this.provider.verifyCode(instruction, generatedCode, fileName, planSummary);
   }
 }
 

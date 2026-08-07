@@ -118,10 +118,11 @@ export class OllamaProvider implements LLMProvider {
   async verifyCode(
     instruction: string,
     generatedCode: string,
-    fileName: string
+    fileName: string,
+    planSummary: string
   ): Promise<LLMVerificationResult> {
     try {
-      const prompt = buildVerifyPrompt(instruction, generatedCode, fileName);
+      const prompt = buildVerifyPrompt(instruction, generatedCode, fileName, planSummary);
       const rawResponse = await this.callOllama(prompt, 0.1);
       const cleaned = this.stripCodeFences(rawResponse);
 
